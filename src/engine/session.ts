@@ -24,6 +24,10 @@ function sectionIsRelevant(instrument: InstrumentDefinition, section: Instrument
   return false;
 }
 
+function blocksDraftMutation(issue: ValidationIssue): boolean {
+  return issue.code === "type" || issue.code === "choice" || issue.code === "unsupported-expression";
+}
+
 class UniversalWhoVaSession implements WhoVaSession {
   private data: SubmissionData;
   private currentSectionName: string;
@@ -97,7 +101,7 @@ class UniversalWhoVaSession implements WhoVaSession {
     const nextData = { ...this.data };
     if (value == null || value === "" || (Array.isArray(value) && value.length === 0)) delete nextData[name];
     else nextData[name] = value;
-    const blocking = validateAnswer(question, value, nextData).filter((issue) => issue.code !== "required");
+    const blocking = validateAnswer(question, value, nextData).filter(blocksDraftMutation);
     if (blocking.length) throw new Error(blocking[0]?.message ?? `${name} is invalid`);
     this.data = applyCalculations(this.instrument, nextData);
     this.issues = this.issues.filter((issue) => issue.question !== name);
@@ -113,7 +117,7 @@ class UniversalWhoVaSession implements WhoVaSession {
     for (const [name, value] of Object.entries(data)) {
       const question = getQuestion(this.instrument, name);
       if (["calculated", "system"].includes(question.control)) continue;
-      const errors = validateAnswer(question, value, { ...replacement, [name]: value }).filter((issue) => issue.code !== "required");
+      const errors = validateAnswer(question, value, { ...replacement, [name]: value }).filter(blocksDraftMutation);
       if (errors.length) throw new Error(errors[0]?.message ?? `${name} is invalid`);
       replacement[name] = value;
     }

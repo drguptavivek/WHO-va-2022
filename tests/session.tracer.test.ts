@@ -33,4 +33,16 @@ describe("universal instrument session", () => {
     expect(() => session.setAnswer("Id10010b", "not-a-choice")).toThrow(/WHO choice list/);
     expect(session.getSnapshot().data.Id10010b).toBeUndefined();
   });
+
+  it("allows a temporary constraint-invalid value while the interviewer is typing", () => {
+    const session = createWhoVaSession(whoVa2022Instrument);
+
+    expect(() => session.setAnswer("Id10010a", 3)).not.toThrow();
+    expect(session.getSnapshot().data.Id10010a).toBe(3);
+
+    session.next();
+    expect(session.getSnapshot().issues).toEqual(expect.arrayContaining([
+      expect.objectContaining({ question: "Id10010a", code: "constraint" })
+    ]));
+  });
 });
