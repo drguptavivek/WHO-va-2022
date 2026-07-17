@@ -1,0 +1,180 @@
+import ExcelJS from "exceljs";
+import path from "node:path";
+
+import type {
+  AnswerDataType,
+  InstrumentChoice,
+  InstrumentDefinition,
+  InstrumentQuestion,
+  InstrumentSection,
+  LocalizedText,
+  QuestionControl
+} from "../types.js";
+import { parseExpression } from "../engine/expression.js";
+
+type SourceRow = Record<string, string> & { _row: string };
+
+function cellText(value: ExcelJS.CellValue): string {
+  if (value == null) return "";
+  if (value instanceof Date) return value.toISOString();
+  if (typeof value === "object") {
+    if ("result" in value && value.result != null) return String(value.result);
+    if ("text" in value && value.text != null) return String(value.text);
+    if ("richText" in value && Array.isArray(value.richText)) return value.richText.map((part) => part.text).join("");
+  }
+  return String(value);
+}
+
+function worksheetRows(sheet: ExcelJS.Worksheet): SourceRow[] {
+  const headers = sheet.getRow(1).values as ExcelJS.CellValue[];
+  const output: SourceRow[] = [];
+  for (let rowNumber = 2; rowNumber <= sheet.rowCount; rowNumber += 1) {
+    const row = sheet.getRow(rowNumber);
+    const record: SourceRow = { _row: String(rowNumber) };
+    for (let column = 1; column < headers.length; column += 1) {
+      const header = cellText(headers[column] ?? null).trim();
+      if (header) record[header] = cellText(row.getCell(column).value).trim();
+    }
+    output.push(record);
+  }
+  return output;
+}
+
+function localeFromHeader(header: string): string | undefined {
+  return header.match(/\(([A-Za-z0-9-]+)\)\s*$/)?.[1]?.toLowerCase();
+}
+
+function localized(row: SourceRow, prefix: string): LocalizedText {
+  const result: LocalizedText = {};
+  for (const [header, value] of Object.entries(row)) {
+    if (!header.startsWith(`${prefix}::`) || !value) continue;
+    const locale = localeFromHeader(header);
+    if (locale) result[locale] = value;
+  }
+  return result;
+}
+
+function normalizeType(sourceType: string): string {
+  return sourceType.trim().replace(/\s+/g, " ");
+}
+
+function sourceBoolean(value: string | undefined): boolean {
+  return /^(?:yes|true|true\(\)|1)$/i.test((value ?? "").trim());
+}
+
+function compileExpression(source: string, row: number, column: string) {
+  try {
+    return { source, ast: parseExpression(source) };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    throw new Error(`Cannot compile survey row ${row} ${column}: ${message}. Expression: ${source}`);
+  }
+}
+
+function questionShape(sourceType: string): { control: QuestionControl; dataType: AnswerDataType; listName?: string } {
+  const type = normalizeType(sourceType);
+  if (type.startsWith("select_one ")) return { control: "singleChoice", dataType: "string", listName: type.slice("select_one ".length) };
+  if (type.startsWith("select_multiple ")) return { control: "multipleChoice", dataType: "string[]", listName: type.slice("select_multiple ".length) };
+  switch (type) {
+    case "text": return { control: "text", dataType: "string" };
+    case "integer": return { control: "integer", dataType: "number" };
+    case "date": return { control: "date", dataType: "date" };
+    case "audio": return { control: "audio", dataType: "attachment" };
+    case "trigger": return { control: "confirm", dataType: "boolean" };
+    case "note": return { control: "note", dataType: "none" };
+    case "calculate": return { control: "calculated", dataType: "calculated" };
+    case "today": return { control: "system", dataType: "date" };
+    case "start":
+    case "end": return { control: "system", dataType: "dateTime" };
+    case "audit": return { control: "system", dataType: "audit" };
+    default: return { control: "system", dataType: "none" };
+  }
+}
+
+export async function compileWhoVaWorkbook(sourceFile: string): Promise<InstrumentDefinition> {
+  const workbook = new ExcelJS.Workbook();
+  await workbook.xlsx.readFile(sourceFile);
+  const surveySheet = workbook.getWorksheet("survey");
+  const choicesSheet = workbook.getWorksheet("choices");
+  const settingsSheet = workbook.getWorksheet("settings");
+  if (!surveySheet || !choicesSheet || !settingsSheet) throw new Error("XLSForm must contain survey, choices, and settings sheets");
+
+  const surveyRows = worksheetRows(surveySheet);
+  const choiceRows = worksheetRows(choicesSheet).filter((row) => row.list_name && row.name);
+  const settings = worksheetRows(settingsSheet)[0];
+  if (!settings) throw new Error("XLSForm settings sheet is empty");
+
+  const choicesByList = new Map<string, InstrumentChoice[]>();
+  for (const row of choiceRows) {
+    const listName = row.list_name;
+    const choiceName = row.name;
+    if (!listName || !choiceName) continue;
+    const list = choicesByList.get(listName) ?? [];
+    list.push({ value: choiceName, label: localized(row, "label"), sourceRow: Number(row._row) });
+    choicesByList.set(listName, list);
+  }
+
+  const sections: InstrumentSection[] = [];
+  const questions: InstrumentQuestion[] = [];
+  const sectionStack: string[] = [];
+  for (const row of surveyRows) {
+    const sourceType = row.type ?? "";
+    const type = normalizeType(sourceType);
+    if (type === "begin group") {
+      const name = row.name || `group_${row._row}`;
+      const parent = sectionStack.at(-1);
+      sections.push({
+        name,
+        sourceRow: Number(row._row),
+        order: Number(row.order || 0),
+        label: localized(row, "label"),
+        ...(row.agegroup ? { ageGroup: row.agegroup } : {}),
+        ...(parent ? { parent } : {}),
+        ...(row.relevant ? { relevant: compileExpression(row.relevant, Number(row._row), "relevant") } : {})
+      });
+      sectionStack.push(name);
+      continue;
+    }
+    if (type === "end group") {
+      sectionStack.pop();
+      continue;
+    }
+    if (!row.name) continue;
+
+    const shape = questionShape(sourceType);
+    const question: InstrumentQuestion = {
+      name: row.name,
+      order: Number(row.order || 0),
+      sourceRow: Number(row._row),
+      sourceType,
+      dataType: shape.dataType,
+      control: shape.control,
+      label: localized(row, "label"),
+      hint: localized(row, "hint"),
+      guidance: localized(row, "guidance_hint"),
+      required: sourceBoolean(row.required),
+      readOnly: sourceBoolean(row.read_only),
+      constraintMessage: localized(row, "constraint_message"),
+      sectionPath: [...sectionStack],
+      ...(row.agegroup ? { ageGroup: row.agegroup } : {}),
+      ...(shape.listName ? { listName: shape.listName, choices: choicesByList.get(shape.listName) ?? [] } : {}),
+      ...(row.appearance ? { appearance: row.appearance } : {}),
+      ...(row.parameters ? { parameters: row.parameters } : {}),
+      ...(row.default ? { defaultValue: row.default } : {}),
+      ...(row.relevant ? { relevant: compileExpression(row.relevant, Number(row._row), "relevant") } : {}),
+      ...(row.constraint ? { constraint: compileExpression(row.constraint, Number(row._row), "constraint") } : {}),
+      ...(row.calculation ? { calculation: compileExpression(row.calculation, Number(row._row), "calculation") } : {})
+    };
+    questions.push(question);
+  }
+
+  return {
+    id: settings.form_id ?? "",
+    title: settings.form_title ?? "",
+    version: settings.version ?? "",
+    defaultLanguage: settings.default_language ?? "",
+    sourceFile: path.basename(sourceFile),
+    sections,
+    questions
+  };
+}

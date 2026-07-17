@@ -1,0 +1,183 @@
+import { applyCalculations, getQuestion, isQuestionRelevant, validateAnswer, validateSubmission } from "./validation.js";
+import { formatLocalDate } from "./date.js";
+import type {
+  AnswerValue,
+  InstrumentDefinition,
+  InstrumentQuestion,
+  InstrumentSection,
+  SessionNavigationResult,
+  SessionSnapshot,
+  SubmissionData,
+  SubmissionValidationResult,
+  ValidationIssue,
+  WhoVaSession,
+  WhoVaSessionOptions
+} from "../types.js";
+
+function directQuestions(instrument: InstrumentDefinition, section: InstrumentSection): InstrumentQuestion[] {
+  return instrument.questions.filter((question) => question.sectionPath.at(-1) === section.name);
+}
+
+function sectionIsRelevant(instrument: InstrumentDefinition, section: InstrumentSection, data: SubmissionData): boolean {
+  const sample = directQuestions(instrument, section)[0];
+  if (sample) return isQuestionRelevant(instrument, sample, data);
+  return false;
+}
+
+class UniversalWhoVaSession implements WhoVaSession {
+  private data: SubmissionData;
+  private currentSectionName: string;
+  private issues: ValidationIssue[] = [];
+  private readonly listeners = new Set<(snapshot: SessionSnapshot) => void>();
+  private readonly now: () => Date;
+
+  constructor(private readonly instrument: InstrumentDefinition, options: WhoVaSessionOptions = {}) {
+    this.now = options.now ?? (() => new Date());
+    const startedAt = this.now();
+    this.data = { ...(options.initialData ?? {}) };
+    for (const question of instrument.questions) {
+      if (question.sourceType === "today" && this.data[question.name] == null) this.data[question.name] = formatLocalDate(startedAt);
+      if (question.sourceType === "start" && this.data[question.name] == null) this.data[question.name] = startedAt.toISOString();
+      if (question.sourceType === "audit" && options.audit && this.data[question.name] == null) this.data[question.name] = options.audit;
+    }
+    this.data = applyCalculations(instrument, this.data);
+    const first = this.visibleSections()[0];
+    if (!first) throw new Error("Instrument has no visible sections");
+    this.currentSectionName = first.name;
+  }
+
+  private visibleSections(): InstrumentSection[] {
+    return this.instrument.sections
+      .filter((section) => directQuestions(this.instrument, section).length > 0 && sectionIsRelevant(this.instrument, section, this.data))
+      .sort((left, right) => {
+        const leftOrder = directQuestions(this.instrument, left)[0]?.order ?? left.order;
+        const rightOrder = directQuestions(this.instrument, right)[0]?.order ?? right.order;
+        return leftOrder - rightOrder;
+      });
+  }
+
+  private currentSection(): InstrumentSection {
+    const visible = this.visibleSections();
+    return visible.find((section) => section.name === this.currentSectionName) ?? visible[0] ?? this.instrument.sections[0] as InstrumentSection;
+  }
+
+  private currentQuestions(): InstrumentQuestion[] {
+    const section = this.currentSection();
+    return directQuestions(this.instrument, section).filter(
+      (question) => !["calculated", "system"].includes(question.control) && isQuestionRelevant(this.instrument, question, this.data)
+    );
+  }
+
+  private notify(): void {
+    const snapshot = this.getSnapshot();
+    for (const listener of this.listeners) listener(snapshot);
+  }
+
+  getSnapshot(): SessionSnapshot {
+    const sections = this.visibleSections();
+    const currentSection = this.currentSection();
+    const index = Math.max(0, sections.findIndex((section) => section.name === currentSection.name));
+    return {
+      data: { ...this.data },
+      currentSection,
+      currentSectionIndex: index,
+      visibleSectionCount: sections.length,
+      questions: this.currentQuestions(),
+      issues: [...this.issues],
+      canGoBack: index > 0,
+      canGoForward: index < sections.length - 1
+    };
+  }
+
+  setAnswer(name: string, value: AnswerValue | undefined): void {
+    const question = getQuestion(this.instrument, name);
+    if (question.readOnly || ["note", "calculated", "system"].includes(question.control)) {
+      throw new Error(`${name} cannot be edited by the respondent`);
+    }
+    const nextData = { ...this.data };
+    if (value == null || value === "" || (Array.isArray(value) && value.length === 0)) delete nextData[name];
+    else nextData[name] = value;
+    const blocking = validateAnswer(question, value, nextData).filter((issue) => issue.code !== "required");
+    if (blocking.length) throw new Error(blocking[0]?.message ?? `${name} is invalid`);
+    this.data = applyCalculations(this.instrument, nextData);
+    this.issues = this.issues.filter((issue) => issue.question !== name);
+    this.notify();
+  }
+
+  replaceData(data: SubmissionData): void {
+    const replacement = { ...this.data };
+    for (const question of this.instrument.questions) {
+      if (["calculated", "system"].includes(question.control)) continue;
+      delete replacement[question.name];
+    }
+    for (const [name, value] of Object.entries(data)) {
+      const question = getQuestion(this.instrument, name);
+      if (["calculated", "system"].includes(question.control)) continue;
+      const errors = validateAnswer(question, value, { ...replacement, [name]: value }).filter((issue) => issue.code !== "required");
+      if (errors.length) throw new Error(errors[0]?.message ?? `${name} is invalid`);
+      replacement[name] = value;
+    }
+    this.data = applyCalculations(this.instrument, replacement);
+    this.issues = [];
+    const current = this.currentSection();
+    this.currentSectionName = current.name;
+    this.notify();
+  }
+
+  next(): SessionNavigationResult {
+    const currentIssues = this.currentQuestions().flatMap((question) => validateAnswer(question, this.data[question.name], this.data));
+    this.issues = currentIssues;
+    if (currentIssues.length) {
+      this.notify();
+      return { advanced: false, issues: [...currentIssues] };
+    }
+    const sections = this.visibleSections();
+    const index = sections.findIndex((section) => section.name === this.currentSection().name);
+    const next = sections[index + 1];
+    if (!next) {
+      const completed = this.complete();
+      return { advanced: completed.valid, completed: completed.valid, issues: completed.issues };
+    }
+    this.currentSectionName = next.name;
+    this.issues = [];
+    this.notify();
+    return { advanced: true, issues: [] };
+  }
+
+  previous(): boolean {
+    const sections = this.visibleSections();
+    const index = sections.findIndex((section) => section.name === this.currentSection().name);
+    const previous = sections[index - 1];
+    if (!previous) return false;
+    this.currentSectionName = previous.name;
+    this.issues = [];
+    this.notify();
+    return true;
+  }
+
+  validate(): SubmissionValidationResult {
+    return validateSubmission(this.instrument, this.data);
+  }
+
+  complete(): SubmissionValidationResult {
+    const completedAt = this.now().toISOString();
+    for (const question of this.instrument.questions) if (question.sourceType === "end") this.data[question.name] = completedAt;
+    const result = validateSubmission(this.instrument, this.data);
+    this.data = result.data;
+    this.issues = result.issues;
+    this.notify();
+    return result;
+  }
+
+  subscribe(listener: (snapshot: SessionSnapshot) => void): () => void {
+    this.listeners.add(listener);
+    return () => this.listeners.delete(listener);
+  }
+}
+
+export function createWhoVaSession(
+  instrument: InstrumentDefinition,
+  options: WhoVaSessionOptions = {}
+): WhoVaSession {
+  return new UniversalWhoVaSession(instrument, options);
+}

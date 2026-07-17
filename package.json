@@ -1,0 +1,73 @@
+{
+  "name": "@who-va/instrument",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "React Native-first WHO 2022 verbal autopsy instrument compiled from the WHO XLSForm.",
+  "files": [
+    "dist",
+    "src/generated"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./native": {
+      "types": "./dist/native.d.ts",
+      "react-native": "./dist/native.js",
+      "import": "./dist/native.js"
+    },
+    "./web": {
+      "types": "./dist/web.d.ts",
+      "browser": "./dist/web.js",
+      "import": "./dist/web.js"
+    },
+    "./web-component": {
+      "types": "./dist/web-component.d.ts",
+      "browser": "./dist/web-component.js",
+      "import": "./dist/web-component.js"
+    }
+  },
+  "scripts": {
+    "generate": "tsx scripts/convert-xlsform.ts",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit",
+    "build": "pnpm generate && tsup",
+    "check": "pnpm generate && pnpm typecheck && pnpm test && pnpm build"
+  },
+  "peerDependencies": {
+    "react": ">=18",
+    "react-dom": ">=18",
+    "react-native": ">=0.73",
+    "react-native-web": ">=0.19"
+  },
+  "peerDependenciesMeta": {
+    "react-dom": {
+      "optional": true
+    },
+    "react-native": {
+      "optional": true
+    },
+    "react-native-web": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "@types/react": "^19.2.0",
+    "@types/react-dom": "^19.2.0",
+    "@types/react-native-web": "0.19.2",
+    "exceljs": "^4.4.0",
+    "jsdom": "^29.1.1",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7",
+    "react-native": "^0.86.0",
+    "react-native-web": "^0.21.2",
+    "tsup": "^8.5.1",
+    "tsx": "^4.20.0",
+    "typescript": "^5.9.3",
+    "vitest": "^4.1.10"
+  },
+  "packageManager": "pnpm@11.9.0"
+}

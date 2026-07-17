@@ -1,0 +1,42 @@
+import { describe, expect, it } from "vitest";
+
+import {
+  getQuestion,
+  isQuestionRelevant,
+  validateAnswer,
+  validateSubmission,
+  whoVa2022Instrument
+} from "../src/index.js";
+
+describe("shared field and submission validation", () => {
+  it("rejects an unlisted coded value at the field boundary", () => {
+    const question = getQuestion(whoVa2022Instrument, "Id10010b");
+    expect(validateAnswer(question, "unknown", {})).toEqual([
+      expect.objectContaining({ question: "Id10010b", code: "choice" })
+    ]);
+  });
+
+  it("evaluates question relevance without a renderer", () => {
+    const question = getQuestion(whoVa2022Instrument, "Id10019");
+    expect(isQuestionRelevant(whoVa2022Instrument, question, { Id10013: "yes" })).toBe(true);
+    expect(isQuestionRelevant(whoVa2022Instrument, question, { Id10013: "no" })).toBe(false);
+  });
+
+  it("enforces the XLSForm constraint and message for interviewer age", () => {
+    const question = getQuestion(whoVa2022Instrument, "Id10010a");
+    expect(validateAnswer(question, 17, {})).toEqual([
+      expect.objectContaining({
+        question: "Id10010a",
+        code: "constraint",
+        message: "Interviewer should be an adult and not older than 89"
+      })
+    ]);
+    expect(validateAnswer(question, 18, {})).toEqual([]);
+    expect(validateAnswer(question, 99, {})).toEqual([]);
+  });
+
+  it("does not require a question when its relevance path is false", () => {
+    const result = validateSubmission(whoVa2022Instrument, { Id10013: "no" });
+    expect(result.issues.some((issue) => issue.question === "Id10019" && issue.code === "required")).toBe(false);
+  });
+});
