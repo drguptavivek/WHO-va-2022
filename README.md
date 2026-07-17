@@ -25,6 +25,10 @@ export default function App() {
       <WhoVaForm
         initialData={{ Id10010c: "INT-001" }}
         platform={{
+          pickDate: async (_question, _data, currentValue) => {
+            // Open the host app's native date picker and return YYYY-MM-DD.
+            return openNativeDatePicker(currentValue);
+          },
           captureAudio: async () => {
             // Connect Expo Audio or the host application's recorder here.
             return { uri: "file:///recordings/va.m4a", mimeType: "audio/mp4" };
@@ -40,7 +44,7 @@ export default function App() {
 }
 ```
 
-Audio capture and draft storage are injected by the host so the module does not force a particular Expo SDK, database, upload service, or file lifecycle.
+Date picking, audio capture, and draft storage are injected by the host so the module does not force a particular Expo SDK, database, upload service, or file lifecycle. If `pickDate` is omitted on native, full-date questions remain usable as validated text inputs with alphabetic, localized months; order follows the locale (`DD-MMM-YYYY`, `MMM-DD-YYYY`, or `YYYY-MMM-DD`). Stored answers always use canonical `YYYY-MM-DD`. Web renderers use the browser's locale-aware native calendar control automatically. Date fields with the WHO `year` appearance, such as `Id10024`, use a four-digit year input rather than the full-date control.
 
 ## React web
 

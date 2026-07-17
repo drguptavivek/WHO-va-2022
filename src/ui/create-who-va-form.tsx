@@ -12,9 +12,15 @@ import type {
 } from "../types.js";
 import { createWhoVaSession } from "../engine/session.js";
 import { whoVa2022Instrument } from "../instrument.js";
+import { dateFormatPlaceholder, formatDisplayDate, parseDisplayDate } from "./date-value.js";
 
 export interface WhoVaPlatformServices {
   captureAudio?: (question: InstrumentQuestion, data: SubmissionData) => Promise<AnswerValue>;
+  pickDate?: (
+    question: InstrumentQuestion,
+    data: SubmissionData,
+    currentValue?: string
+  ) => Promise<string | undefined>;
 }
 
 export interface WhoVaFormProps {
@@ -34,6 +40,7 @@ export interface WhoVaPrimitiveSet {
   View: React.ElementType;
   Text: React.ElementType;
   TextInput: React.ElementType;
+  DateInput?: React.ElementType;
   Pressable: React.ElementType;
   ScrollView: React.ElementType;
 }
@@ -54,6 +61,22 @@ function localized(text: Record<string, string | undefined>, locale: string, fal
 
 function interviewerQuestionLabel(value: string): string {
   return value.replace(/^(\([^)]+\))\s*\[([^\]]+)\](.*)$/s, "$1 $2$3");
+}
+
+function incompleteDateIssue(question: InstrumentQuestion, draft: string | undefined, locale: string): ValidationIssue | undefined {
+  if (question.control !== "date" || !draft) return undefined;
+  if (question.appearance === "year") {
+    return /^\d{4}$/.test(draft)
+      ? undefined
+      : { question: question.name, code: "type", message: "Enter a four-digit year, for example 2026" };
+  }
+  return parseDisplayDate(draft, locale)
+    ? undefined
+    : {
+        question: question.name,
+        code: "type",
+        message: `Enter the date as ${dateFormatPlaceholder(locale)}, for example ${formatDisplayDate("2026-07-17", locale)}`
+      };
 }
 
 const styles = {
@@ -83,7 +106,7 @@ const styles = {
 };
 
 export function createWhoVaForm(primitives: WhoVaPrimitiveSet): React.ComponentType<WhoVaFormProps> {
-  const { View, Text, TextInput, Pressable, ScrollView } = primitives;
+  const { View, Text, TextInput, DateInput, Pressable, ScrollView } = primitives;
 
   function Form(props: WhoVaFormProps) {
     const locale = props.locale ?? "en";
@@ -93,6 +116,7 @@ export function createWhoVaForm(primitives: WhoVaPrimitiveSet): React.ComponentT
     ));
     const [snapshot, setSnapshot] = useState(() => session.getSnapshot());
     const [busyQuestion, setBusyQuestion] = useState<string>();
+    const [dateDrafts, setDateDrafts] = useState<Record<string, string>>({});
 
     useEffect(() => {
       props.onReady?.(session);
@@ -108,7 +132,10 @@ export function createWhoVaForm(primitives: WhoVaPrimitiveSet): React.ComponentT
 
     const renderQuestion = (question: InstrumentQuestion) => {
       const value = snapshot.data[question.name];
-      const issues = snapshot.issues.filter((issue) => issue.question === question.name);
+      const dateDraft = dateDrafts[question.name];
+      const dateDraftIssue = incompleteDateIssue(question, dateDraft, locale);
+      const sessionIssues = snapshot.issues.filter((issue) => issue.question === question.name && !(dateDraftIssue && issue.code === "required"));
+      const issues = dateDraftIssue ? [...sessionIssues, dateDraftIssue] : sessionIssues;
       const label = interviewerQuestionLabel(localized(question.label, locale, question.name));
       const hint = localized(question.hint, locale, "");
       const guidance = localized(question.guidance, locale, "");
@@ -117,6 +144,80 @@ export function createWhoVaForm(primitives: WhoVaPrimitiveSet): React.ComponentT
       let control: React.ReactNode = null;
       if (question.control === "note") {
         control = null;
+      } else if (question.control === "date" && question.appearance === "year") {
+        control = (
+          <TextInput
+            accessibilityLabel={label}
+            testID={`question-${question.name}`}
+            style={[styles.input, hasIssues && styles.inputError]}
+            aria-invalid={hasIssues || undefined}
+            value={dateDraft ?? (typeof value === "string" ? value.slice(0, 4) : "")}
+            keyboardType="number-pad"
+            maxLength={4}
+            placeholder="YYYY"
+            onChangeText={(text: string) => {
+              if (!/^\d*$/.test(text)) return;
+              if (text === "") {
+                setDateDrafts((drafts) => {
+                  const next = { ...drafts };
+                  delete next[question.name];
+                  return next;
+                });
+                answer(question, undefined);
+              } else if (text.length === 4) {
+                answer(question, `${text}-01-01`);
+                setDateDrafts((drafts) => {
+                  const next = { ...drafts };
+                  delete next[question.name];
+                  return next;
+                });
+              } else {
+                setDateDrafts((drafts) => ({ ...drafts, [question.name]: text }));
+                answer(question, undefined);
+              }
+            }}
+          />
+        );
+      } else if (question.control === "date" && DateInput) {
+        control = (
+          <DateInput
+            accessibilityLabel={label}
+            testID={`question-${question.name}`}
+            style={[styles.input, hasIssues && styles.inputError]}
+            aria-invalid={hasIssues || undefined}
+            value={value == null ? "" : String(value)}
+            onChangeText={(text: string) => answer(question, text || undefined)}
+          />
+        );
+      } else if (question.control === "date" && props.platform?.pickDate) {
+        control = (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={label}
+            accessibilityState={{ disabled: busyQuestion === question.name }}
+            testID={`question-${question.name}`}
+            style={[styles.input, hasIssues && styles.inputError, busyQuestion === question.name && styles.buttonDisabled]}
+            disabled={busyQuestion === question.name}
+            onPress={async () => {
+              if (!props.platform?.pickDate) return;
+              setBusyQuestion(question.name);
+              try {
+                const selected = await props.platform.pickDate(
+                  question,
+                  snapshot.data,
+                  typeof value === "string" ? value : undefined
+                );
+                if (selected !== undefined) answer(question, selected);
+              } finally {
+                setBusyQuestion(undefined);
+              }
+            }}
+          >
+            <Text style={value == null ? styles.hint : styles.choiceText}>
+              {busyQuestion === question.name ? "Opening calendar…" : value == null ? "Select date" : formatDisplayDate(String(value), locale)}
+            </Text>
+          </Pressable>
+        );
       } else if (question.control === "text" || question.control === "date" || question.control === "integer") {
         control = (
           <TextInput
@@ -124,14 +225,36 @@ export function createWhoVaForm(primitives: WhoVaPrimitiveSet): React.ComponentT
             testID={`question-${question.name}`}
             style={[styles.input, hasIssues && styles.inputError]}
             aria-invalid={hasIssues || undefined}
-            value={value == null ? "" : String(value)}
+            value={question.control === "date"
+              ? dateDraft ?? (value == null ? "" : formatDisplayDate(String(value), locale))
+              : value == null ? "" : String(value)}
             multiline={question.control === "text" && question.appearance === "multiline"}
             keyboardType={question.control === "integer" ? "number-pad" : "default"}
-            placeholder={question.control === "date" ? "YYYY-MM-DD" : undefined}
+            placeholder={question.control === "date" ? dateFormatPlaceholder(locale) : undefined}
             onChangeText={(text: string) => {
               if (question.control === "integer") {
                 if (text === "") answer(question, undefined);
                 else if (/^-?\d+$/.test(text)) answer(question, Number(text));
+              } else if (question.control === "date") {
+                if (text === "") {
+                  setDateDrafts((drafts) => {
+                    const next = { ...drafts };
+                    delete next[question.name];
+                    return next;
+                  });
+                  answer(question, undefined);
+                } else {
+                  setDateDrafts((drafts) => ({ ...drafts, [question.name]: text }));
+                  const parsed = parseDisplayDate(text, locale);
+                  if (parsed) {
+                    answer(question, parsed);
+                    setDateDrafts((drafts) => {
+                      const next = { ...drafts };
+                      delete next[question.name];
+                      return next;
+                    });
+                  } else answer(question, undefined);
+                }
               } else answer(question, text || undefined);
             }}
           />
@@ -213,6 +336,16 @@ export function createWhoVaForm(primitives: WhoVaPrimitiveSet): React.ComponentT
     };
 
     const advance = () => {
+      const incompleteDates = Object.entries(dateDrafts).flatMap(([name, draft]) => {
+        const question = snapshot.questions.find((item) => item.name === name);
+        if (!question) return [];
+        const issue = incompleteDateIssue(question, draft, locale);
+        return issue ? [issue] : [];
+      });
+      if (incompleteDates.length) {
+        props.onValidation?.(incompleteDates);
+        return;
+      }
       const result = session.next();
       if (result.issues.length) props.onValidation?.(result.issues);
       if (result.completed) props.onComplete?.(session.validate());
