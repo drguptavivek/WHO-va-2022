@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import hindi from "../src/languages/hi.js";
+import { createWhoVaSession } from "../src/engine/session.js";
 import { WHO_VA_2022_LANGUAGES, loadWhoVa2022Language } from "../src/instrument-loader.js";
 import { whoVa2022Instrument } from "../src/instrument.js";
 import type { QuestionTranslation } from "../src/i18n.js";
@@ -33,6 +34,15 @@ describe("built-in Hindi language", () => {
     );
     expect(childAge?.label.hi).toContain("${ageInYears}");
     expect(loaded.uiTranslations.hi?.next).toBe("आगे");
+
+    const session = createWhoVaSession(loaded.instrument, {
+      locale: loaded.locale,
+      uiTranslations: loaded.uiTranslations
+    });
+    const requiredMessage = session.next().issues[0]?.message;
+    expect(requiredMessage).not.toContain("[");
+    expect(requiredMessage).not.toContain("]");
+    expect(requiredMessage).toContain("वीए साक्षात्कारकर्ता का नाम");
   });
 
   it("exposes every available built-in language", async () => {

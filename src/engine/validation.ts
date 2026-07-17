@@ -26,6 +26,10 @@ function message(question: InstrumentQuestion, locale: string, fallback: string)
   return localizeText(question.constraintMessage, locale, fallback);
 }
 
+function validationLabel(question: InstrumentQuestion, locale: string): string {
+  return localizeText(question.label, locale, question.name).replace(/\[([^\]]+)\]/g, "$1");
+}
+
 function typeIsValid(question: InstrumentQuestion, value: unknown): boolean {
   switch (question.dataType) {
     case "string": return typeof value === "string";
@@ -90,7 +94,7 @@ export function validateAnswer(
   if (["note", "calculated", "system"].includes(question.control)) return [];
   if (isEmpty(value)) {
     return question.required
-      ? [{ question: question.name, code: "required", message: messages.required(localizeText(question.label, locale, question.name)) }]
+      ? [{ question: question.name, code: "required", message: messages.required(validationLabel(question, locale)) }]
       : [];
   }
   if (!typeIsValid(question, value)) {
