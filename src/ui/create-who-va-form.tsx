@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 
 import type {
   AnswerValue,
@@ -15,16 +15,13 @@ import type {
 import { createDraftId } from "../draft.js";
 import { createWhoVaSession } from "../engine/session.js";
 import { whoVa2022Instrument } from "../instrument.js";
-import { dateFormatPlaceholder, formatDisplayDate, parseDisplayDate } from "./date-value.js";
+import {
+  createWhoVaQuestionControls,
+  questionControlStyles,
+  type WhoVaPlatformServices
+} from "./question-controls.js";
 
-export interface WhoVaPlatformServices {
-  captureAudio?: (question: InstrumentQuestion, data: SubmissionData) => Promise<AnswerValue>;
-  pickDate?: (
-    question: InstrumentQuestion,
-    data: SubmissionData,
-    currentValue?: string
-  ) => Promise<string | undefined>;
-}
+export type { WhoVaPlatformServices } from "./question-controls.js";
 
 export interface WhoVaFormProps {
   instrument?: InstrumentDefinition;
@@ -50,6 +47,8 @@ export interface WhoVaPrimitiveSet {
   DateInput?: React.ElementType;
   Pressable: React.ElementType;
   ScrollView: React.ElementType;
+  Image?: React.ElementType;
+  platform?: WhoVaPlatformServices;
   draftStore?: WhoVaDraftStore;
   scrollToQuestion?: (questionNode: unknown, scrollViewNode: unknown, y: number) => void;
 }
@@ -72,22 +71,6 @@ function interviewerQuestionLabel(value: string): string {
   return value.replace(/^(\([^)]+\))\s*\[([^\]]+)\](.*)$/s, "$1 $2$3");
 }
 
-function incompleteDateIssue(question: InstrumentQuestion, draft: string | undefined, locale: string): ValidationIssue | undefined {
-  if (question.control !== "date" || !draft) return undefined;
-  if (question.appearance === "year") {
-    return /^\d{4}$/.test(draft)
-      ? undefined
-      : { question: question.name, code: "type", message: "Enter a four-digit year, for example 2026" };
-  }
-  return parseDisplayDate(draft, locale)
-    ? undefined
-    : {
-        question: question.name,
-        code: "type",
-        message: `Enter the date as ${dateFormatPlaceholder(locale)}, for example ${formatDisplayDate("2026-07-17", locale)}`
-      };
-}
-
 const styles = {
   root: { flex: 1, backgroundColor: "#f6f8f7" },
   content: { padding: 20, maxWidth: 760, width: "100%", alignSelf: "center" as const },
@@ -99,24 +82,23 @@ const styles = {
   required: { color: "#a23a2a" },
   hint: { color: "#536b64", fontSize: 13, marginBottom: 10 },
   guidance: { color: "#315e73", fontSize: 13, marginBottom: 10 },
-  input: { borderWidth: 1, borderColor: "#9fb4ad", borderRadius: 8, minHeight: 44, paddingHorizontal: 12, paddingVertical: 9, color: "#142a24", backgroundColor: "#ffffff" },
-  inputError: { borderColor: "#b34231", backgroundColor: "#fff8f6" },
-  choice: { borderWidth: 1, borderColor: "#9fb4ad", borderRadius: 8, padding: 12, marginTop: 7, backgroundColor: "#ffffff" },
-  choiceSelected: { borderColor: "#147d64", backgroundColor: "#e3f4ee" },
-  choiceText: { color: "#213b34" },
   note: { backgroundColor: "#edf5f2", borderLeftWidth: 4, borderLeftColor: "#147d64" },
   error: { color: "#a23a2a", marginTop: 8, fontSize: 13 },
   navigation: { flexDirection: "row" as const, flexWrap: "wrap" as const, justifyContent: "space-between" as const, gap: 12, marginTop: 12, marginBottom: 12 },
-  button: { minHeight: 44, borderRadius: 8, paddingHorizontal: 18, paddingVertical: 12, backgroundColor: "#147d64", justifyContent: "center" as const },
-  buttonSecondary: { backgroundColor: "#dce6e1" },
-  buttonDisabled: { opacity: 0.45 },
-  buttonText: { color: "#ffffff", fontWeight: "700" as const },
-  buttonTextSecondary: { color: "#183d33", fontWeight: "700" as const },
   draftStatus: { color: "#536b64", fontSize: 12, marginTop: 4, marginBottom: 24 }
 };
 
 export function createWhoVaForm(primitives: WhoVaPrimitiveSet): React.ComponentType<WhoVaFormProps> {
-  const { View, Text, TextInput, DateInput, Pressable, ScrollView } = primitives;
+  const { View, Text, Pressable, ScrollView } = primitives;
+  const questionControls = createWhoVaQuestionControls({
+    View,
+    Text,
+    TextInput: primitives.TextInput,
+    DateInput: primitives.DateInput,
+    Pressable,
+    Image: primitives.Image,
+    platform: primitives.platform
+  });
 
   function Form(props: WhoVaFormProps) {
     const locale = props.locale ?? "en";
@@ -126,8 +108,7 @@ export function createWhoVaForm(primitives: WhoVaPrimitiveSet): React.ComponentT
       props.initialData ? { initialData: props.initialData } : {}
     ));
     const [snapshot, setSnapshot] = useState(() => session.getSnapshot());
-    const [busyQuestion, setBusyQuestion] = useState<string>();
-    const [dateDrafts, setDateDrafts] = useState<Record<string, string>>({});
+    const [draftIssues, setDraftIssues] = useState<Record<string, ValidationIssue>>({});
     const [draftId] = useState(() => props.draftId ?? createDraftId());
     const [draftStatus, setDraftStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
     const draftCreatedAt = useRef(new Date().toISOString());
@@ -147,6 +128,16 @@ export function createWhoVaForm(primitives: WhoVaPrimitiveSet): React.ComponentT
     const answer = (question: InstrumentQuestion, value: AnswerValue | undefined) => {
       session.setAnswer(question.name, value);
     };
+
+    const setQuestionDraftIssue = useCallback((questionName: string, issue: ValidationIssue | undefined) => {
+      setDraftIssues((current) => {
+        if (issue) return current[questionName] === issue ? current : { ...current, [questionName]: issue };
+        if (!current[questionName]) return current;
+        const next = { ...current };
+        delete next[questionName];
+        return next;
+      });
+    }, []);
 
     const saveDraft = async () => {
       const store = props.draftStore ?? primitives.draftStore;
@@ -192,188 +183,26 @@ export function createWhoVaForm(primitives: WhoVaPrimitiveSet): React.ComponentT
 
     const renderQuestion = (question: InstrumentQuestion) => {
       const value = snapshot.data[question.name];
-      const dateDraft = dateDrafts[question.name];
-      const dateDraftIssue = incompleteDateIssue(question, dateDraft, locale);
-      const sessionIssues = snapshot.issues.filter((issue) => issue.question === question.name && !(dateDraftIssue && issue.code === "required"));
-      const issues = dateDraftIssue ? [...sessionIssues, dateDraftIssue] : sessionIssues;
+      const draftIssue = draftIssues[question.name];
+      const sessionIssues = snapshot.issues.filter((issue) => issue.question === question.name && !(draftIssue && issue.code === "required"));
+      const issues = draftIssue ? [...sessionIssues, draftIssue] : sessionIssues;
       const label = interviewerQuestionLabel(localized(question.label, locale, question.name));
       const hint = localized(question.hint, locale, "");
       const guidance = localized(question.guidance, locale, "");
       const hasIssues = issues.length > 0;
 
-      let control: React.ReactNode = null;
-      if (question.control === "note") {
-        control = null;
-      } else if (question.control === "date" && question.appearance === "year") {
-        control = (
-          <TextInput
-            accessibilityLabel={label}
-            testID={`question-${question.name}`}
-            style={[styles.input, hasIssues && styles.inputError]}
-            aria-invalid={hasIssues || undefined}
-            value={dateDraft ?? (typeof value === "string" ? value.slice(0, 4) : "")}
-            keyboardType="number-pad"
-            maxLength={4}
-            placeholder="YYYY"
-            onChangeText={(text: string) => {
-              if (!/^\d*$/.test(text)) return;
-              if (text === "") {
-                setDateDrafts((drafts) => {
-                  const next = { ...drafts };
-                  delete next[question.name];
-                  return next;
-                });
-                answer(question, undefined);
-              } else if (text.length === 4) {
-                answer(question, `${text}-01-01`);
-                setDateDrafts((drafts) => {
-                  const next = { ...drafts };
-                  delete next[question.name];
-                  return next;
-                });
-              } else {
-                setDateDrafts((drafts) => ({ ...drafts, [question.name]: text }));
-                answer(question, undefined);
-              }
-            }}
-          />
-        );
-      } else if (question.control === "date" && DateInput) {
-        control = (
-          <DateInput
-            accessibilityLabel={label}
-            testID={`question-${question.name}`}
-            style={[styles.input, hasIssues && styles.inputError]}
-            aria-invalid={hasIssues || undefined}
-            value={value == null ? "" : String(value)}
-            onChangeText={(text: string) => answer(question, text || undefined)}
-          />
-        );
-      } else if (question.control === "date" && props.platform?.pickDate) {
-        control = (
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={label}
-            accessibilityState={{ disabled: busyQuestion === question.name }}
-            testID={`question-${question.name}`}
-            style={[styles.input, hasIssues && styles.inputError, busyQuestion === question.name && styles.buttonDisabled]}
-            disabled={busyQuestion === question.name}
-            onPress={async () => {
-              if (!props.platform?.pickDate) return;
-              setBusyQuestion(question.name);
-              try {
-                const selected = await props.platform.pickDate(
-                  question,
-                  snapshot.data,
-                  typeof value === "string" ? value : undefined
-                );
-                if (selected !== undefined) answer(question, selected);
-              } finally {
-                setBusyQuestion(undefined);
-              }
-            }}
-          >
-            <Text style={value == null ? styles.hint : styles.choiceText}>
-              {busyQuestion === question.name ? "Opening calendar…" : value == null ? "Select date" : formatDisplayDate(String(value), locale)}
-            </Text>
-          </Pressable>
-        );
-      } else if (question.control === "text" || question.control === "date" || question.control === "integer") {
-        control = (
-          <TextInput
-            accessibilityLabel={label}
-            testID={`question-${question.name}`}
-            style={[styles.input, hasIssues && styles.inputError]}
-            aria-invalid={hasIssues || undefined}
-            value={question.control === "date"
-              ? dateDraft ?? (value == null ? "" : formatDisplayDate(String(value), locale))
-              : value == null ? "" : String(value)}
-            multiline={question.control === "text" && question.appearance === "multiline"}
-            keyboardType={question.control === "integer" ? "number-pad" : "default"}
-            placeholder={question.control === "date" ? dateFormatPlaceholder(locale) : undefined}
-            onChangeText={(text: string) => {
-              if (question.control === "integer") {
-                if (text === "") answer(question, undefined);
-                else if (/^-?\d+$/.test(text)) answer(question, Number(text));
-              } else if (question.control === "date") {
-                if (text === "") {
-                  setDateDrafts((drafts) => {
-                    const next = { ...drafts };
-                    delete next[question.name];
-                    return next;
-                  });
-                  answer(question, undefined);
-                } else {
-                  setDateDrafts((drafts) => ({ ...drafts, [question.name]: text }));
-                  const parsed = parseDisplayDate(text, locale);
-                  if (parsed) {
-                    answer(question, parsed);
-                    setDateDrafts((drafts) => {
-                      const next = { ...drafts };
-                      delete next[question.name];
-                      return next;
-                    });
-                  } else answer(question, undefined);
-                }
-              } else answer(question, text || undefined);
-            }}
-          />
-        );
-      } else if (question.control === "singleChoice") {
-        control = (question.choices ?? []).map((choice) => {
-          const selected = value === choice.value;
-          return (
-            <Pressable
-              key={choice.value}
-              accessibilityRole="radio"
-              accessibilityState={{ selected }}
-              testID={`question-${question.name}-choice-${choice.value}`}
-              style={[styles.choice, selected && styles.choiceSelected]}
-              onPress={() => answer(question, choice.value)}
-            >
-              <Text style={styles.choiceText}>{localized(choice.label, locale, choice.value)}</Text>
-            </Pressable>
-          );
-        });
-      } else if (question.control === "multipleChoice") {
-        const selectedValues = Array.isArray(value) ? value : [];
-        control = (question.choices ?? []).map((choice) => {
-          const selected = selectedValues.includes(choice.value);
-          return (
-            <Pressable
-              key={choice.value}
-              accessibilityRole="checkbox"
-              accessibilityState={{ checked: selected }}
-              testID={`question-${question.name}-choice-${choice.value}`}
-              style={[styles.choice, selected && styles.choiceSelected]}
-              onPress={() => answer(question, selected ? selectedValues.filter((item) => item !== choice.value) : [...selectedValues, choice.value])}
-            >
-              <Text style={styles.choiceText}>{localized(choice.label, locale, choice.value)}</Text>
-            </Pressable>
-          );
-        });
-      } else if (question.control === "confirm") {
-        control = (
-          <Pressable style={[styles.button, value === true && styles.choiceSelected]} onPress={() => answer(question, true)}>
-            <Text style={styles.buttonText}>{value === true ? "Confirmed" : "Confirm"}</Text>
-          </Pressable>
-        );
-      } else if (question.control === "audio") {
-        control = (
-          <Pressable
-            style={[styles.button, (!props.platform?.captureAudio || busyQuestion === question.name) && styles.buttonDisabled]}
-            disabled={!props.platform?.captureAudio || busyQuestion === question.name}
-            onPress={async () => {
-              if (!props.platform?.captureAudio) return;
-              setBusyQuestion(question.name);
-              try { answer(question, await props.platform.captureAudio(question, snapshot.data)); }
-              finally { setBusyQuestion(undefined); }
-            }}
-          >
-            <Text style={styles.buttonText}>{busyQuestion === question.name ? "Recording…" : value ? "Replace audio" : "Record audio"}</Text>
-          </Pressable>
-        );
-      }
+      const control = (
+        <questionControls.Control
+          question={question}
+          value={value}
+          data={snapshot.data}
+          locale={locale}
+          issues={issues}
+          platform={props.platform}
+          onAnswer={(next) => answer(question, next)}
+          onDraftIssue={setQuestionDraftIssue}
+        />
+      );
 
       return (
         <View
@@ -407,12 +236,9 @@ export function createWhoVaForm(primitives: WhoVaPrimitiveSet): React.ComponentT
     };
 
     const advance = () => {
-      const incompleteDates = Object.entries(dateDrafts).flatMap(([name, draft]) => {
-        const question = snapshot.questions.find((item) => item.name === name);
-        if (!question) return [];
-        const issue = incompleteDateIssue(question, draft, locale);
-        return issue ? [issue] : [];
-      });
+      const incompleteDates = snapshot.questions
+        .map((question) => draftIssues[question.name])
+        .filter((issue): issue is ValidationIssue => issue != null);
       if (incompleteDates.length) {
         void saveDraft();
         props.onValidation?.(incompleteDates);
@@ -437,21 +263,21 @@ export function createWhoVaForm(primitives: WhoVaPrimitiveSet): React.ComponentT
           <Pressable
             accessibilityRole="button"
             disabled={!snapshot.canGoBack}
-            style={[styles.button, styles.buttonSecondary, !snapshot.canGoBack && styles.buttonDisabled]}
+            style={[questionControlStyles.button, questionControlStyles.buttonSecondary, !snapshot.canGoBack && questionControlStyles.buttonDisabled]}
             onPress={() => session.previous()}
           >
-            <Text style={styles.buttonTextSecondary}>Back</Text>
+            <Text style={questionControlStyles.buttonTextSecondary}>Back</Text>
           </Pressable>
           <Pressable
             accessibilityRole="button"
             disabled={!(props.draftStore ?? primitives.draftStore) || draftStatus === "saving"}
-            style={[styles.button, styles.buttonSecondary, (!(props.draftStore ?? primitives.draftStore) || draftStatus === "saving") && styles.buttonDisabled]}
+            style={[questionControlStyles.button, questionControlStyles.buttonSecondary, (!(props.draftStore ?? primitives.draftStore) || draftStatus === "saving") && questionControlStyles.buttonDisabled]}
             onPress={() => void saveDraft()}
           >
-            <Text style={styles.buttonTextSecondary}>{draftStatus === "saving" ? "Saving…" : "Save draft"}</Text>
+            <Text style={questionControlStyles.buttonTextSecondary}>{draftStatus === "saving" ? "Saving…" : "Save draft"}</Text>
           </Pressable>
-          <Pressable accessibilityRole="button" style={styles.button} onPress={advance}>
-            <Text style={styles.buttonText}>{snapshot.canGoForward ? "Next" : "Complete"}</Text>
+          <Pressable accessibilityRole="button" style={questionControlStyles.button} onPress={advance}>
+            <Text style={questionControlStyles.buttonText}>{snapshot.canGoForward ? "Next" : "Complete"}</Text>
           </Pressable>
         </View>
         <Text style={styles.draftStatus}>

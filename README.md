@@ -40,6 +40,12 @@ export default function App() {
           captureAudio: async () => {
             // Connect Expo Audio or the host application's recorder here.
             return { uri: "file:///recordings/va.m4a", mimeType: "audio/mp4" };
+          },
+          captureImage: async () => openCamera(),
+          selectImage: async () => openImageLibrary(),
+          selectFile: async (_question, _data, acceptedMimeTypes) => {
+            // Connect Expo DocumentPicker and restrict it to acceptedMimeTypes.
+            return openDocumentPicker(acceptedMimeTypes);
           }
         }}
         onDraftSaved={(draft) => console.log(`Saved ${draft.id}`)}
@@ -53,6 +59,14 @@ export default function App() {
 ```
 
 Date picking, audio capture, and draft storage are injected by the host so the module does not force a particular Expo SDK, database, upload service, or file lifecycle. The Save draft button and every Next/Complete press write a UUID-addressed envelope through `draftStore`. If `pickDate` is omitted on native, full-date questions remain usable as validated text inputs with alphabetic, localized months; order follows the locale (`DD-MMM-YYYY`, `MMM-DD-YYYY`, or `YYYY-MMM-DD`). Stored answers always use canonical `YYYY-MM-DD`. Web renderers use the browser's locale-aware native calendar control automatically. Date fields with the WHO `year` appearance, such as `Id10024`, use a four-digit year input rather than the full-date control.
+
+## Reusable question controls
+
+Both `/web` and `/native` export `WhoVaQuestionControls`. Its named components are `Text`, `Integer`, `Date`, `SingleChoice`, `MultipleChoice`, `Confirm`, `Audio`, `Image`, `File`, `Note`, `Calculated`, and `System`; `Control` dispatches from a question's canonical `control` value. These components accept the same question/value/data/issues/onAnswer contract and can be used outside the full form.
+
+WHO text questions with `appearance: "multiline"`, including the detailed open narrative, use a tall multiline input. Image controls support camera/library selection, preview, hide/view, 90-degree rotation, zoom, replace, and remove. File controls request PDF MIME type only and support replace/remove. Web supplies browser selectors; Expo/React Native hosts connect camera, image-library, and document-picker functions through `platform`.
+
+Attachment answers should be durable references such as encrypted app URIs or upload records. The web fallback uses data URLs for standalone operation; production applications should normally persist binary files outside the answer JSON and return a durable reference.
 
 ## React web
 
@@ -105,7 +119,7 @@ await save(assessment.data);
 
 This is the same validator used by the native and web form sessions.
 
-When Next or Complete finds validation issues, the shared renderer scrolls to the first invalid question. Web also focuses the first interactive control; Expo and React Native use the question's measured content position with `ScrollView.scrollTo`.
+When Next or Complete finds validation issues, the shared renderer aligns the first invalid question at the top of the screen and highlights its error card. Web also focuses the first interactive control; Expo and React Native use the question's measured content position with `ScrollView.scrollTo`.
 
 ## Source generation and tests
 

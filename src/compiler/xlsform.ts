@@ -80,6 +80,8 @@ function questionShape(sourceType: string): { control: QuestionControl; dataType
     case "integer": return { control: "integer", dataType: "number" };
     case "date": return { control: "date", dataType: "date" };
     case "audio": return { control: "audio", dataType: "attachment" };
+    case "image": return { control: "image", dataType: "attachment" };
+    case "file": return { control: "file", dataType: "attachment" };
     case "trigger": return { control: "confirm", dataType: "boolean" };
     case "note": return { control: "note", dataType: "none" };
     case "calculate": return { control: "calculated", dataType: "calculated" };

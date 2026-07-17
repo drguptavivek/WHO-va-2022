@@ -53,6 +53,7 @@ describe("validation navigation", () => {
       .find((button) => button.textContent === "Complete");
     next?.click();
     await vi.waitFor(() => expect(scrollIntoView).toHaveBeenCalledOnce());
+    expect(scrollIntoView).toHaveBeenCalledWith({ behavior: "smooth", block: "start" });
 
     const input = container.querySelector<HTMLInputElement>('[data-testid="question-required_name"]');
     expect(document.activeElement).toBe(input);

@@ -17,6 +17,8 @@ export type QuestionControl =
   | "multipleChoice"
   | "date"
   | "audio"
+  | "image"
+  | "file"
   | "confirm"
   | "note"
   | "calculated"
