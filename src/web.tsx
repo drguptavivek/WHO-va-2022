@@ -18,6 +18,7 @@ import {
   processWebPdfAttachment,
   resolveWebAttachmentUri
 } from "./web-attachments.js";
+import { startWebAudioRecording } from "./web-audio.js";
 
 const webThemeValues: Record<string, string> = {
   "#f6f8f7": "var(--who-2022-web-color-canvas, #f5f7fa)",
@@ -151,6 +152,7 @@ async function selectAndProcessWebPdf(): Promise<AnswerValue | undefined> {
 }
 
 const webAttachmentPlatform: WhoVaPlatformServices = {
+  startAudioRecording: async () => startWebAudioRecording({ store: webAttachmentStore }),
   captureImage: async () => selectAndProcessWebImage(true),
   selectImage: async () => selectAndProcessWebImage(),
   selectFile: async (_question, _data, acceptedMimeTypes) => {
@@ -185,6 +187,8 @@ export {
   processWebPdfAttachment,
   resolveWebAttachmentUri
 } from "./web-attachments.js";
+export { startWebAudioRecording } from "./web-audio.js";
+export type * from "./web-audio.js";
 
 export const WhoVaForm = createWhoVaForm({
   View,

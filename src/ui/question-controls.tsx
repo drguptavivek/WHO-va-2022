@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 
 import {
   AttachmentProcessingError,
@@ -17,6 +17,10 @@ import { dateFormatPlaceholder, formatDisplayDate, parseDisplayDate } from "./da
 
 export interface WhoVaPlatformServices {
   captureAudio?: (question: InstrumentQuestion, data: SubmissionData) => Promise<AnswerValue>;
+  startAudioRecording?: (
+    question: InstrumentQuestion,
+    data: SubmissionData
+  ) => Promise<WhoVaAudioRecordingSession>;
   pickDate?: (
     question: InstrumentQuestion,
     data: SubmissionData,
@@ -43,6 +47,11 @@ export interface WhoVaPlatformServices {
   resolveAttachmentUri?: (attachment: AnswerValue) => Promise<string | undefined>;
   releaseAttachmentUri?: (uri: string) => void;
   removeAttachment?: (attachment: AnswerValue) => Promise<void>;
+}
+
+export interface WhoVaAudioRecordingSession {
+  stop(): Promise<AnswerValue>;
+  cancel(): void | Promise<void>;
 }
 
 export interface WhoVaQuestionControlProps {
@@ -333,24 +342,70 @@ export function createWhoVaQuestionControls(primitives: WhoVaQuestionControlPrim
   }
 
   function Audio({ question, value, data, platform, onAnswer }: WhoVaQuestionControlProps) {
-    const [busy, setBusy] = useState(false);
+    const [phase, setPhase] = useState<"idle" | "starting" | "recording" | "stopping">("idle");
+    const [recordingError, setRecordingError] = useState<string>();
+    const session = useRef<WhoVaAudioRecordingSession | undefined>(undefined);
     const services = { ...primitives.platform, ...platform };
-    const disabled = !services?.captureAudio || busy;
+    const disabled = phase === "starting" || phase === "stopping"
+      || (phase === "idle" && !services.startAudioRecording && !services.captureAudio);
+
+    useEffect(() => () => {
+      if (session.current) void session.current.cancel();
+    }, []);
+
+    const label = phase === "starting"
+      ? "Starting microphone…"
+      : phase === "recording"
+        ? "Stop and save recording"
+        : phase === "stopping"
+          ? "Saving recording…"
+          : value ? "Replace audio" : "Record audio";
+
     return (
-      <Pressable
-        accessibilityRole="button"
-        testID={`question-${question.name}`}
-        style={[questionControlStyles.button, disabled && questionControlStyles.buttonDisabled]}
-        disabled={disabled}
-        onPress={async () => {
-          if (!services?.captureAudio) return;
-          setBusy(true);
-          try { onAnswer(await services.captureAudio(question, data)); }
-          finally { setBusy(false); }
-        }}
-      >
-        <PrimitiveText style={questionControlStyles.buttonText}>{busy ? "Recording…" : value ? "Replace audio" : "Record audio"}</PrimitiveText>
-      </Pressable>
+      <View>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityState={{ disabled, busy: phase === "starting" || phase === "stopping" }}
+          testID={`question-${question.name}`}
+          style={[questionControlStyles.button, disabled && questionControlStyles.buttonDisabled]}
+          disabled={disabled}
+          onPress={async () => {
+            setRecordingError(undefined);
+            try {
+              if (phase === "recording" && session.current) {
+                setPhase("stopping");
+                const recorded = await session.current.stop();
+                session.current = undefined;
+                if (value !== undefined) await services.removeAttachment?.(value);
+                onAnswer(recorded);
+                setPhase("idle");
+                return;
+              }
+              if (services.startAudioRecording) {
+                setPhase("starting");
+                session.current = await services.startAudioRecording(question, data);
+                setPhase("recording");
+                return;
+              }
+              if (!services.captureAudio) return;
+              setPhase("starting");
+              const recorded = await services.captureAudio(question, data);
+              if (value !== undefined) await services.removeAttachment?.(value);
+              onAnswer(recorded);
+              setPhase("idle");
+            } catch (error) {
+              session.current = undefined;
+              setPhase("idle");
+              setRecordingError(typeof DOMException !== "undefined" && error instanceof DOMException && error.name === "NotAllowedError"
+                ? "Microphone permission was denied. Allow microphone access in the browser and try again."
+                : error instanceof Error && error.message ? error.message : "Audio recording failed. Please try again.");
+            }
+          }}
+        >
+          <PrimitiveText style={questionControlStyles.buttonText}>{label}</PrimitiveText>
+        </Pressable>
+        {recordingError ? <PrimitiveText accessibilityRole="alert" style={questionControlStyles.attachmentError}>{recordingError}</PrimitiveText> : null}
+      </View>
     );
   }
 

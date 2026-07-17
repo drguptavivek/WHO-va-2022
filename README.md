@@ -78,7 +78,7 @@ export function VerbalAutopsyPage() {
 }
 ```
 
-Web uses `localStorage` by default under `who-va-2022:draft:<uuid>`. Pass `draftId` to continue overwriting a known draft, or pass a custom `draftStore` to use another persistence layer.
+Web uses `localStorage` by default under `who-va-2022:draft:<uuid>`. Pass `draftId` to continue overwriting a known draft, or pass a custom `draftStore` to use another persistence layer. Audio questions use the browser microphone: press **Record audio**, then **Stop and save recording**. The browser will request microphone permission, and recording requires a secure context (`https://` or localhost).
 
 `localStorage` is unencrypted browser storage. For production VA data, provide a secured storage adapter with the application's encryption, access-control, retention, and device-loss protections.
 
