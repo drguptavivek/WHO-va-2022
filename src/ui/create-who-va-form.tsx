@@ -67,6 +67,14 @@ function localized(text: Record<string, string | undefined>, locale: string, fal
   return plainText(text[locale] ?? text.en ?? fallback);
 }
 
+function interpolateSubmissionReferences(value: string, data: SubmissionData): string {
+  return value.replace(/\$\{([^}]+)\}/g, (_match, name: string) => {
+    const answer = data[name];
+    if (answer == null) return "";
+    return Array.isArray(answer) ? answer.join(" ") : String(answer);
+  });
+}
+
 function interviewerQuestionLabel(value: string): string {
   return value.replace(/^(\([^)]+\))\s*\[([^\]]+)\](.*)$/s, "$1 $2$3");
 }
@@ -186,9 +194,12 @@ export function createWhoVaForm(primitives: WhoVaPrimitiveSet): React.ComponentT
       const draftIssue = draftIssues[question.name];
       const sessionIssues = snapshot.issues.filter((issue) => issue.question === question.name && !(draftIssue && issue.code === "required"));
       const issues = draftIssue ? [...sessionIssues, draftIssue] : sessionIssues;
-      const label = interviewerQuestionLabel(localized(question.label, locale, question.name));
-      const hint = localized(question.hint, locale, "");
-      const guidance = localized(question.guidance, locale, "");
+      const label = interviewerQuestionLabel(interpolateSubmissionReferences(
+        localized(question.label, locale, question.name),
+        snapshot.data
+      ));
+      const hint = interpolateSubmissionReferences(localized(question.hint, locale, ""), snapshot.data);
+      const guidance = interpolateSubmissionReferences(localized(question.guidance, locale, ""), snapshot.data);
       const hasIssues = issues.length > 0;
 
       const control = (

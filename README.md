@@ -160,9 +160,14 @@ pnpm dev          # launch the browser preview at http://127.0.0.1:5173
 pnpm generate     # XLSForm -> checked-in runtime contract and audit report
 pnpm typecheck
 pnpm test         # includes one parameterized contract test per named WHO row
+pnpm test:e2e     # run Chromium form automation with trace, video, and HTML report
+pnpm test:e2e:headed # watch each action at 800 ms and each form sequentially
+pnpm test:e2e:report # open the most recent Playwright report
 pnpm build
 pnpm check
 ```
+
+Install the pinned Playwright browser once with `pnpm exec playwright install chromium`. The browser suite enters answers through the rendered controls, captures validation errors and corrected states, verifies the visible age summary and calculated values derived from `Id10021`, and confirms valid paths can advance without alerts.
 
 Generated artifacts:
 
