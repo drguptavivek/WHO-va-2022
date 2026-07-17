@@ -35546,9 +35546,7 @@
       },
       "required": true,
       "readOnly": false,
-      "constraintMessage": {
-        "en": "It is not possible to select \"No weighing under 2.5 kg\" and \"No weighing over 4.5 kg\" together. Please go back and correct the selection."
-      },
+      "constraintMessage": {},
       "sectionPath": [
         "consented",
         "illhistory",
@@ -35641,45 +35639,6 @@
                 "value": "ref"
               }
             ]
-          }
-        }
-      },
-      "constraint": {
-        "source": "not(selected(${Id10363}, 'no') and selected(${Id10365}, 'no'))",
-        "ast": {
-          "type": "unary",
-          "operator": "not",
-          "operand": {
-            "type": "binary",
-            "operator": "and",
-            "left": {
-              "type": "call",
-              "name": "selected",
-              "arguments": [
-                {
-                  "type": "reference",
-                  "name": "Id10363"
-                },
-                {
-                  "type": "literal",
-                  "value": "no"
-                }
-              ]
-            },
-            "right": {
-              "type": "call",
-              "name": "selected",
-              "arguments": [
-                {
-                  "type": "reference",
-                  "name": "Id10365"
-                },
-                {
-                  "type": "literal",
-                  "value": "no"
-                }
-              ]
-            }
           }
         }
       }

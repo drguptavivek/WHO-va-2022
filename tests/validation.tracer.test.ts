@@ -46,6 +46,17 @@ describe("shared field and submission validation", () => {
     ]);
   });
 
+  it("accepts a baby reported as neither under 2.5 kg nor over 4.5 kg", () => {
+    const question = getQuestion(whoVa2022Instrument, "Id10365");
+    const data = { Id10363: "no", Id10365: "no" };
+
+    expect(validateAnswer(question, "no", data)).toEqual([]);
+    expect(validateSubmission(
+      { ...whoVa2022Instrument, sections: [], questions: [{ ...question, sectionPath: [] }] },
+      data
+    )).toMatchObject({ valid: true, issues: [] });
+  });
+
   it("does not require a question when its relevance path is false", () => {
     const result = validateSubmission(whoVa2022Instrument, { Id10013: "no" });
     expect(result.issues.some((issue) => issue.question === "Id10019" && issue.code === "required")).toBe(false);

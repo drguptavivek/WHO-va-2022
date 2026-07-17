@@ -5774,7 +5774,7 @@
         "ref"
       ],
       "relevant": "selected(${Id10363}, 'dk') or selected(${Id10363}, 'no') or selected(${Id10363}, 'ref')",
-      "constraint": "not(selected(${Id10363}, 'no') and selected(${Id10365}, 'no'))",
+      "constraint": null,
       "calculation": null
     },
     {

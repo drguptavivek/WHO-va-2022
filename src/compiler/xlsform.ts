@@ -34,6 +34,11 @@ const RUNTIME_QUESTION_SECTION_PATHS: Record<string, string[]> = {
   nmh: ["consented", "injuries_accidents"]
 };
 
+// Both answers can validly be "No" for a baby of normal birth weight. The
+// upstream rule rejects that ordinary combination, so it must not reach the
+// standalone runtime contract.
+const OMITTED_SOURCE_CONSTRAINTS = new Set(["Id10365"]);
+
 function cellText(value: ExcelJS.CellValue): string {
   if (value == null) return "";
   if (value instanceof Date) return value.toISOString();
@@ -172,6 +177,7 @@ export async function compileWhoVaWorkbook(sourceFile: string): Promise<Instrume
     if (!row.name) continue;
 
     const shape = questionShape(sourceType);
+    const omitSourceConstraint = OMITTED_SOURCE_CONSTRAINTS.has(row.name);
     const question: InstrumentQuestion = {
       name: row.name,
       order: Number(row.order || 0),
@@ -184,7 +190,7 @@ export async function compileWhoVaWorkbook(sourceFile: string): Promise<Instrume
       guidance: localized(row, "guidance_hint"),
       required: sourceBoolean(row.required),
       readOnly: sourceBoolean(row.read_only),
-      constraintMessage: constraintMessage(row),
+      constraintMessage: omitSourceConstraint ? {} : constraintMessage(row),
       sectionPath: [...(RUNTIME_QUESTION_SECTION_PATHS[row.name] ?? sectionStack)],
       ...(row.agegroup ? { ageGroup: row.agegroup } : {}),
       ...(shape.listName ? { listName: shape.listName, choices: choicesByList.get(shape.listName) ?? [] } : {}),
@@ -192,7 +198,9 @@ export async function compileWhoVaWorkbook(sourceFile: string): Promise<Instrume
       ...(row.parameters ? { parameters: row.parameters } : {}),
       ...(row.default ? { defaultValue: row.default } : {}),
       ...(row.relevant ? { relevant: compileExpression(row.relevant, Number(row._row), "relevant") } : {}),
-      ...(row.constraint ? { constraint: compileExpression(row.constraint, Number(row._row), "constraint") } : {}),
+      ...(row.constraint && !omitSourceConstraint
+        ? { constraint: compileExpression(row.constraint, Number(row._row), "constraint") }
+        : {}),
       ...(row.calculation ? { calculation: compileExpression(row.calculation, Number(row._row), "calculation") } : {})
     };
     questions.push(question);
