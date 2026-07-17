@@ -35,6 +35,24 @@ describe("shared field and submission validation", () => {
     expect(validateAnswer(question, 99, {})).toEqual([]);
   });
 
+  it("enforces the complete labour-duration coding rule for Id10382", () => {
+    const question = getQuestion(whoVa2022Instrument, "Id10382");
+    const expectedMessage = "Enter a whole number of hours from 0 to 98. Use 0 for less than 1 hour; use 23 or 25 when only the less-than or more-than-24-hour estimate is known; use 88 for refused; and use 99 for don't know. If the actual duration was 88 hours, enter 87.";
+
+    expect(validateAnswer(question, -1, {})).toEqual([
+      expect.objectContaining({ question: "Id10382", code: "constraint", message: expectedMessage })
+    ]);
+    expect(validateAnswer(question, 12.5, {})).toEqual([
+      expect.objectContaining({ question: "Id10382", code: "type" })
+    ]);
+    expect(validateAnswer(question, 100, {})).toEqual([
+      expect.objectContaining({ question: "Id10382", code: "constraint", message: expectedMessage })
+    ]);
+    for (const value of [0, 12, 23, 25, 87, 88, 98, 99]) {
+      expect(validateAnswer(question, value, {})).toEqual([]);
+    }
+  });
+
   it("explains the date-of-death constraint in interviewer-facing language", () => {
     const question = getQuestion(whoVa2022Instrument, "Id10023_a");
     expect(validateAnswer(question, "2026-07-01", { Id10021: "2026-07-05" })).toEqual([

@@ -20,7 +20,14 @@ const INTERVIEWER_CONSTRAINT_MESSAGES: Record<string, LocalizedText> = {
   },
   Id10023_b: {
     en: "Date of death cannot be in the future."
+  },
+  Id10382: {
+    en: "Enter a whole number of hours from 0 to 98. Use 0 for less than 1 hour; use 23 or 25 when only the less-than or more-than-24-hour estimate is known; use 88 for refused; and use 99 for don't know. If the actual duration was 88 hours, enter 87."
   }
+};
+
+const RUNTIME_QUESTION_CONSTRAINTS: Record<string, string> = {
+  Id10382: "(.>=0 and .<=98) or .=99"
 };
 
 const RUNTIME_SECTION_LABELS: Record<string, LocalizedText> = {
@@ -80,10 +87,10 @@ function localized(row: SourceRow, prefix: string): LocalizedText {
 }
 
 function constraintMessage(row: SourceRow): LocalizedText {
+  const interviewerMessage = INTERVIEWER_CONSTRAINT_MESSAGES[row.name ?? ""];
+  if (interviewerMessage) return interviewerMessage;
   const sourceMessage = localized(row, "constraint_message");
-  return Object.keys(sourceMessage).length > 0
-    ? sourceMessage
-    : INTERVIEWER_CONSTRAINT_MESSAGES[row.name ?? ""] ?? {};
+  return Object.keys(sourceMessage).length > 0 ? sourceMessage : {};
 }
 
 function normalizeType(sourceType: string): string {
@@ -178,6 +185,7 @@ export async function compileWhoVaWorkbook(sourceFile: string): Promise<Instrume
 
     const shape = questionShape(sourceType);
     const omitSourceConstraint = OMITTED_SOURCE_CONSTRAINTS.has(row.name);
+    const constraintSource = RUNTIME_QUESTION_CONSTRAINTS[row.name] ?? row.constraint;
     const question: InstrumentQuestion = {
       name: row.name,
       order: Number(row.order || 0),
@@ -198,8 +206,8 @@ export async function compileWhoVaWorkbook(sourceFile: string): Promise<Instrume
       ...(row.parameters ? { parameters: row.parameters } : {}),
       ...(row.default ? { defaultValue: row.default } : {}),
       ...(row.relevant ? { relevant: compileExpression(row.relevant, Number(row._row), "relevant") } : {}),
-      ...(row.constraint && !omitSourceConstraint
-        ? { constraint: compileExpression(row.constraint, Number(row._row), "constraint") }
+      ...(constraintSource && !omitSourceConstraint
+        ? { constraint: compileExpression(constraintSource, Number(row._row), "constraint") }
         : {}),
       ...(row.calculation ? { calculation: compileExpression(row.calculation, Number(row._row), "calculation") } : {})
     };

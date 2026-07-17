@@ -36293,7 +36293,7 @@
       "required": false,
       "readOnly": false,
       "constraintMessage": {
-        "en": "Please enter a value between 0 and 99.  If response was greater than 98 hours, confirm the response and enter 98."
+        "en": "Enter a whole number of hours from 0 to 98. Use 0 for less than 1 hour; use 23 or 25 when only the less-than or more-than-24-hour estimate is known; use 88 for refused; and use 99 for don't know. If the actual duration was 88 hours, enter 87."
       },
       "sectionPath": [
         "consented",
@@ -36303,24 +36303,39 @@
       ],
       "ageGroup": "N",
       "constraint": {
-        "source": ".>=0 and .<=99",
+        "source": "(.>=0 and .<=98) or .=99",
         "ast": {
           "type": "binary",
-          "operator": "and",
+          "operator": "or",
           "left": {
             "type": "binary",
-            "operator": ">=",
+            "operator": "and",
             "left": {
-              "type": "current"
+              "type": "binary",
+              "operator": ">=",
+              "left": {
+                "type": "current"
+              },
+              "right": {
+                "type": "literal",
+                "value": 0
+              }
             },
             "right": {
-              "type": "literal",
-              "value": 0
+              "type": "binary",
+              "operator": "<=",
+              "left": {
+                "type": "current"
+              },
+              "right": {
+                "type": "literal",
+                "value": 98
+              }
             }
           },
           "right": {
             "type": "binary",
-            "operator": "<=",
+            "operator": "=",
             "left": {
               "type": "current"
             },
