@@ -2,7 +2,7 @@
  * Factory for the shared questionnaire form, coordinating session state,
  * validation, navigation, draft persistence, and platform question controls.
  */
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import type {
   AnswerValue,
@@ -361,11 +361,13 @@ export function createWhoVaForm(primitives: WhoVaPrimitiveSet): React.ComponentT
       if (result.completed) props.onComplete?.(session.validate());
     };
 
-    const answeredQuestions = instrument.questions.filter((question) => (
-      !["note", "calculated", "system"].includes(question.control)
-      && isQuestionRelevant(instrument, question, snapshot.data)
-      && hasAnswer(snapshot.data[question.name])
-    ));
+    const answeredQuestions = useMemo(() => view === "preview"
+      ? instrument.questions.filter((question) => (
+        !["note", "calculated", "system"].includes(question.control)
+        && hasAnswer(snapshot.data[question.name])
+        && isQuestionRelevant(instrument, question, snapshot.data)
+      ))
+      : [], [instrument, snapshot.data, view]);
 
     if (view === "preview") {
       return (

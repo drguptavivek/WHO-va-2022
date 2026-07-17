@@ -1,8 +1,9 @@
 /**
  * Canonical answer and submission validation, relevance evaluation, and
- * calculated-field normalization for the compiled instrument.
+ * calculated-field normalization for the canonical instrument contract.
  */
 import { evaluateExpression, parseExpression } from "./expression.js";
+import { getInstrumentRuntimeIndex } from "./instrument-index.js";
 import type {
   AnswerValue,
   InstrumentDefinition,
@@ -41,14 +42,14 @@ function typeIsValid(question: InstrumentQuestion, value: unknown): boolean {
 }
 
 export function getQuestion(instrument: InstrumentDefinition, name: string): InstrumentQuestion {
-  const question = instrument.questions.find((item) => item.name === name);
+  const question = getInstrumentRuntimeIndex(instrument).questionsByName.get(name);
   if (!question) throw new Error(`Unknown question '${name}'`);
   return question;
 }
 
 export function applyCalculations(instrument: InstrumentDefinition, data: SubmissionData): SubmissionData {
   const calculated: SubmissionData = { ...data };
-  for (const question of instrument.questions) {
+  for (const question of getInstrumentRuntimeIndex(instrument).calculatedQuestions) {
     if (!question.calculation) continue;
     calculated[question.name] = evaluateExpression(expressionAst(question.calculation), calculated) as AnswerValue;
   }
@@ -61,8 +62,18 @@ export function isQuestionRelevant(
   data: SubmissionData
 ): boolean {
   const calculated = applyCalculations(instrument, data);
+  return isQuestionRelevantWithCalculatedData(instrument, question, calculated);
+}
+
+/** Internal fast path for callers that already hold freshly calculated data. */
+export function isQuestionRelevantWithCalculatedData(
+  instrument: InstrumentDefinition,
+  question: InstrumentQuestion,
+  calculated: SubmissionData
+): boolean {
+  const { sectionsByName } = getInstrumentRuntimeIndex(instrument);
   for (const sectionName of question.sectionPath) {
-    const section = instrument.sections.find((item) => item.name === sectionName);
+    const section = sectionsByName.get(sectionName);
     if (section?.relevant && !evaluateExpression(expressionAst(section.relevant), calculated)) return false;
   }
   if (question.relevant && !evaluateExpression(expressionAst(question.relevant), calculated)) return false;
@@ -123,7 +134,7 @@ export function validateSubmission(
   const normalized: SubmissionData = { ...calculated };
   const issues: ValidationIssue[] = [];
   for (const question of instrument.questions) {
-    if (!isQuestionRelevant(instrument, question, calculated)) {
+    if (!isQuestionRelevantWithCalculatedData(instrument, question, calculated)) {
       if (question.control !== "system") delete normalized[question.name];
       continue;
     }

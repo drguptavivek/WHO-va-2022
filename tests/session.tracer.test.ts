@@ -34,6 +34,19 @@ describe("universal instrument session", () => {
     expect(session.getSnapshot().data.Id10010b).toBeUndefined();
   });
 
+  it("does not publish a redundant snapshot for the same instrument object", () => {
+    const session = createWhoVaSession(whoVa2022Instrument);
+    let notifications = 0;
+    const unsubscribe = session.subscribe(() => {
+      notifications += 1;
+    });
+
+    session.setInstrument(whoVa2022Instrument);
+
+    expect(notifications).toBe(0);
+    unsubscribe();
+  });
+
   it("allows a temporary constraint-invalid value while the interviewer is typing", () => {
     const session = createWhoVaSession(whoVa2022Instrument);
 
