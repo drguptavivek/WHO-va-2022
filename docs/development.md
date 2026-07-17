@@ -1,0 +1,136 @@
+# Developer guide
+
+This guide covers local development of `@who-va/instrument`. For application integration, start with the [README](../README.md). For exported interfaces and functions, see the [API reference](api.md).
+
+## Prerequisites
+
+- Node.js compatible with the versions supported by the current dependencies
+- pnpm 11.9.0 (the version pinned in `package.json`)
+- Chromium installed through Playwright for browser end-to-end tests
+
+```bash
+corepack enable
+pnpm install
+pnpm exec playwright install chromium
+```
+
+The package is ESM-only. React is required by the UI entry points; React DOM, React Native, and React Native Web are optional peer dependencies so consumers install only the platforms they use.
+
+## Run the project
+
+```bash
+pnpm dev
+```
+
+This starts the Vite demo at `http://127.0.0.1:5173`. The demo uses the same web entry point published by the package.
+
+Useful commands:
+
+| Command | Purpose |
+| --- | --- |
+| `pnpm typecheck` | Check TypeScript without emitting files |
+| `pnpm test` | Run Vitest unit, integration, tracer, and source-conformance tests |
+| `pnpm test:watch` | Run Vitest in watch mode |
+| `pnpm test:e2e` | Run Playwright against the Vite demo |
+| `pnpm test:e2e:headed` | Run the browser suite visibly and sequentially |
+| `pnpm test:e2e:report` | Open the latest Playwright HTML report |
+| `pnpm build` | Build ESM bundles, declarations, and source maps into `dist/` |
+| `pnpm build:demo` | Produce a static demo build |
+| `pnpm check` | Run type checking, Vitest, and the package build |
+
+`pnpm check` intentionally does not include Playwright. Run `pnpm test:e2e` separately when a change affects controls, navigation, browser persistence, or form behavior.
+
+## Repository map
+
+| Path | Responsibility |
+| --- | --- |
+| `src/index.ts` | Root, headless package entry point |
+| `src/native.tsx` | Expo and React Native entry point |
+| `src/web.tsx` | React web entry point and browser adapters |
+| `src/web-component.tsx` | Custom-element wrapper for non-React sites |
+| `src/engine/` | Expression parsing/evaluation, calculations, validation, indexes, and session state |
+| `src/ui/` | Shared form and reusable question-control factories |
+| `src/generated/` | Checked-in canonical instrument and question audit |
+| `src/languages/` | Lazily imported built-in language files |
+| `src/attachments.ts` | Platform-neutral attachment policy and processing contracts |
+| `src/web-attachments.ts` | IndexedDB, browser image processing, and PDF.js adapters |
+| `src/native-attachments.ts` | Native image-processing adapter seam |
+| `tests/` | Vitest tests, including workbook conformance checks |
+| `e2e/` | Playwright form automation |
+| `examples/` | Minimal React web, Expo, and plain-web integrations |
+| `demo/` | Local Vite preview used by developers and Playwright |
+| `whova2022_xls_form_for_odk.xlsx` | WHO source workbook retained as provenance and a test fixture |
+
+## Source-of-truth rules
+
+`src/generated/who-va-2022.instrument.json` is the authoritative executable instrument. It is checked in so builds are deterministic and offline. The runtime and package build must not read the workbook or import `exceljs`.
+
+The workbook is a provenance artifact. `src/compiler/xlsform.ts` may read it only in tests to compare the source with the canonical JSON. The compiler must not regenerate or overwrite the checked-in contract.
+
+When changing the instrument:
+
+1. Edit the canonical JSON deliberately and review the diff as data.
+2. Keep stable question names and coded choice values unless the external data contract is intentionally changing.
+3. Update `who-va-2022.question-audit.json` when the human-review matrix must change with the contract.
+4. Run source-conformance tests and the question-by-question test suite.
+5. Document any intentional divergence from the retained workbook.
+
+## Runtime flow
+
+The headless engine is shared by every renderer:
+
+```text
+canonical instrument -> session -> calculations/relevance -> field validation
+                                      -> navigation -> submission validation
+```
+
+`createWhoVaSession()` is the stateful boundary. It owns answers, the current visible section, navigation, and subscriptions. The validation functions are also exported independently for server-side or batch use. Renderers add controls and platform adapters but do not implement separate questionnaire rules.
+
+The root entry point exposes a synchronous `whoVa2022Instrument` for compatibility. UI entry points call `loadWhoVa2022Instrument()` so the large JSON contract is parsed only when the first default form needs it.
+
+## Making changes
+
+### Engine or instrument behavior
+
+Add focused tests under `tests/`. Prefer testing public functions or a session over duplicating internal calculations. If behavior originates in the workbook, include or update a source-conformance assertion.
+
+### Shared controls
+
+Controls belong in `src/ui/question-controls.tsx` and should use injected primitives and platform services. Keep questionnaire behavior outside platform-specific entry points. Verify shared behavior with Vitest and browser interaction with Playwright when relevant.
+
+### Platform adapters
+
+Keep native-only APIs in `src/native.tsx` or native adapter modules, and browser-only APIs in `src/web.tsx` or web adapter modules. Do not pull browser globals into the root entry point or native dependencies into the web bundle.
+
+### Languages
+
+Language files translate interviewer-facing text only. Question names, choice values, expressions, and stored answers remain unchanged. Built-in French and Hindi are draft translations and require specialist review before production deployment. See the README for the language-file shape and lazy-loader example.
+
+### Attachments
+
+Attachment handling is fail-closed. New formats or processing paths need byte-level validation, a canonical stored representation, lifecycle cleanup, and tests. Review [Attachment processing](attachments.md) before changing this boundary.
+
+## Test strategy
+
+The suites are intentionally layered:
+
+- Unit tests cover dates, expressions, localization, attachments, and isolated controls.
+- Tracer and integration tests cover calculations, constraints, sessions, web-component events, and runtime boundaries.
+- Parameterized tests exercise every named WHO question through field and submission validation.
+- Source-conformance tests compare the canonical JSON with the workbook without mutating either artifact.
+- Playwright drives the rendered form, including error correction, age calculations, and navigation.
+
+For a normal code change, run the narrowest related Vitest file while iterating, then `pnpm check`. Add `pnpm test:e2e` for user-visible browser or navigation changes.
+
+## Build and package boundaries
+
+`tsup.config.ts` emits four ESM entry points: root, native, web, and web component. React platform packages are externalized. Before publishing or consuming a local build, inspect `dist/` and confirm that:
+
+- declarations exist for every entry point;
+- the root bundle has no React, browser, React Native, Excel, or workbook dependency;
+- platform-specific code remains behind its documented subpath;
+- generated JSON and language chunks needed at runtime are included.
+
+## Data and deployment responsibilities
+
+This repository provides the instrument, offline interview state, validation, and client-side attachment canonicalization. A host application remains responsible for identity, encryption, access control, synchronization, retention, backups, device-loss handling, upload authorization, malware scanning, and authoritative server-side file validation.

@@ -4,6 +4,19 @@ A React Native-first implementation of the **WHO 2022 Verbal Autopsy instrument 
 
 The runtime and package build do **not** use SurveyJS, Excel, or XLSForm generation. The WHO workbook and its `exceljs` compiler are retained only as development fixtures for source-conformance tests; they never write the canonical JSON contract.
 
+## Documentation
+
+- [Developer guide](docs/development.md) — setup, repository map, common workflows, testing, and contribution rules
+- [API reference](docs/api.md) — entry points and the main headless, form, draft, localization, and attachment APIs
+- [Architecture](docs/architecture.md) — executable contract, runtime boundaries, shared behavior, and platform services
+- [Attachment processing](docs/attachments.md) — validation policy, browser/native lifecycles, and the server boundary
+
+## Screenshots
+
+| English | Hindi |
+| --- | --- |
+| ![WHO 2022 Verbal Autopsy form in English](docs/images/form-english.jpg) | ![WHO 2022 Verbal Autopsy form in Hindi](docs/images/form-hindi.jpg) |
+
 ## Package entry points
 
 | Import | Purpose |
@@ -298,4 +311,4 @@ Canonical artifacts:
 
 The package build reads only the checked-in JSON. Tests may compile the retained XLSForm in memory to detect source drift and verify type, coded values, requiredness, relevance AST, constraints, calculations, field validation, and isolated submission validation. The test compiler never regenerates or modifies the JSON.
 
-See [Architecture](docs/architecture.md) for the trust boundaries and extension points.
+See the [developer guide](docs/development.md) for the full contributor workflow and [Architecture](docs/architecture.md) for the trust boundaries and extension points.
