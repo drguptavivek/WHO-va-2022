@@ -52,17 +52,23 @@ function localized(text: Record<string, string | undefined>, locale: string, fal
   return plainText(text[locale] ?? text.en ?? fallback);
 }
 
+function interviewerQuestionLabel(value: string): string {
+  return value.replace(/^(\([^)]+\))\s*\[([^\]]+)\](.*)$/s, "$1 $2$3");
+}
+
 const styles = {
   root: { flex: 1, backgroundColor: "#f6f8f7" },
   content: { padding: 20, maxWidth: 760, width: "100%", alignSelf: "center" as const },
   progress: { color: "#47625b", marginBottom: 6, fontSize: 13 },
   sectionTitle: { color: "#12372d", fontSize: 24, fontWeight: "700" as const, marginBottom: 18 },
   question: { backgroundColor: "#ffffff", borderRadius: 12, padding: 16, marginBottom: 12, borderWidth: 1, borderColor: "#dce6e1" },
+  questionError: { borderColor: "#d66552" },
   label: { color: "#142a24", fontSize: 16, fontWeight: "600" as const, marginBottom: 8 },
   required: { color: "#a23a2a" },
   hint: { color: "#536b64", fontSize: 13, marginBottom: 10 },
   guidance: { color: "#315e73", fontSize: 13, marginBottom: 10 },
   input: { borderWidth: 1, borderColor: "#9fb4ad", borderRadius: 8, minHeight: 44, paddingHorizontal: 12, paddingVertical: 9, color: "#142a24", backgroundColor: "#ffffff" },
+  inputError: { borderColor: "#b34231", backgroundColor: "#fff8f6" },
   choice: { borderWidth: 1, borderColor: "#9fb4ad", borderRadius: 8, padding: 12, marginTop: 7, backgroundColor: "#ffffff" },
   choiceSelected: { borderColor: "#147d64", backgroundColor: "#e3f4ee" },
   choiceText: { color: "#213b34" },
@@ -103,9 +109,10 @@ export function createWhoVaForm(primitives: WhoVaPrimitiveSet): React.ComponentT
     const renderQuestion = (question: InstrumentQuestion) => {
       const value = snapshot.data[question.name];
       const issues = snapshot.issues.filter((issue) => issue.question === question.name);
-      const label = localized(question.label, locale, question.name);
+      const label = interviewerQuestionLabel(localized(question.label, locale, question.name));
       const hint = localized(question.hint, locale, "");
       const guidance = localized(question.guidance, locale, "");
+      const hasIssues = issues.length > 0;
 
       let control: React.ReactNode = null;
       if (question.control === "note") {
@@ -115,7 +122,8 @@ export function createWhoVaForm(primitives: WhoVaPrimitiveSet): React.ComponentT
           <TextInput
             accessibilityLabel={label}
             testID={`question-${question.name}`}
-            style={styles.input}
+            style={[styles.input, hasIssues && styles.inputError]}
+            aria-invalid={hasIssues || undefined}
             value={value == null ? "" : String(value)}
             multiline={question.control === "text" && question.appearance === "multiline"}
             keyboardType={question.control === "integer" ? "number-pad" : "default"}
@@ -185,12 +193,21 @@ export function createWhoVaForm(primitives: WhoVaPrimitiveSet): React.ComponentT
       }
 
       return (
-        <View key={question.name} style={[styles.question, question.control === "note" && styles.note]} testID={`question-card-${question.name}`}>
+        <View key={question.name} style={[styles.question, question.control === "note" && styles.note, hasIssues && styles.questionError]} testID={`question-card-${question.name}`}>
           <Text style={styles.label}>{label}{question.required && question.control !== "note" ? <Text style={styles.required}> *</Text> : null}</Text>
           {hint ? <Text style={styles.hint}>{hint}</Text> : null}
           {props.showSourceGuidance && guidance ? <Text style={styles.guidance}>{guidance}</Text> : null}
           {control}
-          {issues.map((issue) => <Text key={`${issue.code}-${issue.message}`} style={styles.error}>{issue.message}</Text>)}
+          {issues.map((issue) => (
+            <Text
+              key={`${issue.code}-${issue.message}`}
+              style={styles.error}
+              accessibilityLiveRegion="polite"
+              role="alert"
+            >
+              {issue.message}
+            </Text>
+          ))}
         </View>
       );
     };

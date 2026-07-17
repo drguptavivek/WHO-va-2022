@@ -17,6 +17,8 @@ describe("framework-independent web embedding", () => {
 
     expect(element.getData().Id10011).toEqual(expect.any(String));
     expect(element.textContent).not.toContain("Once filled in ODK Collect");
+    expect(element.textContent).toContain("(Id10010) Name of VA interviewer");
+    expect(element.textContent).not.toContain("(Id10010) [Name of VA interviewer]");
     element.setData({ Id10010b: "female" });
     expect(element.getData().Id10010b).toBe("female");
     expect(element.validate().valid).toBe(false);

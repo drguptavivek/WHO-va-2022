@@ -39,10 +39,11 @@ describe("universal instrument session", () => {
 
     expect(() => session.setAnswer("Id10010a", 3)).not.toThrow();
     expect(session.getSnapshot().data.Id10010a).toBe(3);
-
-    session.next();
     expect(session.getSnapshot().issues).toEqual(expect.arrayContaining([
       expect.objectContaining({ question: "Id10010a", code: "constraint" })
     ]));
+
+    session.setAnswer("Id10010a", 33);
+    expect(session.getSnapshot().issues.some((issue) => issue.question === "Id10010a")).toBe(false);
   });
 });

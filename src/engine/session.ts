@@ -101,10 +101,15 @@ class UniversalWhoVaSession implements WhoVaSession {
     const nextData = { ...this.data };
     if (value == null || value === "" || (Array.isArray(value) && value.length === 0)) delete nextData[name];
     else nextData[name] = value;
-    const blocking = validateAnswer(question, value, nextData).filter(blocksDraftMutation);
+    const calculatedNextData = applyCalculations(this.instrument, nextData);
+    const fieldIssues = validateAnswer(question, value, calculatedNextData);
+    const blocking = fieldIssues.filter(blocksDraftMutation);
     if (blocking.length) throw new Error(blocking[0]?.message ?? `${name} is invalid`);
-    this.data = applyCalculations(this.instrument, nextData);
-    this.issues = this.issues.filter((issue) => issue.question !== name);
+    this.data = calculatedNextData;
+    this.issues = [
+      ...this.issues.filter((issue) => issue.question !== name),
+      ...fieldIssues
+    ];
     this.notify();
   }
 
