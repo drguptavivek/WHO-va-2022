@@ -5,6 +5,12 @@ import { createWhoVaForm } from "./ui/create-who-va-form.js";
 import { createLocalStorageDraftStore } from "./draft.js";
 import { createWhoVaQuestionControls, type WhoVaPlatformServices } from "./ui/question-controls.js";
 import type { AnswerValue } from "./types.js";
+import {
+  createIndexedDbWebAttachmentStore,
+  processWebImageAttachment,
+  processWebPdfAttachment,
+  resolveWebAttachmentUri
+} from "./web-attachments.js";
 
 export * from "./index.js";
 export type { WhoVaFormProps, WhoVaPlatformServices } from "./ui/create-who-va-form.js";
@@ -40,7 +46,7 @@ function scrollToWebQuestion(questionNode: unknown) {
   )?.focus({ preventScroll: true });
 }
 
-function selectWebAttachment(accept: string, capture = false): Promise<AnswerValue | undefined> {
+function selectWebFile(accept: string, capture = false): Promise<File | undefined> {
   return new Promise((resolve) => {
     const input = document.createElement("input");
     input.type = "file";
@@ -52,26 +58,60 @@ function selectWebAttachment(accept: string, capture = false): Promise<AnswerVal
         resolve(undefined);
         return;
       }
-      const reader = new FileReader();
-      reader.addEventListener("load", () => resolve({
-        uri: String(reader.result),
-        name: file.name,
-        mimeType: file.type || accept,
-        size: file.size
-      }));
-      reader.addEventListener("error", () => resolve(undefined));
-      reader.readAsDataURL(file);
+      resolve(file);
     }, { once: true });
     input.addEventListener("cancel", () => resolve(undefined), { once: true });
     input.click();
   });
 }
 
+const webAttachmentStore = createIndexedDbWebAttachmentStore();
+
+async function selectAndProcessWebImage(capture = false): Promise<AnswerValue | undefined> {
+  const file = await selectWebFile("image/jpeg,image/png", capture);
+  return file ? processWebImageAttachment(file, { store: webAttachmentStore }) : undefined;
+}
+
+async function selectAndProcessWebPdf(): Promise<AnswerValue | undefined> {
+  const file = await selectWebFile("application/pdf");
+  return file ? processWebPdfAttachment(file, { store: webAttachmentStore }) : undefined;
+}
+
 const webAttachmentPlatform: WhoVaPlatformServices = {
-  captureImage: async () => selectWebAttachment("image/*", true),
-  selectImage: async () => selectWebAttachment("image/*"),
-  selectFile: async (_question, _data, acceptedMimeTypes) => selectWebAttachment(acceptedMimeTypes.join(","))
+  captureImage: async () => selectAndProcessWebImage(true),
+  selectImage: async () => selectAndProcessWebImage(),
+  selectFile: async (_question, _data, acceptedMimeTypes) => {
+    if (!acceptedMimeTypes.includes("application/pdf")) return undefined;
+    return selectAndProcessWebPdf();
+  },
+  resolveAttachmentUri: async (attachment) => {
+    if (attachment == null || Array.isArray(attachment) || typeof attachment !== "object" || typeof attachment.id !== "string") return undefined;
+    return resolveWebAttachmentUri({ id: attachment.id }, webAttachmentStore);
+  },
+  releaseAttachmentUri: (uri) => {
+    if (uri.startsWith("blob:")) URL.revokeObjectURL(uri);
+  },
+  removeAttachment: async (attachment) => {
+    if (attachment != null && !Array.isArray(attachment) && typeof attachment === "object" && typeof attachment.id === "string") {
+      const pages = Array.isArray(attachment.pages) ? attachment.pages : [];
+      const pageIds = pages.flatMap((page) => (
+        page != null && typeof page === "object" && "id" in page && typeof page.id === "string" ? [page.id] : []
+      ));
+      await Promise.all(pageIds.length > 0
+        ? pageIds.map((id) => webAttachmentStore.remove(id))
+        : [webAttachmentStore.remove(attachment.id)]);
+    }
+  }
 };
+
+export {
+  createBrowserImageTranscoder,
+  createIndexedDbWebAttachmentStore,
+  createPdfJsRasterizer,
+  processWebImageAttachment,
+  processWebPdfAttachment,
+  resolveWebAttachmentUri
+} from "./web-attachments.js";
 
 export const WhoVaForm = createWhoVaForm({
   View,

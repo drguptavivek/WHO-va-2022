@@ -4,7 +4,7 @@ import React from "react";
 import { createRoot } from "react-dom/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { whoVa2022Instrument, type InstrumentQuestion } from "../src/index.js";
+import { AttachmentProcessingError, whoVa2022Instrument, type InstrumentQuestion } from "../src/index.js";
 import { WhoVaQuestionControls } from "../src/web.js";
 
 const textQuestion: InstrumentQuestion = {
@@ -123,8 +123,73 @@ describe("reusable question controls", () => {
     root.unmount();
   });
 
+  it("shows a realtime processing error and does not retain a rejected image", async () => {
+    const onAnswer = vi.fn();
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+    root.render(
+      <WhoVaQuestionControls.Image
+        question={{ ...textQuestion, name: "photo", sourceType: "image", dataType: "attachment", control: "image" }}
+        value={undefined}
+        data={{}}
+        locale="en"
+        issues={[]}
+        platform={{ selectImage: vi.fn().mockRejectedValue(new AttachmentProcessingError("image-type-not-allowed")) }}
+        onAnswer={onAnswer}
+      />
+    );
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    const chooseImage = Array.from(container.querySelectorAll<HTMLElement>('[role="button"]'))
+      .find((button) => button.textContent === "Choose image");
+    chooseImage?.click();
+
+    await vi.waitFor(() => expect(container.querySelector('[role="alert"]')?.textContent)
+      .toContain("Choose a valid JPEG or PNG image"));
+    expect(onAnswer).not.toHaveBeenCalled();
+    root.unmount();
+  });
+
+  it("does not accept an unprocessed native image reference", async () => {
+    const onAnswer = vi.fn();
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+    root.render(
+      <WhoVaQuestionControls.Image
+        question={{ ...textQuestion, name: "photo", sourceType: "image", dataType: "attachment", control: "image" }}
+        value={undefined}
+        data={{}}
+        locale="en"
+        issues={[]}
+        platform={{ selectImage: vi.fn().mockResolvedValue({ uri: "file:///camera/raw.heic", name: "raw.heic" }) }}
+        onAnswer={onAnswer}
+      />
+    );
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    Array.from(container.querySelectorAll<HTMLElement>('[role="button"]'))
+      .find((button) => button.textContent === "Choose image")?.click();
+
+    await vi.waitFor(() => expect(container.querySelector('[role="alert"]')?.textContent)
+      .toContain("Image processing is unavailable"));
+    expect(onAnswer).not.toHaveBeenCalled();
+    root.unmount();
+  });
+
   it("limits the reusable file selector to PDFs and returns the attachment", async () => {
-    const selectedPdf = { uri: "app://documents/report.pdf", name: "report.pdf", mimeType: "application/pdf" };
+    const selectedPdf = {
+      uri: "who-va-pdf-pages:report",
+      name: "report-pages",
+      originalName: "report.pdf",
+      mimeType: "application/vnd.who-va.pdf-pages+json",
+      pageCount: 1,
+      size: 24,
+      originalRetained: false,
+      processed: true,
+      pages: [{ uri: "who-va-attachment:report-page-001", mimeType: "image/jpeg" }]
+    };
     const selectFile = vi.fn().mockResolvedValue(selectedPdf);
     const onAnswer = vi.fn();
     const container = document.createElement("div");

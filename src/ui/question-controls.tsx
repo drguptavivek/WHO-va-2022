@@ -1,5 +1,12 @@
 import React, { useEffect, useState } from "react";
 
+import {
+  AttachmentProcessingError,
+  WHO_VA_ATTACHMENT_POLICY,
+  isProcessedImageAttachment,
+  isProcessedPdfAttachment,
+  type ImageAttachmentPolicy
+} from "../attachments.js";
 import type {
   AnswerValue,
   InstrumentQuestion,
@@ -17,11 +24,25 @@ export interface WhoVaPlatformServices {
   ) => Promise<string | undefined>;
   captureImage?: (question: InstrumentQuestion, data: SubmissionData) => Promise<AnswerValue | undefined>;
   selectImage?: (question: InstrumentQuestion, data: SubmissionData) => Promise<AnswerValue | undefined>;
+  processImage?: (
+    selection: AnswerValue,
+    policy: ImageAttachmentPolicy,
+    question: InstrumentQuestion,
+    data: SubmissionData
+  ) => Promise<AnswerValue>;
   selectFile?: (
     question: InstrumentQuestion,
     data: SubmissionData,
     acceptedMimeTypes: string[]
   ) => Promise<AnswerValue | undefined>;
+  processPdf?: (
+    selection: AnswerValue,
+    question: InstrumentQuestion,
+    data: SubmissionData
+  ) => Promise<AnswerValue>;
+  resolveAttachmentUri?: (attachment: AnswerValue) => Promise<string | undefined>;
+  releaseAttachmentUri?: (uri: string) => void;
+  removeAttachment?: (attachment: AnswerValue) => Promise<void>;
 }
 
 export interface WhoVaQuestionControlProps {
@@ -63,7 +84,8 @@ export const questionControlStyles = {
   buttonTextDanger: { color: "#8c3022", fontWeight: "700" as const },
   imageFrame: { overflow: "hidden" as const, minHeight: 220, borderRadius: 8, backgroundColor: "#10231e", alignItems: "center" as const, justifyContent: "center" as const, marginTop: 8 },
   image: { width: "100%", height: 260, resizeMode: "contain" as const },
-  attachmentName: { color: "#213b34", marginTop: 10 }
+  attachmentName: { color: "#213b34", marginTop: 10 },
+  attachmentError: { color: "#a23a2a", fontSize: 13, fontWeight: "700" as const, marginTop: 8 }
 };
 
 function plainText(value: string | undefined): string {
@@ -106,9 +128,15 @@ function attachmentDetails(value: AnswerValue | undefined): { uri?: string; name
   if (value == null || Array.isArray(value) || typeof value !== "object") return {};
   return {
     ...(typeof value.uri === "string" ? { uri: value.uri } : {}),
-    ...(typeof value.name === "string" ? { name: value.name } : {}),
+    ...(typeof value.originalName === "string" ? { name: value.originalName } : typeof value.name === "string" ? { name: value.name } : {}),
     ...(typeof value.mimeType === "string" ? { mimeType: value.mimeType } : {})
   };
+}
+
+function attachmentErrorMessage(error: unknown): string {
+  return error instanceof AttachmentProcessingError
+    ? error.userMessage
+    : "The selected attachment could not be processed and was discarded.";
 }
 
 export function createWhoVaQuestionControls(primitives: WhoVaQuestionControlPrimitives) {
@@ -327,25 +355,64 @@ export function createWhoVaQuestionControls(primitives: WhoVaQuestionControlPrim
   }
 
   function ImagePicker({ question, value, data, platform, onAnswer }: WhoVaQuestionControlProps) {
+    const attachment = attachmentDetails(value);
     const [busy, setBusy] = useState<"camera" | "library">();
     const [rotation, setRotation] = useState(0);
     const [zoom, setZoom] = useState(1);
     const [visible, setVisible] = useState(true);
-    const attachment = attachmentDetails(value);
+    const [previewUri, setPreviewUri] = useState<string | undefined>(() => attachment.uri);
+    const [processingError, setProcessingError] = useState<string>();
     const services = { ...primitives.platform, ...platform };
+    const resolveAttachmentUri = services.resolveAttachmentUri;
+    const releaseAttachmentUri = services.releaseAttachmentUri;
+
+    useEffect(() => {
+      let active = true;
+      let resolvedUri: string | undefined;
+      const attachmentValue = value;
+      if (!attachment.uri) {
+        setPreviewUri(undefined);
+        return () => { active = false; };
+      }
+      if (!resolveAttachmentUri || attachmentValue === undefined || typeof attachmentValue === "string" || !attachment.uri.startsWith("who-va-attachment:")) {
+        setPreviewUri(attachment.uri);
+        return () => { active = false; };
+      }
+      setPreviewUri(undefined);
+      void resolveAttachmentUri(attachmentValue).then((uri) => {
+        resolvedUri = uri;
+        if (active) setPreviewUri(uri);
+      }).catch(() => {
+        if (active) setProcessingError("The saved image could not be loaded from this device.");
+      });
+      return () => {
+        active = false;
+        if (resolvedUri) releaseAttachmentUri?.(resolvedUri);
+      };
+    }, [attachment.uri, releaseAttachmentUri, resolveAttachmentUri, value]);
 
     const choose = async (source: "camera" | "library") => {
       const picker = source === "camera" ? services?.captureImage : services?.selectImage;
       if (!picker) return;
       setBusy(source);
+      setProcessingError(undefined);
       try {
-        const selected = await picker(question, data);
+        const candidate = await picker(question, data);
+        let selected = candidate;
+        if (candidate !== undefined && !isProcessedImageAttachment(candidate)) {
+          if (!services.processImage) throw new AttachmentProcessingError("image-processing-unavailable");
+          selected = await services.processImage(candidate, WHO_VA_ATTACHMENT_POLICY.image, question, data);
+        }
         if (selected !== undefined) {
+          if (!isProcessedImageAttachment(selected)) throw new AttachmentProcessingError("image-output-invalid");
+          if (value !== undefined) await services.removeAttachment?.(value);
           onAnswer(selected);
           setRotation(0);
           setZoom(1);
           setVisible(true);
         }
+      } catch (error) {
+        setProcessingError(attachmentErrorMessage(error));
       } finally {
         setBusy(undefined);
       }
@@ -353,17 +420,18 @@ export function createWhoVaQuestionControls(primitives: WhoVaQuestionControlPrim
 
     return (
       <>
-        {attachment.uri && visible && Image ? (
+        {previewUri && visible && Image ? (
           <View style={questionControlStyles.imageFrame}>
             <Image
               accessibilityLabel={attachment.name ?? "Selected image"}
               testID={`question-${question.name}-preview`}
-              source={{ uri: attachment.uri }}
+              source={{ uri: previewUri }}
               style={[questionControlStyles.image, { transform: [{ rotate: `${rotation}deg` }, { scale: zoom }] }]}
             />
           </View>
         ) : null}
         {attachment.name ? <PrimitiveText style={questionControlStyles.attachmentName}>{attachment.name}</PrimitiveText> : null}
+        {processingError ? <PrimitiveText accessibilityRole="alert" style={questionControlStyles.attachmentError}>{processingError}</PrimitiveText> : null}
         <View style={questionControlStyles.actions}>
           <Pressable
             accessibilityRole="button"
@@ -395,7 +463,10 @@ export function createWhoVaQuestionControls(primitives: WhoVaQuestionControlPrim
               <Pressable accessibilityRole="button" style={[questionControlStyles.button, questionControlStyles.buttonSecondary]} onPress={() => setZoom((current) => Math.max(0.5, current - 0.25))}>
                 <PrimitiveText style={questionControlStyles.buttonTextSecondary}>Zoom out</PrimitiveText>
               </Pressable>
-              <Pressable accessibilityRole="button" style={[questionControlStyles.button, questionControlStyles.buttonDanger]} onPress={() => onAnswer(undefined)}>
+              <Pressable accessibilityRole="button" style={[questionControlStyles.button, questionControlStyles.buttonDanger]} onPress={() => {
+                if (value !== undefined) void services.removeAttachment?.(value);
+                onAnswer(undefined);
+              }}>
                 <PrimitiveText style={questionControlStyles.buttonTextDanger}>Remove image</PrimitiveText>
               </Pressable>
             </>
@@ -407,6 +478,7 @@ export function createWhoVaQuestionControls(primitives: WhoVaQuestionControlPrim
 
   function FilePicker({ question, value, data, platform, onAnswer }: WhoVaQuestionControlProps) {
     const [busy, setBusy] = useState(false);
+    const [processingError, setProcessingError] = useState<string>();
     const attachment = attachmentDetails(value);
     const services = { ...primitives.platform, ...platform };
     return (
@@ -421,9 +493,21 @@ export function createWhoVaQuestionControls(primitives: WhoVaQuestionControlPrim
             onPress={async () => {
               if (!services?.selectFile) return;
               setBusy(true);
+              setProcessingError(undefined);
               try {
-                const selected = await services.selectFile(question, data, ["application/pdf"]);
-                if (selected !== undefined) onAnswer(selected);
+                const candidate = await services.selectFile(question, data, ["application/pdf"]);
+                let selected = candidate;
+                if (candidate !== undefined && !isProcessedPdfAttachment(candidate)) {
+                  if (!services.processPdf) throw new AttachmentProcessingError("pdf-processing-unavailable");
+                  selected = await services.processPdf(candidate, question, data);
+                }
+                if (selected !== undefined) {
+                  if (!isProcessedPdfAttachment(selected)) throw new AttachmentProcessingError("pdf-render-failed");
+                  if (value !== undefined) await services.removeAttachment?.(value);
+                  onAnswer(selected);
+                }
+              } catch (error) {
+                setProcessingError(attachmentErrorMessage(error));
               } finally {
                 setBusy(false);
               }
@@ -431,8 +515,12 @@ export function createWhoVaQuestionControls(primitives: WhoVaQuestionControlPrim
           >
             <PrimitiveText style={questionControlStyles.buttonText}>{busy ? "Opening files…" : attachment.uri ? "Replace PDF" : "Choose PDF"}</PrimitiveText>
           </Pressable>
+          {processingError ? <PrimitiveText accessibilityRole="alert" style={questionControlStyles.attachmentError}>{processingError}</PrimitiveText> : null}
           {attachment.uri ? (
-            <Pressable accessibilityRole="button" style={[questionControlStyles.button, questionControlStyles.buttonDanger]} onPress={() => onAnswer(undefined)}>
+            <Pressable accessibilityRole="button" style={[questionControlStyles.button, questionControlStyles.buttonDanger]} onPress={() => {
+              if (value !== undefined) void services.removeAttachment?.(value);
+              onAnswer(undefined);
+            }}>
               <PrimitiveText style={questionControlStyles.buttonTextDanger}>Remove PDF</PrimitiveText>
             </Pressable>
           ) : null}
