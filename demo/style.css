@@ -75,15 +75,6 @@ body {
   letter-spacing: -0.035em;
 }
 
-.eyebrow {
-  margin: 0;
-  color: #bfdbfe;
-  font-size: 0.7rem;
-  font-weight: 750;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-}
-
 .language-picker {
   flex: 0 0 auto;
   align-self: flex-start;
