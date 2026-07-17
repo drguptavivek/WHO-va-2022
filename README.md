@@ -92,6 +92,7 @@ This is the same validator used by the native and web form sessions.
 ## Source generation and tests
 
 ```bash
+pnpm dev          # launch the browser preview at http://127.0.0.1:5173
 pnpm generate     # XLSForm -> checked-in runtime contract and audit report
 pnpm typecheck
 pnpm test         # includes one parameterized contract test per named WHO row

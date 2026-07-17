@@ -29,6 +29,8 @@
     }
   },
   "scripts": {
+    "dev": "vite demo --host 127.0.0.1",
+    "build:demo": "vite build demo",
     "generate": "tsx scripts/convert-xlsform.ts",
     "test": "vitest run",
     "test:watch": "vitest",
@@ -67,6 +69,7 @@
     "tsup": "^8.5.1",
     "tsx": "^4.20.0",
     "typescript": "^5.9.3",
+    "vite": "^8.1.5",
     "vitest": "^4.1.10"
   },
   "packageManager": "pnpm@11.9.0"
