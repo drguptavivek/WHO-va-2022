@@ -27,9 +27,22 @@ describe("runtime artifact boundary", () => {
     });
   });
 
-  it("does not expose the build-time workbook compiler from the public runtime", async () => {
-    const source = await readFile("src/index.ts", "utf8");
+  it("builds from checked-in JSON while workbook tooling remains development-only", async () => {
+    const [source, packageSource] = await Promise.all([
+      readFile("src/index.ts", "utf8"),
+      readFile("package.json", "utf8")
+    ]);
+    const packageJson = JSON.parse(packageSource) as {
+      scripts?: Record<string, string>;
+      dependencies?: Record<string, string>;
+      devDependencies?: Record<string, string>;
+    };
+
     expect(source).not.toContain("compiler/xlsform");
-    expect(source).not.toContain("exceljs");
+    expect(packageJson.scripts).not.toHaveProperty("generate");
+    expect(packageJson.scripts?.build).not.toContain("generate");
+    expect(packageJson.scripts?.check).not.toContain("generate");
+    expect(packageJson.dependencies).not.toHaveProperty("exceljs");
+    expect(packageJson.devDependencies).toHaveProperty("exceljs");
   });
 });

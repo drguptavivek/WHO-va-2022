@@ -16,5 +16,5 @@
     "sourceMap": true,
     "types": ["vitest/globals", "node"]
   },
-  "include": ["src", "scripts", "tests", "tsup.config.ts"]
+  "include": ["src", "tests", "tsup.config.ts"]
 }

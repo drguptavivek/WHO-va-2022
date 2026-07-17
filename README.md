@@ -1,8 +1,8 @@
 # WHO 2022 Verbal Autopsy Instrument
 
-A React Native-first implementation of the **WHO 2022 Verbal Autopsy instrument V1.1**. One platform-neutral question contract drives Expo, React Native, React Native Web, non-React websites, field validation, and submission validation.
+A React Native-first implementation of the **WHO 2022 Verbal Autopsy instrument V1.1**. One checked-in, platform-neutral JSON contract drives Expo, React Native, React Native Web, non-React websites, field validation, and submission validation.
 
-The runtime does **not** use SurveyJS and does **not** read the Excel workbook. The WHO XLSForm is a build-time source used only by `pnpm generate`.
+The runtime and package build do **not** use SurveyJS, Excel, or XLSForm generation. The WHO workbook and its `exceljs` compiler are retained only as development fixtures for source-conformance tests; they never write the canonical JSON contract.
 
 ## Package entry points
 
@@ -182,8 +182,6 @@ const instrument = withInstrumentTranslation(whoVa2022Instrument, "fr", {
 
 Only the supplied fields are added. Existing translations are preserved, untranslated fields fall back to English, and question IDs, choice values, calculations, relevance rules, and stored answers are unchanged. The same `instrument` object can be passed directly to `WhoVaForm`, or the translation object can be placed under `instrument` in a lazy `WhoVaLanguageFile` as shown above.
 
-As an alternative for ODK/XLSForm-managed deployments, language columns can remain in the source workbook: add `label::French (fr)`, `hint::French (fr)`, `guidance_hint::French (fr)`, and `constraint_message::French (fr)` on `survey`, plus `label::French (fr)` on `choices`, then run `pnpm generate`. The compiler discovers any locale in parentheses without TypeScript changes.
-
 ## Web theming
 
 The React web renderer and web component expose namespaced CSS custom properties. Set them on `:root`, an application wrapper, or one form instance; no component fork or `!important` override is needed.
@@ -233,13 +231,12 @@ This is the same validator used by the native and web form sessions.
 
 When Next or Complete finds validation issues, the shared renderer aligns the first invalid question at the top of the screen and highlights its error card. Web also focuses the first interactive control; Expo and React Native use the question's measured content position with `ScrollView.scrollTo`.
 
-## Source generation and tests
+## Development and tests
 
 ```bash
 pnpm dev          # launch the browser preview at http://127.0.0.1:5173
-pnpm generate     # XLSForm -> checked-in runtime contract and audit report
 pnpm typecheck
-pnpm test         # includes one parameterized contract test per named WHO row
+pnpm test         # includes source-conformance and runtime tests
 pnpm test:e2e     # run Chromium form automation with trace, video, and HTML report
 pnpm test:e2e:headed # watch each action at 800 ms and each form sequentially
 pnpm test:e2e:report # open the most recent Playwright report
@@ -249,11 +246,11 @@ pnpm check
 
 Install the pinned Playwright browser once with `pnpm exec playwright install chromium`. The browser suite enters answers through the rendered controls, captures validation errors and corrected states, verifies the visible age summary and calculated values derived from `Id10021`, and confirms valid paths can advance without alerts.
 
-Generated artifacts:
+Canonical artifacts:
 
-- `src/generated/who-va-2022.instrument.json` — runtime instrument
-- `src/generated/who-va-2022.question-audit.json` — human-reviewable question matrix
+- `src/generated/who-va-2022.instrument.json` — authoritative runtime instrument
+- `src/generated/who-va-2022.question-audit.json` — human-reviewable question matrix retained alongside the contract
 
-The question-by-question suite compares the checked-in runtime artifact with the XLSForm and verifies type, coded values, requiredness, relevance AST, constraints, calculations, field validation, and isolated submission validation for each of the 449 named rows.
+The package build reads only the checked-in JSON. Tests may compile the retained XLSForm in memory to detect source drift and verify type, coded values, requiredness, relevance AST, constraints, calculations, field validation, and isolated submission validation. The test compiler never regenerates or modifies the JSON.
 
 See [Architecture](docs/architecture.md) for the trust boundaries and extension points.

@@ -1,6 +1,6 @@
 /**
- * Build-time compiler that converts the WHO 2022 XLSForm workbook into the
- * platform-neutral instrument contract consumed by the runtime.
+ * Test-only compiler that converts the WHO 2022 XLSForm workbook into the
+ * platform-neutral instrument contract for source-conformance checks.
  */
 import ExcelJS from "exceljs";
 import path from "node:path";

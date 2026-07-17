@@ -1,14 +1,14 @@
 # Architecture
 
-## Source and runtime boundary
+## Contract and provenance boundary
 
-The WHO XLSForm is immutable source evidence. `scripts/convert-xlsform.ts` reads it during development and produces a versioned JSON instrument. Neither Excel nor `exceljs` is imported from the public runtime.
+The checked-in JSON instrument is the authoritative executable contract. Runtime code, package builds, and application bundles read that contract directly. The WHO XLSForm is retained only as provenance evidence and a source-conformance fixture; a test-only compiler reads it in memory but never generates or modifies runtime JSON. Neither Excel nor `exceljs` is imported from the public runtime or build entry points.
 
 ```mermaid
 flowchart LR
-  XLS["WHO XLSForm"] -->|"build time only"| Compiler["TypeScript compiler"]
-  Compiler --> Contract["Generated instrument contract"]
-  Contract --> Engine["Expression, session, and validation engine"]
+  Contract["Canonical JSON instrument"] --> Engine["Expression, session, and validation engine"]
+  XLS["WHO XLSForm provenance"] -->|"tests only"| Conformance["Source-conformance tests"]
+  Contract --> Conformance
   Engine --> Native["Expo / React Native renderer"]
   Engine --> Web["React Native Web renderer"]
   Web --> Element["Web Component wrapper"]
@@ -19,7 +19,7 @@ flowchart LR
 
 Each question carries its WHO identifier, source row and type, answer data type, UI control, localized text, coded choices, requiredness, group path, relevance, constraint, error message, calculation, and source metadata. Expressions are compiled into a platform-neutral AST so no ODK or browser expression interpreter is required at runtime.
 
-The generated artifact is intentionally checked in. Changes can therefore be reviewed as ordinary diffs and the runtime works in offline applications without the workbook.
+The contract is intentionally checked in and maintained directly. Changes can therefore be reviewed as ordinary diffs, and builds remain deterministic and work without reading the workbook.
 
 ## Shared behavior
 
@@ -52,4 +52,4 @@ Drafts use a stable UUID and a platform-neutral envelope containing instrument i
 
 ## Test boundary
 
-Tests operate through public compiler, expression, validation, session, and embedding APIs. The parameterized question suite covers all named WHO rows and checks both field-level and isolated submission behavior. Tracer tests additionally exercise navigation, calculations, custom-element events, and the no-Excel runtime boundary.
+Runtime tests operate through expression, validation, session, and embedding APIs. Source-conformance tests alone may use the test-only XLSForm compiler. The parameterized question suite covers all named WHO rows and checks both field-level and isolated submission behavior. Tracer tests additionally exercise navigation, calculations, custom-element events, and the no-Excel build/runtime boundary.
