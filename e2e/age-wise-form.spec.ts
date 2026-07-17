@@ -33,6 +33,12 @@ async function next(page: Page): Promise<void> {
   await page.getByRole("button", { name: "Next", exact: true }).click();
 }
 
+async function openEnglishForm(page: Page): Promise<void> {
+  await page.goto("/");
+  await page.getByLabel("Instrument language").selectOption("en");
+  await expect(page.getByRole("button", { name: "Next", exact: true })).toBeVisible();
+}
+
 async function fillInterviewer(page: Page): Promise<void> {
   await fill(page, "Id10010", "Browser E2E Interviewer");
   await fill(page, "Id10010a", "35");
@@ -91,7 +97,7 @@ async function attachState(page: Page, testInfo: TestInfo, name: string): Promis
 }
 
 test("required and constraint errors appear, then clear after correction", async ({ page }, testInfo) => {
-  await page.goto("/");
+  await openEnglishForm(page);
   await next(page);
   await expect(page.getByTestId("question-card-Id10010").getByRole("alert")).toContainText("is required");
   await attachState(page, testInfo, "required-errors");
@@ -112,7 +118,7 @@ test("required and constraint errors appear, then clear after correction", async
 
 for (const scenario of ageScenarios) {
   test(`${scenario.name}: fills the browser form and shows correct calculations`, async ({ page }, testInfo) => {
-    await page.goto("/");
+    await openEnglishForm(page);
     await reachDeceasedScreen(page);
     await fillDeceasedScreen(page, scenario);
 

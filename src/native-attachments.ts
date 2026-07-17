@@ -6,8 +6,11 @@ import {
   AttachmentProcessingError,
   WHO_VA_ATTACHMENT_POLICY,
   processImageAttachment,
+  processInspectedImageAttachment,
   type ImageAttachmentPolicy,
   type ImageEncodingOptions,
+  type ImageTranscoder,
+  type InspectedRasterImage,
   type ProcessImageAttachmentOptions
 } from "./attachments.js";
 
@@ -19,6 +22,8 @@ export interface NativeAttachmentSelection {
 export interface NativeAttachmentFileAdapter {
   getSize(uri: string): Promise<number>;
   read(uri: string): Promise<Uint8Array>;
+  /** Native inspection avoids copying the original file into the JS heap. */
+  inspect?(uri: string): Promise<InspectedRasterImage>;
   encodeJpeg(uri: string, options: ImageEncodingOptions): Promise<string>;
   persist(temporaryUri: string, name: string): Promise<string>;
   remove(uri: string): Promise<void>;
@@ -54,19 +59,28 @@ export async function processNativeImageAttachment(
 
   let temporaryUri: string | undefined;
   try {
-    const processed = await processImageAttachment({
-      name: selection.name,
-      bytes: await adapter.read(selection.uri)
-    }, {
+    const transcoder: ImageTranscoder = {
       async encodeJpeg(_image, encodingOptions) {
         if (temporaryUri) await adapter.remove(temporaryUri).catch(() => undefined);
         temporaryUri = await adapter.encodeJpeg(selection.uri, encodingOptions);
         return adapter.read(temporaryUri);
       }
-    }, {
+    };
+    const processingOptions = {
       policy,
       ...(options.createId ? { createId: options.createId } : {})
-    });
+    };
+    const processed = adapter.inspect
+      ? await processInspectedImageAttachment(
+        selection.name,
+        await adapter.inspect(selection.uri),
+        transcoder,
+        processingOptions
+      )
+      : await processImageAttachment({
+        name: selection.name,
+        bytes: await adapter.read(selection.uri)
+      }, transcoder, processingOptions);
     if (!temporaryUri) throw new AttachmentProcessingError("image-output-invalid");
 
     let durableUri: string;

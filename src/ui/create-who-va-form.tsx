@@ -19,7 +19,6 @@ import type {
 import { createDraftId } from "../draft.js";
 import { createWhoVaSession } from "../engine/session.js";
 import { isQuestionRelevant } from "../engine/validation.js";
-import { whoVa2022Instrument } from "../instrument.js";
 import { localeFromLanguageName, localizeText, resolveUiMessages, type WhoVaUiTranslations } from "../i18n.js";
 import {
   createWhoVaQuestionControls,
@@ -44,6 +43,7 @@ export interface WhoVaFormProps {
   onValidation?: (issues: ValidationIssue[]) => void;
   onDraftSaved?: (draft: WhoVaDraft) => void;
   onDraftError?: (error: Error) => void;
+  onInstrumentError?: (error: Error) => void;
   onComplete?: (result: SubmissionValidationResult) => void;
 }
 
@@ -109,21 +109,21 @@ function hasAnswer(value: AnswerValue | undefined): value is AnswerValue {
   return value != null && value !== "" && (!Array.isArray(value) || value.length > 0);
 }
 
-function previewAnswer(question: InstrumentQuestion, value: AnswerValue, locale: string): string {
+function previewAnswer(question: InstrumentQuestion, value: AnswerValue, locale: string, messages: ReturnType<typeof resolveUiMessages>): string {
   const choiceLabel = (choiceValue: string) => {
     const choice = question.choices?.find((candidate) => candidate.value === choiceValue);
     return choice ? localized(choice.label, locale, choiceValue) : choiceValue;
   };
   if (Array.isArray(value)) return value.map(choiceLabel).join(", ");
   if (typeof value === "string") return choiceLabel(value);
-  if (typeof value === "boolean") return value ? "Yes" : "No";
+  if (typeof value === "boolean") return value ? messages.yes : messages.no;
   if (typeof value === "number") return String(value);
-  if (value == null) return "Recorded";
+  if (value == null) return messages.recorded;
   for (const property of ["name", "originalName", "fileName", "uri"] as const) {
     const candidate = value[property];
     if (typeof candidate === "string" && candidate) return candidate;
   }
-  return "Recorded";
+  return messages.recorded;
 }
 
 const styles = {
@@ -146,7 +146,10 @@ const styles = {
   previewEmpty: { color: "#536b64", fontSize: 15, paddingVertical: 16 }
 };
 
-export function createWhoVaForm(primitives: WhoVaPrimitiveSet): React.ComponentType<WhoVaFormProps> {
+export function createWhoVaForm(
+  primitives: WhoVaPrimitiveSet,
+  loadDefaultInstrument?: () => Promise<InstrumentDefinition>
+): React.ComponentType<WhoVaFormProps> {
   const { View, Text, Pressable, ScrollView } = primitives;
   const questionControls = createWhoVaQuestionControls({
     View,
@@ -158,8 +161,8 @@ export function createWhoVaForm(primitives: WhoVaPrimitiveSet): React.ComponentT
     platform: primitives.platform
   });
 
-  function Form(props: WhoVaFormProps) {
-    const instrument = props.instrument ?? whoVa2022Instrument;
+  function ReadyForm(props: WhoVaFormProps & { resolvedInstrument: InstrumentDefinition }) {
+    const instrument = props.resolvedInstrument;
     const locale = props.locale ?? localeFromLanguageName(instrument.defaultLanguage) ?? "en";
     const messages = resolveUiMessages(locale, props.uiTranslations);
     const [restoredNavigation] = useState(() => {
@@ -372,9 +375,9 @@ export function createWhoVaForm(primitives: WhoVaPrimitiveSet): React.ComponentT
     if (view === "preview") {
       return (
         <ScrollView style={styles.root} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-          <Text style={styles.progress}>{answeredQuestions.length} answered question{answeredQuestions.length === 1 ? "" : "s"}</Text>
-          <Text style={styles.sectionTitle}>Answer preview</Text>
-          <Text style={styles.previewIntro}>Review the answers entered so far. Return to the form to make changes.</Text>
+          <Text style={styles.progress}>{messages.answeredQuestions(answeredQuestions.length)}</Text>
+          <Text style={styles.sectionTitle}>{messages.answerPreview}</Text>
+          <Text style={styles.previewIntro}>{messages.previewIntro}</Text>
           {answeredQuestions.length ? answeredQuestions.map((question) => {
             const value = snapshot.data[question.name];
             if (!hasAnswer(value)) return null;
@@ -385,10 +388,10 @@ export function createWhoVaForm(primitives: WhoVaPrimitiveSet): React.ComponentT
             return (
               <View key={question.name} style={styles.question} testID={`preview-answer-${question.name}`}>
                 <Text style={styles.label}>{label}</Text>
-                <Text style={styles.previewAnswer}>{previewAnswer(question, value, locale)}</Text>
+                <Text style={styles.previewAnswer}>{previewAnswer(question, value, locale, messages)}</Text>
               </View>
             );
-          }) : <Text style={styles.previewEmpty}>No answers have been entered yet.</Text>}
+          }) : <Text style={styles.previewEmpty}>{messages.noAnswers}</Text>}
           <View style={styles.navigation}>
             <Pressable
               accessibilityRole="button"
@@ -398,7 +401,7 @@ export function createWhoVaForm(primitives: WhoVaPrimitiveSet): React.ComponentT
                 primitives.navigation?.back();
               }}
             >
-              <Text style={questionControlStyles.buttonTextSecondary}>Back to form</Text>
+              <Text style={questionControlStyles.buttonTextSecondary}>{messages.backToForm}</Text>
             </Pressable>
           </View>
         </ScrollView>
@@ -442,7 +445,7 @@ export function createWhoVaForm(primitives: WhoVaPrimitiveSet): React.ComponentT
               setView("preview");
             }}
           >
-            <Text style={questionControlStyles.buttonTextSecondary}>Preview answers</Text>
+            <Text style={questionControlStyles.buttonTextSecondary}>{messages.previewAnswers}</Text>
           </Pressable>
           <Pressable accessibilityRole="button" style={questionControlStyles.button} onPress={advance}>
             <Text style={questionControlStyles.buttonText}>{snapshot.canGoForward ? messages.next : messages.complete}</Text>
@@ -453,6 +456,45 @@ export function createWhoVaForm(primitives: WhoVaPrimitiveSet): React.ComponentT
         </Text>
       </ScrollView>
     );
+  }
+
+  function Form(props: WhoVaFormProps) {
+    const [loadedInstrument, setLoadedInstrument] = useState<InstrumentDefinition>();
+    const [loadError, setLoadError] = useState<Error>();
+
+    useEffect(() => {
+      if (props.instrument) return;
+      let active = true;
+      if (!loadDefaultInstrument) {
+        const error = new Error("No instrument or default instrument loader was provided");
+        setLoadError(error);
+        props.onInstrumentError?.(error);
+        return () => { active = false; };
+      }
+      void loadDefaultInstrument().then((instrument) => {
+        if (active) setLoadedInstrument(instrument);
+      }).catch((error: unknown) => {
+        if (!active) return;
+        const resolved = error instanceof Error ? error : new Error(String(error));
+        setLoadError(resolved);
+        props.onInstrumentError?.(resolved);
+      });
+      return () => { active = false; };
+    }, [props.instrument, props.onInstrumentError]);
+
+    const instrument = props.instrument ?? loadedInstrument;
+    if (!instrument) {
+      return (
+        <View style={styles.root}>
+          <View style={styles.content}>
+            <Text accessibilityLiveRegion="polite" role={loadError ? "alert" : undefined} style={loadError ? styles.error : styles.progress}>
+              {loadError ? "The questionnaire could not be loaded." : "Loading questionnaire…"}
+            </Text>
+          </View>
+        </View>
+      );
+    }
+    return <ReadyForm {...props} resolvedInstrument={instrument} />;
   }
 
   Form.displayName = "WhoVaForm";

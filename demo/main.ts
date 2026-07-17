@@ -1,27 +1,20 @@
 import { defineWhoVaElement, type WhoVaFormElement } from "../src/web-component.js";
+import { WHO_VA_2022_LANGUAGES } from "../src/instrument-loader.js";
 
 defineWhoVaElement();
 
 const form = document.querySelector<WhoVaFormElement>("#who-va-form");
-const status = document.querySelector<HTMLElement>("#status");
+const language = document.querySelector<HTMLSelectElement>("#language");
 
-form?.addEventListener("who-va-change", () => {
-  if (status) status.textContent = "Unsaved changes";
-});
+for (const availableLanguage of WHO_VA_2022_LANGUAGES) {
+  const option = document.createElement("option");
+  option.value = availableLanguage.locale;
+  option.textContent = availableLanguage.label;
+  option.selected = availableLanguage.locale === (form?.getAttribute("locale") ?? "en");
+  language?.append(option);
+}
 
-form?.addEventListener("who-va-draft-saved", (event) => {
-  const draft = (event as CustomEvent<{ id: string }>).detail;
-  if (status && !status.textContent?.includes("need attention")) {
-    status.textContent = `Draft ${draft.id} saved locally`;
-  }
-});
-
-form?.addEventListener("who-va-validation", (event) => {
-  const issues = (event as CustomEvent<Array<unknown>>).detail;
-  if (status) status.textContent = `${issues.length} field${issues.length === 1 ? "" : "s"} need attention`;
-});
-
-form?.addEventListener("who-va-complete", (event) => {
-  const result = (event as CustomEvent<{ valid: boolean }>).detail;
-  if (status) status.textContent = result.valid ? "Submission is valid" : "Submission needs attention";
+language?.addEventListener("change", () => {
+  form?.setAttribute("locale", language.value);
+  document.documentElement.lang = language.value;
 });

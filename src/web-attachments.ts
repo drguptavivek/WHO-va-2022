@@ -6,9 +6,11 @@ import {
   AttachmentProcessingError,
   WHO_VA_ATTACHMENT_POLICY,
   processImageAttachment,
+  processInspectedImageAttachment,
   processPdfAttachment,
   type ImageAttachmentPolicy,
   type ImageTranscoder,
+  type ProcessedImageAttachment,
   type PdfRasterizer
 } from "./attachments.js";
 
@@ -26,6 +28,7 @@ export interface WebAttachmentBinaryStore {
   save(id: string, blob: Blob): Promise<void>;
   load(id: string): Promise<Blob | undefined>;
   remove(id: string): Promise<void>;
+  listIds?(): Promise<string[]>;
 }
 
 export interface WebStoredAttachmentReference {
@@ -124,6 +127,14 @@ export function createIndexedDbWebAttachmentStore(factory: IDBFactory | undefine
       const transaction = (await getDatabase()).transaction(WEB_ATTACHMENT_OBJECT_STORE, "readwrite");
       transaction.objectStore(WEB_ATTACHMENT_OBJECT_STORE).delete(id);
       await transactionComplete(transaction);
+    },
+    async listIds() {
+      const transaction = (await getDatabase()).transaction(WEB_ATTACHMENT_OBJECT_STORE, "readonly");
+      const request = transaction.objectStore(WEB_ATTACHMENT_OBJECT_STORE).getAllKeys();
+      return await new Promise<string[]>((resolve, reject) => {
+        request.addEventListener("success", () => resolve(request.result.filter((key): key is string => typeof key === "string")), { once: true });
+        request.addEventListener("error", () => reject(request.error ?? new Error("Unable to list attachments")), { once: true });
+      });
     }
   };
 }
@@ -166,6 +177,73 @@ export function createBrowserImageTranscoder(): ImageTranscoder {
         bitmap.close();
       }
     }
+  };
+}
+
+function imageMimeTypeFromHeader(bytes: Uint8Array): "image/jpeg" | "image/png" {
+  if (bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff) return "image/jpeg";
+  const png = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
+  if (png.every((byte, index) => bytes[index] === byte)) return "image/png";
+  throw new AttachmentProcessingError("image-type-not-allowed");
+}
+
+async function processBrowserBlobImage(
+  file: WebImageFile & Blob,
+  options: ProcessWebImageAttachmentOptions
+): Promise<ProcessedImageAttachment> {
+  const header = new Uint8Array(await file.slice(0, 16).arrayBuffer());
+  const mimeType = imageMimeTypeFromHeader(header);
+  let bitmap: ImageBitmap;
+  try {
+    bitmap = await globalThis.createImageBitmap(file, { imageOrientation: "from-image" });
+  } catch (error) {
+    throw new AttachmentProcessingError("image-decode-failed", error);
+  }
+  try {
+    return await processInspectedImageAttachment(file.name, {
+      mimeType,
+      width: bitmap.width,
+      height: bitmap.height
+    }, {
+      async encodeJpeg(_image, encodingOptions) {
+        const canvas = document.createElement("canvas");
+        canvas.width = encodingOptions.width;
+        canvas.height = encodingOptions.height;
+        const context = canvas.getContext("2d");
+        if (!context) throw new Error("Canvas rendering is unavailable");
+        context.fillStyle = encodingOptions.background;
+        context.fillRect(0, 0, canvas.width, canvas.height);
+        context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+        return new Uint8Array(await (await canvasToJpeg(canvas, encodingOptions.quality)).arrayBuffer());
+      }
+    }, {
+      policy: options.policy ?? WHO_VA_ATTACHMENT_POLICY.image,
+      ...(options.createId ? { createId: options.createId } : {})
+    });
+  } finally {
+    bitmap.close();
+  }
+}
+
+async function storeProcessedWebImage(
+  processed: ProcessedImageAttachment,
+  store: WebAttachmentBinaryStore
+): Promise<WebStoredAttachmentReference> {
+  try {
+    await store.save(processed.id, new Blob([copiedArrayBuffer(processed.bytes)], { type: processed.mimeType }));
+  } catch (error) {
+    throw new AttachmentProcessingError("attachment-storage-failed", error);
+  }
+  return {
+    id: processed.id,
+    uri: `who-va-attachment:${processed.id}`,
+    name: processed.name,
+    originalName: processed.originalName,
+    mimeType: processed.mimeType,
+    size: processed.size,
+    width: processed.width,
+    height: processed.height,
+    processed: true
   };
 }
 
@@ -236,29 +314,20 @@ export async function processWebImageAttachment(
 ): Promise<WebStoredAttachmentReference> {
   const policy = options.policy ?? WHO_VA_ATTACHMENT_POLICY.image;
   if (file.size > policy.maxInputBytes) throw new AttachmentProcessingError("image-input-too-large");
-  const processed = await processImageAttachment({
-    name: file.name,
-    bytes: new Uint8Array(await file.arrayBuffer())
-  }, options.transcoder ?? createBrowserImageTranscoder(), {
-    policy,
-    ...(options.createId ? { createId: options.createId } : {})
-  });
-  try {
-    await options.store.save(processed.id, new Blob([copiedArrayBuffer(processed.bytes)], { type: processed.mimeType }));
-  } catch (error) {
-    throw new AttachmentProcessingError("attachment-storage-failed", error);
-  }
-  return {
-    id: processed.id,
-    uri: `who-va-attachment:${processed.id}`,
-    name: processed.name,
-    originalName: processed.originalName,
-    mimeType: processed.mimeType,
-    size: processed.size,
-    width: processed.width,
-    height: processed.height,
-    processed: true
-  };
+  const canProcessBlobDirectly = !options.transcoder
+    && file instanceof Blob
+    && typeof globalThis.createImageBitmap === "function"
+    && typeof document !== "undefined";
+  const processed = canProcessBlobDirectly
+    ? await processBrowserBlobImage(file, options)
+    : await processImageAttachment({
+      name: file.name,
+      bytes: new Uint8Array(await file.arrayBuffer())
+    }, options.transcoder ?? createBrowserImageTranscoder(), {
+      policy,
+      ...(options.createId ? { createId: options.createId } : {})
+    });
+  return storeProcessedWebImage(processed, options.store);
 }
 
 export async function processWebPdfAttachment(
@@ -315,4 +384,44 @@ export async function resolveWebAttachmentUri(
 ): Promise<string | undefined> {
   const blob = await store.load(reference.id);
   return blob ? createObjectURL(blob) : undefined;
+}
+
+/** Returns a Blob suitable for streaming in multipart/fetch uploads without base64 conversion. */
+export function loadWebAttachmentBlob(
+  reference: { id: string },
+  store: WebAttachmentBinaryStore
+): Promise<Blob | undefined> {
+  return store.load(reference.id);
+}
+
+function collectReferenceIds(value: unknown, output: Set<string>, seen: WeakSet<object>): void {
+  if (value == null || typeof value !== "object") return;
+  if (seen.has(value)) return;
+  seen.add(value);
+  if (Array.isArray(value)) {
+    for (const item of value) collectReferenceIds(item, output, seen);
+    return;
+  }
+  const candidate = value as Record<string, unknown>;
+  if (
+    typeof candidate.id === "string"
+    && typeof candidate.uri === "string"
+    && (candidate.uri.startsWith("who-va-attachment:") || candidate.uri.startsWith("who-va-pdf-pages:"))
+  ) output.add(candidate.id);
+  for (const nested of Object.values(candidate)) collectReferenceIds(nested, output, seen);
+}
+
+/** Deletes stored binaries that are not referenced by any supplied draft/answer attachment. */
+export async function cleanupOrphanedWebAttachments(
+  references: Iterable<unknown>,
+  store: WebAttachmentBinaryStore
+): Promise<number> {
+  if (!store.listIds) return 0;
+  const retained = new Set<string>();
+  const seen = new WeakSet<object>();
+  for (const reference of references) collectReferenceIds(reference, retained, seen);
+  const stored = await store.listIds();
+  const orphaned = stored.filter((id) => !retained.has(id));
+  await Promise.all(orphaned.map((id) => store.remove(id)));
+  return orphaned.length;
 }

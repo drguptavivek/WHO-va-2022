@@ -15,7 +15,11 @@ The runtime and package build do **not** use SurveyJS, Excel, or XLSForm generat
 
 ## Runtime performance
 
-The offline JSON contract is still bundled and loaded as one artifact. Once an instrument is used, the runtime builds shared indexes for questions by name, questions by section, sections by name, and calculated questions.
+The canonical JSON remains one offline artifact, but the `/native` and `/web` form entry points no longer parse it when the application bundle starts. They dynamically load and cache it when a form first needs the default instrument. The root `@who-va/instrument` entry keeps the synchronous `whoVa2022Instrument` export for headless and server compatibility; applications concerned about startup cost can import `loadWhoVa2022Instrument` instead.
+
+Opening the first default form still parses the complete instrument once. The runtime does not fetch a section at a time: relevance, calculations, navigation, and final validation can refer to questions in other sections, and the instrument must continue working completely offline. This trades a single predictable parse for simpler, reliable interviews; only the current section's controls are rendered. Further section chunking should be considered only if profiling the target low-spec devices shows this deferred parse is still material.
+
+Once an instrument is used, the runtime builds shared indexes for questions by name, questions by section, sections by name, and calculated questions.
 
 Indexes are cached by instrument identity in a `WeakMap`. Sessions and translated instruments can be released normally, while repeated lookups avoid scanning all 450 questions.
 
@@ -24,6 +28,8 @@ Calculations run once after an answer changes and once for full submission valid
 Session snapshots compute the visible section list once and render only its current questions. Answer-preview filtering is memoized and runs only while the preview is open.
 
 Field validation remains real time. Type, choice, and constraint errors appear as the interviewer enters an answer and clear immediately after correction; Next and Complete still perform section or full-form validation.
+
+Language modules are also loaded on demand. Translation application structurally shares every unchanged section, question, and choice with the English instrument, and the built-in loader retains only the most recently used translated instrument. JavaScript runtimes normally retain an imported language module in their module cache, so selecting a language can keep its translation dictionary resident; the bounded loader specifically prevents an additional unbounded collection of cloned instrument graphs.
 
 ## Expo / React Native
 
@@ -78,7 +84,9 @@ Both `/web` and `/native` export `WhoVaQuestionControls`. Its named components a
 
 WHO text questions with `appearance: "multiline"`, including the detailed open narrative, use a tall multiline input. Image controls support camera/library selection, preview, hide/view, 90-degree rotation, zoom, replace, and remove. File controls request PDF MIME type only and support replace/remove. Web supplies browser selectors; Expo/React Native hosts connect camera, image-library, and document-picker functions through `platform`.
 
-Attachment answers should be durable references such as encrypted app URIs or upload records. The web fallback uses data URLs for standalone operation; production applications should normally persist binary files outside the answer JSON and return a durable reference.
+Attachment answers are durable references, not embedded base64 data. Browser images are decoded directly from the selected `Blob`, resized and JPEG-encoded, and stored in IndexedDB; the answer JSON stores only an ID and metadata. Native adapters can provide `inspect(uri)` so the original camera file is decoded by the platform without first copying all of its bytes into the JavaScript heap. The processed native file remains a URI that the host can stream to its upload service.
+
+The default limits protect low-memory devices: images are capped at 10 MB and 16 megapixels before processing, then reduced to at most 2048 pixels on the longest edge and 2 MB. PDFs are capped at 5 MB and 10 pages; the original PDF is replaced by JPEG page images no larger than 1600 pixels on the longest edge. Host applications may choose stricter image limits.
 
 ## React web
 
@@ -91,6 +99,29 @@ export function VerbalAutopsyPage() {
 ```
 
 Web uses `localStorage` by default under `who-va-2022:draft:<uuid>`. Pass `draftId` to continue overwriting a known draft, or pass a custom `draftStore` to use another persistence layer. Audio questions use the browser microphone: press **Record audio**, then **Stop and save recording**. The browser will request microphone permission, and recording requires a secure context (`https://` or localhost).
+
+Upload a stored browser attachment as a `Blob`; do not convert it to base64:
+
+```ts
+import { loadWhoVaWebAttachmentBlob } from "@who-va/instrument/web";
+
+const blob = await loadWhoVaWebAttachmentBlob(attachmentReference);
+if (blob) {
+  const body = new FormData();
+  body.append("file", blob, attachmentReference.name);
+  await fetch("/api/attachments", { method: "POST", body });
+}
+```
+
+After loading all drafts that must remain on the device, orphaned IndexedDB binaries can be removed explicitly:
+
+```ts
+import { cleanupWhoVaWebAttachments } from "@who-va/instrument/web";
+
+await cleanupWhoVaWebAttachments(allRetainedDrafts.map((draft) => draft.data));
+```
+
+Only call cleanup with the complete set of retained drafts/answers; omitted references are treated as deleted. Object URLs used for previews are revoked when controls release them.
 
 `localStorage` is unencrypted browser storage. For production VA data, provide a secured storage adapter with the application's encryption, access-control, retention, and device-loss protections.
 
@@ -117,6 +148,8 @@ defineWhoVaElement();
 The element exposes `getData()`, `setData(data)`, `getDraftId()`, `validate()`, and `complete()`. Set a `draft-id` attribute before attaching the element to continue a known UUID; otherwise it generates one.
 
 ## Adding languages
+
+The built-in preview currently exposes English, French, and Hindi through `WHO_VA_2022_LANGUAGES`. French and Hindi are loaded only when selected. Their full instrument text is a machine-generated draft for UI evaluation; the workbook's existing French choice labels are preserved, but clinical and field terminology still requires review by fluent verbal-autopsy specialists before production use.
 
 The preferred runtime layout is one independent file per language. Each file is JSON-serializable and owns that locale's section labels, question text, hints, guidance, choice labels, constraint messages, and optional form UI strings:
 

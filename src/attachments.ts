@@ -30,19 +30,19 @@ export interface WhoVaAttachmentPolicy {
 export const WHO_VA_ATTACHMENT_POLICY: WhoVaAttachmentPolicy = {
   image: {
     acceptedMimeTypes: ["image/jpeg", "image/png"],
-    maxInputBytes: 20 * 1024 * 1024,
+    maxInputBytes: 10 * 1024 * 1024,
     maxOutputBytes: 2 * 1024 * 1024,
-    maxPixels: 40_000_000,
-    maxInputWidthOrHeight: 20_000,
+    maxPixels: 16_000_000,
+    maxInputWidthOrHeight: 8_192,
     maxOutputWidthOrHeight: 2048,
     jpegQualities: [0.82, 0.72, 0.62, 0.52]
   },
   pdf: {
     acceptedMimeTypes: ["application/pdf"],
-    maxInputBytes: 10 * 1024 * 1024,
-    maxPages: 20,
-    maxOutputBytes: 20 * 1024 * 1024,
-    maxPageWidthOrHeight: 2048
+    maxInputBytes: 5 * 1024 * 1024,
+    maxPages: 10,
+    maxOutputBytes: 10 * 1024 * 1024,
+    maxPageWidthOrHeight: 1600
   }
 };
 
@@ -64,7 +64,7 @@ export type AttachmentProcessingErrorCode =
   | "pdf-processing-unavailable";
 
 const ERROR_MESSAGES: Record<AttachmentProcessingErrorCode, string> = {
-  "image-input-too-large": "Choose an image smaller than 20 MB.",
+  "image-input-too-large": "Choose an image smaller than 10 MB.",
   "image-type-not-allowed": "Choose a valid JPEG or PNG image. Renamed and unsupported files are not accepted.",
   "image-dimensions-invalid": "This image has invalid dimensions and cannot be used.",
   "image-dimensions-too-large": "This image has too many pixels. Choose a smaller image or retake the photograph.",
@@ -73,10 +73,10 @@ const ERROR_MESSAGES: Record<AttachmentProcessingErrorCode, string> = {
   "image-output-too-large": "This image could not be reduced below 2 MB. Retake it at a lower resolution.",
   "image-processing-unavailable": "Image processing is unavailable. The original image was not saved.",
   "attachment-storage-failed": "The processed attachment could not be saved on this device.",
-  "pdf-input-too-large": "Choose a PDF smaller than 10 MB.",
+  "pdf-input-too-large": "Choose a PDF smaller than 5 MB.",
   "pdf-type-not-allowed": "Choose a valid PDF. Renamed and unsupported files are not accepted.",
   "pdf-render-failed": "This PDF could not be safely converted to page images and was discarded.",
-  "pdf-too-many-pages": "This PDF has too many pages. Select a document with no more than 20 pages.",
+  "pdf-too-many-pages": "This PDF has too many pages. Select a document with no more than 10 pages.",
   "pdf-output-too-large": "The converted PDF pages are too large and were discarded.",
   "pdf-processing-unavailable": "PDF conversion is unavailable. The original PDF was not saved."
 };
@@ -150,6 +150,65 @@ export function isProcessedImageAttachment(value: unknown, policy: ImageAttachme
 export interface ProcessImageAttachmentOptions {
   policy?: ImageAttachmentPolicy;
   createId?: () => string;
+}
+
+async function encodeInspectedImage(
+  name: string,
+  inspected: InspectedRasterImage,
+  transcoder: ImageTranscoder,
+  sourceBytes: Uint8Array,
+  options: ProcessImageAttachmentOptions
+): Promise<ProcessedImageAttachment> {
+  const policy = options.policy ?? WHO_VA_ATTACHMENT_POLICY.image;
+  validateInputDimensions(inspected, policy);
+  const dimensions = targetDimensions(inspected.width, inspected.height, policy.maxOutputWidthOrHeight);
+  const image: DecodableImage = { name, bytes: sourceBytes, ...inspected };
+  let lastOutput: Uint8Array | undefined;
+
+  for (const quality of policy.jpegQualities) {
+    try {
+      lastOutput = await transcoder.encodeJpeg(image, { ...dimensions, quality, background: "#ffffff" });
+    } catch (error) {
+      throw error instanceof AttachmentProcessingError
+        ? error
+        : new AttachmentProcessingError("image-decode-failed", error);
+    }
+    if (lastOutput.byteLength <= policy.maxOutputBytes) break;
+  }
+
+  if (!lastOutput || lastOutput.byteLength > policy.maxOutputBytes) {
+    throw new AttachmentProcessingError("image-output-too-large");
+  }
+
+  let outputInspection: InspectedRasterImage;
+  try {
+    outputInspection = inspectRasterImage(lastOutput);
+  } catch (error) {
+    throw new AttachmentProcessingError("image-output-invalid", error);
+  }
+  if (outputInspection.mimeType !== "image/jpeg") throw new AttachmentProcessingError("image-output-invalid");
+
+  const id = (options.createId ?? createDraftId)();
+  return {
+    id,
+    name: `${id}.jpg`,
+    originalName: name,
+    mimeType: "image/jpeg",
+    width: outputInspection.width,
+    height: outputInspection.height,
+    size: lastOutput.byteLength,
+    bytes: lastOutput
+  };
+}
+
+/** Processes an image already inspected by a trusted native or browser decoder. */
+export function processInspectedImageAttachment(
+  name: string,
+  inspected: InspectedRasterImage,
+  transcoder: ImageTranscoder,
+  options: ProcessImageAttachmentOptions = {}
+): Promise<ProcessedImageAttachment> {
+  return encodeInspectedImage(name, inspected, transcoder, new Uint8Array(), options);
 }
 
 export interface PdfRasterizationOptions {
@@ -287,45 +346,7 @@ export async function processImageAttachment(
   if (selection.bytes.byteLength > policy.maxInputBytes) throw new AttachmentProcessingError("image-input-too-large");
 
   const inspected = inspectRasterImage(selection.bytes, selection.name);
-  validateInputDimensions(inspected, policy);
-  const dimensions = targetDimensions(inspected.width, inspected.height, policy.maxOutputWidthOrHeight);
-  const image: DecodableImage = { ...selection, ...inspected };
-  let lastOutput: Uint8Array | undefined;
-
-  for (const quality of policy.jpegQualities) {
-    try {
-      lastOutput = await transcoder.encodeJpeg(image, { ...dimensions, quality, background: "#ffffff" });
-    } catch (error) {
-      throw error instanceof AttachmentProcessingError
-        ? error
-        : new AttachmentProcessingError("image-decode-failed", error);
-    }
-    if (lastOutput.byteLength <= policy.maxOutputBytes) break;
-  }
-
-  if (!lastOutput || lastOutput.byteLength > policy.maxOutputBytes) {
-    throw new AttachmentProcessingError("image-output-too-large");
-  }
-
-  let outputInspection: InspectedRasterImage;
-  try {
-    outputInspection = inspectRasterImage(lastOutput);
-  } catch (error) {
-    throw new AttachmentProcessingError("image-output-invalid", error);
-  }
-  if (outputInspection.mimeType !== "image/jpeg") throw new AttachmentProcessingError("image-output-invalid");
-
-  const id = (options.createId ?? createDraftId)();
-  return {
-    id,
-    name: `${id}.jpg`,
-    originalName: selection.name,
-    mimeType: "image/jpeg",
-    width: outputInspection.width,
-    height: outputInspection.height,
-    size: lastOutput.byteLength,
-    bytes: lastOutput
-  };
+  return encodeInspectedImage(selection.name, inspected, transcoder, selection.bytes, options);
 }
 
 function hasPdfSignature(bytes: Uint8Array): boolean {

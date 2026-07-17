@@ -8,6 +8,7 @@ import { createRoot, type Root } from "react-dom/client";
 import { createDraftId } from "./draft.js";
 import { createWhoVaSession } from "./engine/session.js";
 import { whoVa2022Instrument } from "./instrument.js";
+import { loadWhoVa2022Language } from "./instrument-loader.js";
 import type { SubmissionData, SubmissionValidationResult, WhoVaSession } from "./types.js";
 import { WhoVaForm } from "./web.js";
 
@@ -17,6 +18,7 @@ export class WhoVaFormElement extends HTMLElement {
   private root: Root | undefined;
   private readonly session: WhoVaSession;
   private readonly generatedDraftId = createDraftId();
+  private renderVersion = 0;
 
   constructor() {
     super();
@@ -24,7 +26,7 @@ export class WhoVaFormElement extends HTMLElement {
   }
 
   connectedCallback(): void {
-    this.renderForm();
+    void this.renderForm();
   }
 
   disconnectedCallback(): void {
@@ -33,7 +35,7 @@ export class WhoVaFormElement extends HTMLElement {
   }
 
   attributeChangedCallback(): void {
-    if (this.isConnected) this.renderForm();
+    if (this.isConnected) void this.renderForm();
   }
 
   getData(): SubmissionData {
@@ -56,13 +58,21 @@ export class WhoVaFormElement extends HTMLElement {
     return this.getAttribute("draft-id") ?? this.generatedDraftId;
   }
 
-  private renderForm(): void {
+  private async renderForm(): Promise<void> {
+    const renderVersion = ++this.renderVersion;
+    const requestedLocale = this.getAttribute("locale") ?? "en";
+    const language = await loadWhoVa2022Language(requestedLocale);
+    if (!this.isConnected || renderVersion !== this.renderVersion) return;
+    this.session.setInstrument(language.instrument);
+    this.session.setLocale(language.locale, language.uiTranslations);
     this.root ??= createRoot(this);
     this.root.render(
       <WhoVaForm
+        instrument={language.instrument}
         session={this.session}
         draftId={this.getDraftId()}
-        locale={this.getAttribute("locale") ?? "en"}
+        locale={language.locale}
+        uiTranslations={language.uiTranslations}
         showSourceGuidance={this.hasAttribute("show-guidance")}
         onChange={(data) => this.dispatchEvent(new CustomEvent("who-va-change", { detail: data, bubbles: true }))}
         onValidation={(issues) => this.dispatchEvent(new CustomEvent("who-va-validation", { detail: issues, bubbles: true }))}

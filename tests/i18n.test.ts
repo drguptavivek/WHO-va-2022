@@ -64,6 +64,24 @@ describe("instrument internationalization", () => {
     expect(instrument.questions[0]?.label.fr).toBeUndefined();
   });
 
+  it("retains unchanged question objects when applying a partial translation overlay", () => {
+    const unchangedQuestion = {
+      ...instrument.questions[0]!,
+      name: "unchanged",
+      order: 2,
+      label: { en: "Unchanged" }
+    };
+    const extended = { ...instrument, questions: [...instrument.questions, unchangedQuestion] };
+
+    const translated = withInstrumentTranslations(extended, {
+      fr: { questions: { symptom: { label: "Symptôme" } } }
+    });
+
+    expect(translated.questions[0]).not.toBe(extended.questions[0]);
+    expect(translated.questions[1]).toBe(extended.questions[1]);
+    expect(translated.questions[1]?.label).toBe(extended.questions[1]?.label);
+  });
+
   it("uses the session locale for required validation and supports translated UI phrases", () => {
     const translated = withInstrumentTranslations(instrument, {
       fr: { questions: { symptom: { label: "Symptôme" } } }
@@ -118,5 +136,27 @@ describe("instrument internationalization", () => {
     session.setLocale(french.locale, french.uiTranslations);
     expect(session.getSnapshot().data.symptom).toBe("fever");
     expect(session.getSnapshot().questions[0]?.label.fr).toBe("Symptôme");
+  });
+
+  it("evicts the least-recently-used translated instrument when the cache is full", async () => {
+    let frenchImports = 0;
+    let swahiliImports = 0;
+    const loadLanguage = createWhoVaLanguageLoader(instrument, {
+      fr: async () => {
+        frenchImports += 1;
+        return { locale: "fr", instrument: { questions: { symptom: { label: "Symptôme" } } } };
+      },
+      sw: async () => {
+        swahiliImports += 1;
+        return { locale: "sw", instrument: { questions: { symptom: { label: "Dalili" } } } };
+      }
+    }, { maxCachedLanguages: 1 });
+
+    await loadLanguage("fr");
+    await loadLanguage("sw");
+    await loadLanguage("fr");
+
+    expect(frenchImports).toBe(2);
+    expect(swahiliImports).toBe(1);
   });
 });

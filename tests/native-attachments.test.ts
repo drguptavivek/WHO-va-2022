@@ -74,4 +74,26 @@ describe("native attachment processing", () => {
     expect(adapter.read).not.toHaveBeenCalled();
     expect(adapter.encodeJpeg).not.toHaveBeenCalled();
   });
+
+  it("uses native inspection without copying the original image into the JS heap", async () => {
+    const encoded = jpeg(1600, 1067);
+    const adapter: NativeAttachmentFileAdapter = {
+      getSize: vi.fn().mockResolvedValue(4_000_000),
+      inspect: vi.fn().mockResolvedValue({ mimeType: "image/png", width: 3000, height: 2000 }),
+      read: vi.fn(async (uri) => uri.includes("processed") ? encoded : new Uint8Array()),
+      encodeJpeg: vi.fn().mockResolvedValue("file:///cache/processed.jpg"),
+      persist: vi.fn(async (_uri, name) => `file:///documents/attachments/${name}`),
+      remove: vi.fn().mockResolvedValue(undefined)
+    };
+
+    await processNativeImageAttachment(
+      { uri: "file:///picker/raw.png", name: "raw.png" },
+      adapter,
+      { createId: () => "native-inspected" }
+    );
+
+    expect(adapter.inspect).toHaveBeenCalledWith("file:///picker/raw.png");
+    expect(adapter.read).not.toHaveBeenCalledWith("file:///picker/raw.png");
+    expect(adapter.read).toHaveBeenCalledWith("file:///cache/processed.jpg");
+  });
 });

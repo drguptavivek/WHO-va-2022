@@ -74,7 +74,7 @@ describe("attachment processing", () => {
 
     const processed = await processImageAttachment({
       name: "death-certificate.PNG",
-      bytes: png(6000, 4000)
+      bytes: png(3000, 2000)
     }, { encodeJpeg }, {
       createId: () => "53e80b9f-ff9b-4b52-9842-e36f38931a6c"
     });
@@ -108,8 +108,8 @@ describe("attachment processing", () => {
   it("converts every PDF page to a bounded JPEG manifest without retaining the PDF", async () => {
     const rasterizer: PdfRasterizer = {
       rasterizePdf: vi.fn().mockResolvedValue([
-        { bytes: jpeg(1448, 2048, 400_000), width: 1448, height: 2048 },
-        { bytes: jpeg(1448, 2048, 450_000), width: 1448, height: 2048 }
+        { bytes: jpeg(1131, 1600, 400_000), width: 1131, height: 1600 },
+        { bytes: jpeg(1131, 1600, 450_000), width: 1131, height: 1600 }
       ])
     };
 

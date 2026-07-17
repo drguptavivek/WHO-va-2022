@@ -4,6 +4,8 @@ import { describe, expect, it, vi } from "vitest";
 
 import { WHO_VA_ATTACHMENT_POLICY, type ImageTranscoder } from "../src/attachments.js";
 import {
+  cleanupOrphanedWebAttachments,
+  loadWebAttachmentBlob,
   processWebImageAttachment,
   processWebPdfAttachment,
   resolveWebAttachmentUri,
@@ -45,7 +47,8 @@ function memoryStore(): WebAttachmentBinaryStore & { saved: Map<string, Blob> } 
     saved,
     async save(id, blob) { saved.set(id, blob); },
     async load(id) { return saved.get(id); },
-    async remove(id) { saved.delete(id); }
+    async remove(id) { saved.delete(id); },
+    async listIds() { return [...saved.keys()]; }
   };
 }
 
@@ -83,6 +86,33 @@ describe("web attachment processing", () => {
     expect(new Uint8Array(await store.saved.get(reference.id)!.arrayBuffer())).toEqual(output);
   });
 
+  it("processes a browser Blob without reading the complete original into the JS heap", async () => {
+    const original = png(3000, 2000);
+    const file = new File([arrayBuffer(original)], "camera.png", { type: "image/png" });
+    const fullRead = vi.spyOn(file, "arrayBuffer");
+    const close = vi.fn();
+    vi.stubGlobal("createImageBitmap", vi.fn().mockResolvedValue({ width: 3000, height: 2000, close }));
+    vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue({
+      fillStyle: "",
+      fillRect: vi.fn(),
+      drawImage: vi.fn()
+    } as unknown as CanvasRenderingContext2D);
+    vi.spyOn(HTMLCanvasElement.prototype, "toBlob").mockImplementation((callback) => {
+      callback(new Blob([arrayBuffer(jpeg(2048, 1365))], { type: "image/jpeg" }));
+    });
+
+    const reference = await processWebImageAttachment(file, {
+      store: memoryStore(),
+      createId: () => "blob-direct"
+    });
+
+    expect(reference.id).toBe("blob-direct");
+    expect(fullRead).not.toHaveBeenCalled();
+    expect(close).toHaveBeenCalledOnce();
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
   it("resolves a stored attachment to a temporary preview URL", async () => {
     const store = memoryStore();
     await store.save("stored-image", new Blob([arrayBuffer(jpeg(100, 100))], { type: "image/jpeg" }));
@@ -91,6 +121,7 @@ describe("web attachment processing", () => {
     await expect(resolveWebAttachmentUri({ id: "stored-image" }, store, createObjectURL))
       .resolves.toBe("blob:preview-url");
     expect(createObjectURL).toHaveBeenCalledWith(expect.any(Blob));
+    await expect(loadWebAttachmentBlob({ id: "stored-image" }, store)).resolves.toBeInstanceOf(Blob);
   });
 
   it("rejects an oversized selection before reading it into memory", async () => {
@@ -118,12 +149,12 @@ describe("web attachment processing", () => {
       type: "application/pdf",
       async arrayBuffer() { return arrayBuffer(original); }
     };
-    const firstPage = jpeg(1448, 2048);
-    const secondPage = jpeg(1448, 2048);
+    const firstPage = jpeg(1131, 1600);
+    const secondPage = jpeg(1131, 1600);
     const rasterizer: PdfRasterizer = {
       rasterizePdf: vi.fn().mockResolvedValue([
-        { bytes: firstPage, width: 1448, height: 2048 },
-        { bytes: secondPage, width: 1448, height: 2048 }
+        { bytes: firstPage, width: 1131, height: 1600 },
+        { bytes: secondPage, width: 1131, height: 1600 }
       ])
     };
     const store = memoryStore();
@@ -145,5 +176,27 @@ describe("web attachment processing", () => {
     expect(store.saved.size).toBe(2);
     expect(Array.from(store.saved.values()).every((blob) => blob.type === "image/jpeg")).toBe(true);
     expect(Array.from(store.saved.values()).some((blob) => blob.type === "application/pdf")).toBe(false);
+  });
+
+  it("removes stored binaries that are no longer referenced by drafts", async () => {
+    const store = memoryStore();
+    await store.save("kept", new Blob(["kept"]));
+    await store.save("kept-page", new Blob(["kept page"]));
+    await store.save("orphan", new Blob(["orphan"]));
+    const references = [{
+      data: {
+        imageAnswer: { id: "kept", uri: "who-va-attachment:kept" },
+        documentAnswer: {
+          id: "pdf",
+          uri: "who-va-pdf-pages:pdf",
+          pages: [{ id: "kept-page", uri: "who-va-attachment:kept-page" }]
+        }
+      }
+    }];
+
+    await expect(cleanupOrphanedWebAttachments(references, store)).resolves.toBe(1);
+    expect(store.saved.has("kept")).toBe(true);
+    expect(store.saved.has("kept-page")).toBe(true);
+    expect(store.saved.has("orphan")).toBe(false);
   });
 });

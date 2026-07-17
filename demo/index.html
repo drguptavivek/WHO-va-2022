@@ -13,14 +13,14 @@
         <p class="eyebrow">Universal instrument preview</p>
         <h1>WHO 2022 Verbal Autopsy</h1>
       </div>
-      <div class="status-card" aria-live="polite">
-        <span class="status-dot"></span>
-        <span id="status">Form ready</span>
-      </div>
+      <label class="language-picker">
+        <span class="sr-only">भाषा / Language</span>
+        <select id="language" aria-label="Instrument language"></select>
+      </label>
     </header>
 
     <main>
-      <who-va-2022-form id="who-va-form" locale="en"></who-va-2022-form>
+      <who-va-2022-form id="who-va-form" locale="hi"></who-va-2022-form>
     </main>
 
     <script type="module" src="/main.ts"></script>

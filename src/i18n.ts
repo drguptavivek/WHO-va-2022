@@ -40,6 +40,15 @@ export interface WhoVaUiMessageTemplates {
   selectDate: string;
   confirm: string;
   confirmed: string;
+  answeredQuestions: string;
+  answerPreview: string;
+  previewIntro: string;
+  noAnswers: string;
+  backToForm: string;
+  previewAnswers: string;
+  yes: string;
+  no: string;
+  recorded: string;
 }
 
 /** One independently importable language file. */
@@ -57,6 +66,11 @@ export interface LoadedWhoVaLanguage {
 
 export type WhoVaLanguageImport = () => Promise<WhoVaLanguageFile | { default: WhoVaLanguageFile }>;
 export type WhoVaLanguageImports = Record<string, WhoVaLanguageImport>;
+
+export interface WhoVaLanguageLoaderOptions {
+  /** Maximum translated instruments retained at once. Defaults to two. */
+  maxCachedLanguages?: number;
+}
 
 export interface WhoVaUiMessages {
   sectionProgress: (current: number, total: number) => string;
@@ -78,6 +92,15 @@ export interface WhoVaUiMessages {
   selectDate: string;
   confirm: string;
   confirmed: string;
+  answeredQuestions: (count: number) => string;
+  answerPreview: string;
+  previewIntro: string;
+  noAnswers: string;
+  backToForm: string;
+  previewAnswers: string;
+  yes: string;
+  no: string;
+  recorded: string;
 }
 
 export type WhoVaUiTranslations = Record<string, Partial<WhoVaUiMessageTemplates>>;
@@ -101,7 +124,16 @@ export const ENGLISH_UI_MESSAGE_TEMPLATES: WhoVaUiMessageTemplates = {
   openingCalendar: "Opening calendar…",
   selectDate: "Select date",
   confirm: "Confirm",
-  confirmed: "Confirmed"
+  confirmed: "Confirmed",
+  answeredQuestions: "{count} answered questions",
+  answerPreview: "Answer preview",
+  previewIntro: "Review the answers entered so far. Return to the form to make changes.",
+  noAnswers: "No answers have been entered yet.",
+  backToForm: "Back to form",
+  previewAnswers: "Preview answers",
+  yes: "Yes",
+  no: "No",
+  recorded: "Recorded"
 };
 
 function format(template: string, values: Record<string, string | number>): string {
@@ -120,7 +152,8 @@ function messagesFromTemplates(templates: WhoVaUiMessageTemplates): WhoVaUiMessa
     invalidType: (name, dataType) => format(templates.invalidType, { name, dataType }),
     invalidChoice: (name) => format(templates.invalidChoice, { name }),
     invalidConstraint: (name) => format(templates.invalidConstraint, { name }),
-    invalidDate: (dateFormat, example) => format(templates.invalidDate, { format: dateFormat, example })
+    invalidDate: (dateFormat, example) => format(templates.invalidDate, { format: dateFormat, example }),
+    answeredQuestions: (count) => format(templates.answeredQuestions, { count })
   };
 }
 
@@ -159,34 +192,58 @@ export function withInstrumentTranslations(
   translations: InstrumentTranslations
 ): InstrumentDefinition {
   const sections = instrument.sections.map((section) => {
-    const label = { ...section.label };
+    let label = section.label;
     for (const [locale, translation] of Object.entries(translations)) {
       const value = translation.sections?.[section.name];
-      if (value) label[locale.toLowerCase().replaceAll("_", "-")] = value;
+      if (value) {
+        if (label === section.label) label = { ...section.label };
+        label[locale.toLowerCase().replaceAll("_", "-")] = value;
+      }
     }
-    return { ...section, label };
+    return label === section.label ? section : { ...section, label };
   });
 
   const questions = instrument.questions.map((question) => {
-    const label = { ...question.label };
-    const hint = { ...question.hint };
-    const guidance = { ...question.guidance };
-    const constraintMessage = { ...question.constraintMessage };
-    const choices = question.choices?.map((choice) => ({ ...choice, label: { ...choice.label } }));
+    let label = question.label;
+    let hint = question.hint;
+    let guidance = question.guidance;
+    let constraintMessage = question.constraintMessage;
+    let choices = question.choices;
     for (const [locale, translation] of Object.entries(translations)) {
       const key = locale.toLowerCase().replaceAll("_", "-");
       const value = translation.questions?.[question.name];
       if (!value) continue;
-      if (value.label) label[key] = value.label;
-      if (value.hint) hint[key] = value.hint;
-      if (value.guidance) guidance[key] = value.guidance;
-      if (value.constraintMessage) constraintMessage[key] = value.constraintMessage;
-      for (const choice of choices ?? []) {
-        const choiceLabel = value.choices?.[choice.value];
-        if (choiceLabel) choice.label[key] = choiceLabel;
+      if (value.label) {
+        if (label === question.label) label = { ...question.label };
+        label[key] = value.label;
+      }
+      if (value.hint) {
+        if (hint === question.hint) hint = { ...question.hint };
+        hint[key] = value.hint;
+      }
+      if (value.guidance) {
+        if (guidance === question.guidance) guidance = { ...question.guidance };
+        guidance[key] = value.guidance;
+      }
+      if (value.constraintMessage) {
+        if (constraintMessage === question.constraintMessage) constraintMessage = { ...question.constraintMessage };
+        constraintMessage[key] = value.constraintMessage;
+      }
+      if (value.choices && choices) {
+        choices = choices.map((choice) => {
+          const choiceLabel = value.choices?.[choice.value];
+          return choiceLabel ? { ...choice, label: { ...choice.label, [key]: choiceLabel } } : choice;
+        });
       }
     }
-    return { ...question, label, hint, guidance, constraintMessage, ...(choices ? { choices } : {}) };
+    const changed = label !== question.label
+      || hint !== question.hint
+      || guidance !== question.guidance
+      || constraintMessage !== question.constraintMessage
+      || choices !== question.choices;
+    return changed
+      ? { ...question, label, hint, guidance, constraintMessage, ...(choices ? { choices } : {}) }
+      : question;
   });
 
   return { ...instrument, sections, questions };
@@ -210,13 +267,19 @@ function languageFileFromModule(module: WhoVaLanguageFile | { default: WhoVaLang
  */
 export function createWhoVaLanguageLoader(
   baseInstrument: InstrumentDefinition,
-  imports: WhoVaLanguageImports
+  imports: WhoVaLanguageImports,
+  options: WhoVaLanguageLoaderOptions = {}
 ): (locale: string) => Promise<LoadedWhoVaLanguage> {
+  const maximum = Math.max(1, Math.floor(options.maxCachedLanguages ?? 2));
   const cache = new Map<string, Promise<LoadedWhoVaLanguage>>();
   return async (requestedLocale: string) => {
     const normalized = localeCandidates(requestedLocale)[0] ?? "en";
     const existing = cache.get(normalized);
-    if (existing) return existing;
+    if (existing) {
+      cache.delete(normalized);
+      cache.set(normalized, existing);
+      return existing;
+    }
     const loading = (async () => {
       for (const candidate of localeCandidates(requestedLocale)) {
         const key = Object.keys(imports).find((item) => item.toLowerCase().replaceAll("_", "-") === candidate);
@@ -232,6 +295,14 @@ export function createWhoVaLanguageLoader(
       return { locale: "en", instrument: baseInstrument, uiTranslations: {} };
     })();
     cache.set(normalized, loading);
+    while (cache.size > maximum) {
+      const oldest = cache.keys().next().value as string | undefined;
+      if (!oldest) break;
+      cache.delete(oldest);
+    }
+    void loading.catch(() => {
+      if (cache.get(normalized) === loading) cache.delete(normalized);
+    });
     return loading;
   };
 }

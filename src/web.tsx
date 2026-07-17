@@ -18,10 +18,13 @@ import {
   type WhoVaNavigationState
 } from "./ui/create-who-va-form.js";
 import { createLocalStorageDraftStore } from "./draft.js";
+import { loadWhoVa2022Instrument } from "./instrument-loader.js";
 import { createWhoVaQuestionControls, type WhoVaPlatformServices } from "./ui/question-controls.js";
 import type { AnswerValue } from "./types.js";
 import {
   createIndexedDbWebAttachmentStore,
+  cleanupOrphanedWebAttachments,
+  loadWebAttachmentBlob,
   processWebImageAttachment,
   processWebPdfAttachment,
   resolveWebAttachmentUri
@@ -143,7 +146,8 @@ const browserNavigation: WhoVaNavigationAdapter = {
   }
 };
 
-export * from "./index.js";
+export * from "./core.js";
+export { WHO_VA_2022_LANGUAGES, loadWhoVa2022Instrument, loadWhoVa2022Language } from "./instrument-loader.js";
 export type { WhoVaFormProps, WhoVaPlatformServices } from "./ui/create-who-va-form.js";
 
 interface WebDateInputProps extends Omit<React.InputHTMLAttributes<HTMLInputElement>, "onChange" | "style"> {
@@ -198,6 +202,16 @@ function selectWebFile(accept: string, capture = false): Promise<File | undefine
 
 const webAttachmentStore = createIndexedDbWebAttachmentStore();
 
+/** Loads a stored attachment as a Blob so fetch/FormData can upload it without base64 conversion. */
+export function loadWhoVaWebAttachmentBlob(reference: { id: string }): Promise<Blob | undefined> {
+  return loadWebAttachmentBlob(reference, webAttachmentStore);
+}
+
+/** Removes binaries no longer referenced by the supplied drafts or answer values. */
+export function cleanupWhoVaWebAttachments(references: Iterable<unknown>): Promise<number> {
+  return cleanupOrphanedWebAttachments(references, webAttachmentStore);
+}
+
 async function selectAndProcessWebImage(capture = false): Promise<AnswerValue | undefined> {
   const file = await selectWebFile("image/jpeg,image/png", capture);
   return file ? processWebImageAttachment(file, { store: webAttachmentStore }) : undefined;
@@ -237,11 +251,13 @@ const webAttachmentPlatform: WhoVaPlatformServices = {
 };
 
 export {
+  cleanupOrphanedWebAttachments,
   createBrowserImageTranscoder,
   createIndexedDbWebAttachmentStore,
   createPdfJsRasterizer,
   processWebImageAttachment,
   processWebPdfAttachment,
+  loadWebAttachmentBlob,
   resolveWebAttachmentUri
 } from "./web-attachments.js";
 export { startWebAudioRecording } from "./web-audio.js";
@@ -259,7 +275,7 @@ export const WhoVaForm = createWhoVaForm({
   draftStore: createLocalStorageDraftStore(),
   navigation: browserNavigation,
   scrollToQuestion: scrollToWebQuestion
-});
+}, loadWhoVa2022Instrument);
 
 export const WhoVaQuestionControls = createWhoVaQuestionControls({
   View,
