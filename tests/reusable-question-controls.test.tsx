@@ -123,6 +123,65 @@ describe("reusable question controls", () => {
     root.unmount();
   });
 
+  it("processes a selected JPG before returning it as the image answer", async () => {
+    const rawJpg = {
+      uri: "file:///picker/death-certificate.jpg",
+      name: "death-certificate.jpg",
+      mimeType: "image/jpeg",
+      size: 3_000_000
+    };
+    const processedJpg = {
+      id: "processed-jpg",
+      uri: "who-va-attachment:processed-jpg",
+      name: "processed-jpg.jpg",
+      originalName: "death-certificate.jpg",
+      mimeType: "image/jpeg",
+      size: 800_000,
+      width: 1600,
+      height: 1200,
+      processed: true
+    };
+    const selectImage = vi.fn().mockResolvedValue(rawJpg);
+    const processImage = vi.fn().mockResolvedValue(processedJpg);
+    const onAnswer = vi.fn();
+    const question = {
+      ...textQuestion,
+      name: "photo",
+      sourceType: "image" as const,
+      dataType: "attachment" as const,
+      control: "image" as const
+    };
+    const data = { existing_answer: "kept" };
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+    root.render(
+      <WhoVaQuestionControls.Image
+        question={question}
+        value={undefined}
+        data={data}
+        locale="en"
+        issues={[]}
+        platform={{ selectImage, processImage }}
+        onAnswer={onAnswer}
+      />
+    );
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    Array.from(container.querySelectorAll<HTMLElement>('[role="button"]'))
+      .find((button) => button.textContent === "Choose image")?.click();
+
+    await vi.waitFor(() => expect(onAnswer).toHaveBeenCalledWith(processedJpg));
+    expect(selectImage).toHaveBeenCalledWith(question, data);
+    expect(processImage).toHaveBeenCalledWith(
+      rawJpg,
+      expect.objectContaining({ acceptedMimeTypes: ["image/jpeg", "image/png"] }),
+      question,
+      data
+    );
+    root.unmount();
+  });
+
   it("shows a realtime processing error and does not retain a rejected image", async () => {
     const onAnswer = vi.fn();
     const container = document.createElement("div");
@@ -178,8 +237,14 @@ describe("reusable question controls", () => {
     root.unmount();
   });
 
-  it("limits the reusable file selector to PDFs and returns the attachment", async () => {
-    const selectedPdf = {
+  it("limits file selection to PDFs and processes the selection before returning the answer", async () => {
+    const rawPdf = {
+      uri: "file:///picker/report.pdf",
+      name: "report.pdf",
+      mimeType: "application/pdf",
+      size: 120_000
+    };
+    const processedPdf = {
       uri: "who-va-pdf-pages:report",
       name: "report-pages",
       originalName: "report.pdf",
@@ -190,19 +255,28 @@ describe("reusable question controls", () => {
       processed: true,
       pages: [{ uri: "who-va-attachment:report-page-001", mimeType: "image/jpeg" }]
     };
-    const selectFile = vi.fn().mockResolvedValue(selectedPdf);
+    const selectFile = vi.fn().mockResolvedValue(rawPdf);
+    const processPdf = vi.fn().mockResolvedValue(processedPdf);
     const onAnswer = vi.fn();
+    const question = {
+      ...textQuestion,
+      name: "document",
+      sourceType: "file" as const,
+      dataType: "attachment" as const,
+      control: "file" as const
+    };
+    const data = { existing_answer: "kept" };
     const container = document.createElement("div");
     document.body.append(container);
     const root = createRoot(container);
     root.render(
       <WhoVaQuestionControls.File
-        question={{ ...textQuestion, name: "document", sourceType: "file", dataType: "attachment", control: "file" }}
+        question={question}
         value={undefined}
-        data={{}}
+        data={data}
         locale="en"
         issues={[]}
-        platform={{ selectFile }}
+        platform={{ selectFile, processPdf }}
         onAnswer={onAnswer}
       />
     );
@@ -211,8 +285,83 @@ describe("reusable question controls", () => {
     const choosePdf = Array.from(container.querySelectorAll<HTMLElement>('[role="button"]'))
       .find((button) => button.textContent === "Choose PDF");
     choosePdf?.click();
-    await vi.waitFor(() => expect(onAnswer).toHaveBeenCalledWith(selectedPdf));
-    expect(selectFile).toHaveBeenCalledWith(expect.objectContaining({ name: "document" }), {}, ["application/pdf"]);
+    await vi.waitFor(() => expect(onAnswer).toHaveBeenCalledWith(processedPdf));
+    expect(selectFile).toHaveBeenCalledWith(question, data, ["application/pdf"]);
+    expect(processPdf).toHaveBeenCalledWith(rawPdf, question, data);
+    root.unmount();
+  });
+
+  it.each([
+    {
+      kind: "JPG",
+      raw: { uri: "file:///picker/certificate.jpg", name: "certificate.jpg", mimeType: "image/jpeg", size: 120_000 },
+      processed: {
+        id: "certificate-image",
+        uri: "who-va-attachment:certificate-image",
+        name: "certificate-image.jpg",
+        originalName: "certificate.jpg",
+        mimeType: "image/jpeg",
+        size: 90_000,
+        width: 1200,
+        height: 800,
+        processed: true
+      },
+      processor: "image"
+    },
+    {
+      kind: "PDF",
+      raw: { uri: "file:///picker/certificate.pdf", name: "certificate.pdf", mimeType: "application/pdf", size: 120_000 },
+      processed: {
+        uri: "who-va-pdf-pages:certificate",
+        name: "certificate-pages",
+        originalName: "certificate.pdf",
+        mimeType: "application/vnd.who-va.pdf-pages+json",
+        pageCount: 1,
+        size: 90_000,
+        originalRetained: false,
+        processed: true,
+        pages: [{ uri: "who-va-attachment:certificate-page-001", mimeType: "image/jpeg" }]
+      },
+      processor: "pdf"
+    }
+  ])("accepts and processes a $kind medical-certificate upload", async ({ raw, processed, processor }) => {
+    const question = whoVa2022Instrument.questions.find((candidate) => candidate.name === "custom_medical_certificate_upload");
+    expect(question).toBeDefined();
+    const selectFile = vi.fn().mockResolvedValue(raw);
+    const processImage = vi.fn().mockResolvedValue(processed);
+    const processPdf = vi.fn().mockResolvedValue(processed);
+    const onAnswer = vi.fn();
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+    root.render(
+      <WhoVaQuestionControls.File
+        question={question as InstrumentQuestion}
+        value={undefined}
+        data={{}}
+        locale="en"
+        issues={[]}
+        platform={{ selectFile, processImage, processPdf }}
+        onAnswer={onAnswer}
+      />
+    );
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    container.querySelector<HTMLElement>('[data-testid="question-custom_medical_certificate_upload"]')?.click();
+
+    await vi.waitFor(() => expect(onAnswer).toHaveBeenCalledWith(processed));
+    expect(selectFile).toHaveBeenCalledWith(
+      question,
+      {},
+      ["image/jpeg", "image/png", "application/pdf"]
+    );
+    if (processor === "image") {
+      expect(processImage).toHaveBeenCalledWith(raw, expect.anything(), question, {});
+      expect(processPdf).not.toHaveBeenCalled();
+    } else {
+      expect(processPdf).toHaveBeenCalledWith(raw, question, {});
+      expect(processImage).not.toHaveBeenCalled();
+    }
     root.unmount();
   });
 });

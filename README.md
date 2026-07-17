@@ -104,6 +104,86 @@ defineWhoVaElement();
 
 The element exposes `getData()`, `setData(data)`, `getDraftId()`, `validate()`, and `complete()`. Set a `draft-id` attribute before attaching the element to continue a known UUID; otherwise it generates one.
 
+## Adding languages
+
+The preferred runtime layout is one independent file per language. Each file is JSON-serializable and owns that locale's section labels, question text, hints, guidance, choice labels, constraint messages, and optional form UI strings:
+
+```ts
+// languages/fr.ts (languages/fr.json has the same data shape)
+import type { WhoVaLanguageFile } from "@who-va/instrument";
+
+export default {
+  locale: "fr",
+  instrument: {
+    sections: { va_interviewer: "Enquêteur AV" },
+    questions: {
+      Id10021: {
+        label: "Quand la personne décédée est-elle née ?",
+        hint: "Utilisez la meilleure date disponible",
+        constraintMessage: "Saisissez une date de naissance valide",
+        choices: { "1": "Oui", "0": "Non" }
+      }
+    }
+  },
+  ui: {
+    next: "Suivant",
+    required: "{label} est obligatoire"
+  }
+} satisfies WhoVaLanguageFile;
+```
+
+Register dynamic imports once. No language file is downloaded until it is selected; loaded files are cached. A regional request such as `fr-CA` falls back to the `fr` file, then to the base English instrument.
+
+```tsx
+import { createWhoVaLanguageLoader, whoVa2022Instrument } from "@who-va/instrument";
+import { WhoVaForm } from "@who-va/instrument/web";
+
+const loadLanguage = createWhoVaLanguageLoader(whoVa2022Instrument, {
+  fr: () => import("./languages/fr.js"),
+  sw: () => import("./languages/sw.js")
+});
+
+const language = await loadLanguage(selectedLocale);
+
+<WhoVaForm
+  instrument={language.instrument}
+  locale={language.locale}
+  uiTranslations={language.uiTranslations}
+/>;
+```
+
+Stable question names and choice values are never translated, so saved submissions and branching logic remain compatible across languages. Constraint expressions are also shared; each language file supplies only the interviewer-facing `constraintMessage`.
+
+Changing the loaded `instrument` and `locale` props switches the active language without discarding the current session answers.
+
+### Adding translations manually
+
+XLSForm is not required. A translation may be partial, so another question, hint, choice, or constraint message can be added whenever it becomes available:
+
+```ts
+import { whoVa2022Instrument, withInstrumentTranslation } from "@who-va/instrument";
+
+const instrument = withInstrumentTranslation(whoVa2022Instrument, "fr", {
+  questions: {
+    Id10021: {
+      label: "Quand la personne décédée est-elle née ?",
+      hint: "Utilisez la meilleure date disponible"
+    },
+    Id10022: {
+      choices: {
+        "1": "Oui",
+        "0": "Non"
+      },
+      constraintMessage: "Sélectionnez une réponse valide"
+    }
+  }
+});
+```
+
+Only the supplied fields are added. Existing translations are preserved, untranslated fields fall back to English, and question IDs, choice values, calculations, relevance rules, and stored answers are unchanged. The same `instrument` object can be passed directly to `WhoVaForm`, or the translation object can be placed under `instrument` in a lazy `WhoVaLanguageFile` as shown above.
+
+As an alternative for ODK/XLSForm-managed deployments, language columns can remain in the source workbook: add `label::French (fr)`, `hint::French (fr)`, `guidance_hint::French (fr)`, and `constraint_message::French (fr)` on `survey`, plus `label::French (fr)` on `choices`, then run `pnpm generate`. The compiler discovers any locale in parentheses without TypeScript changes.
+
 ## Web theming
 
 The React web renderer and web component expose namespaced CSS custom properties. Set them on `:root`, an application wrapper, or one form instance; no component fork or `!important` override is needed.

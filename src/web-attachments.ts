@@ -1,3 +1,7 @@
+/**
+ * Browser attachment adapters for IndexedDB persistence, image transcoding,
+ * PDF rasterization, shared-policy processing, and object-URL resolution.
+ */
 import {
   AttachmentProcessingError,
   WHO_VA_ATTACHMENT_POLICY,

@@ -1,3 +1,7 @@
+/**
+ * Canonical answer and submission validation, relevance evaluation, and
+ * calculated-field normalization for the compiled instrument.
+ */
 import { evaluateExpression, parseExpression } from "./expression.js";
 import type {
   AnswerValue,
@@ -7,6 +11,7 @@ import type {
   SubmissionValidationResult,
   ValidationIssue
 } from "../types.js";
+import { ENGLISH_UI_MESSAGES, localizeText, type WhoVaUiMessages } from "../i18n.js";
 
 function expressionAst(expression: { source: string; ast?: ReturnType<typeof parseExpression> }) {
   return expression.ast ?? parseExpression(expression.source);
@@ -17,7 +22,7 @@ function isEmpty(value: unknown): boolean {
 }
 
 function message(question: InstrumentQuestion, locale: string, fallback: string): string {
-  return question.constraintMessage[locale] ?? question.constraintMessage.en ?? fallback;
+  return localizeText(question.constraintMessage, locale, fallback);
 }
 
 function typeIsValid(question: InstrumentQuestion, value: unknown): boolean {
@@ -68,22 +73,23 @@ export function validateAnswer(
   question: InstrumentQuestion,
   value: AnswerValue | undefined,
   data: SubmissionData,
-  locale = "en"
+  locale = "en",
+  messages: WhoVaUiMessages = ENGLISH_UI_MESSAGES
 ): ValidationIssue[] {
   if (["note", "calculated", "system"].includes(question.control)) return [];
   if (isEmpty(value)) {
     return question.required
-      ? [{ question: question.name, code: "required", message: `${question.label[locale] ?? question.label.en ?? question.name} is required` }]
+      ? [{ question: question.name, code: "required", message: messages.required(localizeText(question.label, locale, question.name)) }]
       : [];
   }
   if (!typeIsValid(question, value)) {
-    return [{ question: question.name, code: "type", message: `${question.name} must be a valid ${question.dataType} value` }];
+    return [{ question: question.name, code: "type", message: messages.invalidType(question.name, question.dataType) }];
   }
   if (question.choices) {
     const allowed = new Set(question.choices.map((choice) => choice.value));
     const values = Array.isArray(value) ? value : [value];
     if (values.some((item) => typeof item !== "string" || !allowed.has(item)) || new Set(values).size !== values.length) {
-      return [{ question: question.name, code: "choice", message: `${question.name} contains a value outside its WHO choice list` }];
+      return [{ question: question.name, code: "choice", message: messages.invalidChoice(question.name) }];
     }
   }
   if (question.constraint) {
@@ -93,7 +99,7 @@ export function validateAnswer(
         return [{
           question: question.name,
           code: "constraint",
-          message: message(question, locale, `${question.name} does not satisfy its WHO constraint`)
+          message: message(question, locale, messages.invalidConstraint(question.name))
         }];
       }
     } catch (error) {
@@ -110,7 +116,8 @@ export function validateAnswer(
 export function validateSubmission(
   instrument: InstrumentDefinition,
   data: SubmissionData,
-  locale = "en"
+  locale = "en",
+  messages: WhoVaUiMessages = ENGLISH_UI_MESSAGES
 ): SubmissionValidationResult {
   const calculated = applyCalculations(instrument, data);
   const normalized: SubmissionData = { ...calculated };
@@ -120,7 +127,7 @@ export function validateSubmission(
       if (question.control !== "system") delete normalized[question.name];
       continue;
     }
-    issues.push(...validateAnswer(question, calculated[question.name], calculated, locale));
+    issues.push(...validateAnswer(question, calculated[question.name], calculated, locale, messages));
   }
   return { valid: issues.length === 0, data: normalized, issues };
 }

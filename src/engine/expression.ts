@@ -1,3 +1,7 @@
+/**
+ * Parser and evaluator for the supported XLSForm expression subset, operating
+ * on the canonical submission data without a browser or ODK dependency.
+ */
 import type { AnswerValue, ExpressionNode, SubmissionData } from "../types.js";
 import { formatLocalDate } from "./date.js";
 

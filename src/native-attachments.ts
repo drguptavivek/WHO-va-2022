@@ -1,3 +1,7 @@
+/**
+ * React Native attachment adapter that applies the shared image policy through
+ * host-provided file, image-encoding, and persistence operations.
+ */
 import {
   AttachmentProcessingError,
   WHO_VA_ATTACHMENT_POLICY,

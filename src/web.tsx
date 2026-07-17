@@ -1,3 +1,7 @@
+/**
+ * React web package entry point, binding the shared UI to react-native-web and
+ * browser adapters for navigation, drafts, audio, and attachments.
+ */
 import React from "react";
 import {
   Image as WebImage,
@@ -8,7 +12,11 @@ import {
   View as WebView
 } from "react-native-web";
 
-import { createWhoVaForm } from "./ui/create-who-va-form.js";
+import {
+  createWhoVaForm,
+  type WhoVaNavigationAdapter,
+  type WhoVaNavigationState
+} from "./ui/create-who-va-form.js";
 import { createLocalStorageDraftStore } from "./draft.js";
 import { createWhoVaQuestionControls, type WhoVaPlatformServices } from "./ui/question-controls.js";
 import type { AnswerValue } from "./types.js";
@@ -86,6 +94,55 @@ const Pressable = themedPrimitive(WebPressable, "WhoVaWebPressable");
 const ScrollView = themedPrimitive(WebScrollView, "WhoVaWebScrollView");
 const Image = themedPrimitive(WebImage, "WhoVaWebImage");
 
+const navigationStateKey = "__whoVaFormNavigation";
+
+function readBrowserNavigationState(): WhoVaNavigationState | undefined {
+  if (typeof window === "undefined") return undefined;
+  const historyState = window.history.state;
+  if (historyState == null || typeof historyState !== "object") return undefined;
+  const state = (historyState as Record<string, unknown>)[navigationStateKey];
+  if (state == null || typeof state !== "object") return undefined;
+  const candidate = state as Partial<WhoVaNavigationState>;
+  if (
+    typeof candidate.instrumentId !== "string"
+    || typeof candidate.draftId !== "string"
+    || typeof candidate.currentSection !== "string"
+    || (candidate.view !== "form" && candidate.view !== "preview")
+    || candidate.data == null
+    || typeof candidate.data !== "object"
+  ) return undefined;
+  return candidate as WhoVaNavigationState;
+}
+
+function browserHistoryEnvelope(state: WhoVaNavigationState): Record<string, unknown> {
+  const current = window.history.state;
+  return {
+    ...(current != null && typeof current === "object" ? current as Record<string, unknown> : {}),
+    [navigationStateKey]: state
+  };
+}
+
+const browserNavigation: WhoVaNavigationAdapter = {
+  read: readBrowserNavigationState,
+  replace(state) {
+    if (typeof window === "undefined") return;
+    window.history.replaceState(browserHistoryEnvelope(state), "");
+  },
+  push(state) {
+    if (typeof window === "undefined") return;
+    window.history.pushState(browserHistoryEnvelope(state), "");
+  },
+  back() {
+    if (typeof window !== "undefined") window.history.back();
+  },
+  subscribe(listener) {
+    if (typeof window === "undefined") return () => undefined;
+    const handlePopState = () => listener(readBrowserNavigationState());
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }
+};
+
 export * from "./index.js";
 export type { WhoVaFormProps, WhoVaPlatformServices } from "./ui/create-who-va-form.js";
 
@@ -146,18 +203,18 @@ async function selectAndProcessWebImage(capture = false): Promise<AnswerValue | 
   return file ? processWebImageAttachment(file, { store: webAttachmentStore }) : undefined;
 }
 
-async function selectAndProcessWebPdf(): Promise<AnswerValue | undefined> {
-  const file = await selectWebFile("application/pdf");
-  return file ? processWebPdfAttachment(file, { store: webAttachmentStore }) : undefined;
-}
-
 const webAttachmentPlatform: WhoVaPlatformServices = {
   startAudioRecording: async () => startWebAudioRecording({ store: webAttachmentStore }),
   captureImage: async () => selectAndProcessWebImage(true),
   selectImage: async () => selectAndProcessWebImage(),
   selectFile: async (_question, _data, acceptedMimeTypes) => {
-    if (!acceptedMimeTypes.includes("application/pdf")) return undefined;
-    return selectAndProcessWebPdf();
+    const file = await selectWebFile(acceptedMimeTypes.join(","));
+    if (!file) return undefined;
+    const imageSelected = acceptedMimeTypes.includes("image/jpeg")
+      && (file.type === "image/jpeg" || file.type === "image/png" || /\.(?:jpe?g|png)$/i.test(file.name));
+    if (imageSelected) return processWebImageAttachment(file, { store: webAttachmentStore });
+    if (acceptedMimeTypes.includes("application/pdf")) return processWebPdfAttachment(file, { store: webAttachmentStore });
+    return undefined;
   },
   resolveAttachmentUri: async (attachment) => {
     if (attachment == null || Array.isArray(attachment) || typeof attachment !== "object" || typeof attachment.id !== "string") return undefined;
@@ -200,6 +257,7 @@ export const WhoVaForm = createWhoVaForm({
   Image,
   platform: webAttachmentPlatform,
   draftStore: createLocalStorageDraftStore(),
+  navigation: browserNavigation,
   scrollToQuestion: scrollToWebQuestion
 });
 

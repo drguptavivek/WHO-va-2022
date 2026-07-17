@@ -1,3 +1,7 @@
+/**
+ * Build-time compiler that converts the WHO 2022 XLSForm workbook into the
+ * platform-neutral instrument contract consumed by the runtime.
+ */
 import ExcelJS from "exceljs";
 import path from "node:path";
 
@@ -88,9 +92,8 @@ function localized(row: SourceRow, prefix: string): LocalizedText {
 
 function constraintMessage(row: SourceRow): LocalizedText {
   const interviewerMessage = INTERVIEWER_CONSTRAINT_MESSAGES[row.name ?? ""];
-  if (interviewerMessage) return interviewerMessage;
   const sourceMessage = localized(row, "constraint_message");
-  return Object.keys(sourceMessage).length > 0 ? sourceMessage : {};
+  return { ...sourceMessage, ...interviewerMessage };
 }
 
 function normalizeType(sourceType: string): string {

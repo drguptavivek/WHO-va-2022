@@ -1,3 +1,7 @@
+/**
+ * React Native package entry point, binding shared form and question-control
+ * factories to native primitives while re-exporting the headless API.
+ */
 import { Image, Pressable, ScrollView, Text, TextInput, View } from "react-native";
 
 import { createWhoVaForm } from "./ui/create-who-va-form.js";

@@ -1,3 +1,7 @@
+/**
+ * Factory for the shared questionnaire form, coordinating session state,
+ * validation, navigation, draft persistence, and platform question controls.
+ */
 import React, { useCallback, useEffect, useRef, useState } from "react";
 
 import type {
@@ -14,7 +18,9 @@ import type {
 } from "../types.js";
 import { createDraftId } from "../draft.js";
 import { createWhoVaSession } from "../engine/session.js";
+import { isQuestionRelevant } from "../engine/validation.js";
 import { whoVa2022Instrument } from "../instrument.js";
+import { localeFromLanguageName, localizeText, resolveUiMessages, type WhoVaUiTranslations } from "../i18n.js";
 import {
   createWhoVaQuestionControls,
   questionControlStyles,
@@ -28,6 +34,7 @@ export interface WhoVaFormProps {
   session?: WhoVaSession;
   initialData?: SubmissionData;
   locale?: string;
+  uiTranslations?: WhoVaUiTranslations;
   showSourceGuidance?: boolean;
   platform?: WhoVaPlatformServices;
   draftId?: string;
@@ -50,7 +57,26 @@ export interface WhoVaPrimitiveSet {
   Image?: React.ElementType;
   platform?: WhoVaPlatformServices;
   draftStore?: WhoVaDraftStore;
+  navigation?: WhoVaNavigationAdapter;
   scrollToQuestion?: (questionNode: unknown, scrollViewNode: unknown, y: number) => void;
+}
+
+type FormView = "form" | "preview";
+
+export interface WhoVaNavigationState {
+  instrumentId: string;
+  draftId: string;
+  currentSection: string;
+  view: FormView;
+  data: SubmissionData;
+}
+
+export interface WhoVaNavigationAdapter {
+  read(): WhoVaNavigationState | undefined;
+  replace(state: WhoVaNavigationState): void;
+  push(state: WhoVaNavigationState): void;
+  back(): void;
+  subscribe(listener: (state: WhoVaNavigationState | undefined) => void): () => void;
 }
 
 function plainText(value: string | undefined): string {
@@ -64,7 +90,7 @@ function plainText(value: string | undefined): string {
 }
 
 function localized(text: Record<string, string | undefined>, locale: string, fallback: string): string {
-  return plainText(text[locale] ?? text.en ?? fallback);
+  return plainText(localizeText(text, locale, fallback));
 }
 
 function interpolateSubmissionReferences(value: string, data: SubmissionData): string {
@@ -77,6 +103,27 @@ function interpolateSubmissionReferences(value: string, data: SubmissionData): s
 
 function interviewerQuestionLabel(value: string): string {
   return value.replace(/^(\([^)]+\))\s*\[([^\]]+)\](.*)$/s, "$1 $2$3");
+}
+
+function hasAnswer(value: AnswerValue | undefined): value is AnswerValue {
+  return value != null && value !== "" && (!Array.isArray(value) || value.length > 0);
+}
+
+function previewAnswer(question: InstrumentQuestion, value: AnswerValue, locale: string): string {
+  const choiceLabel = (choiceValue: string) => {
+    const choice = question.choices?.find((candidate) => candidate.value === choiceValue);
+    return choice ? localized(choice.label, locale, choiceValue) : choiceValue;
+  };
+  if (Array.isArray(value)) return value.map(choiceLabel).join(", ");
+  if (typeof value === "string") return choiceLabel(value);
+  if (typeof value === "boolean") return value ? "Yes" : "No";
+  if (typeof value === "number") return String(value);
+  if (value == null) return "Recorded";
+  for (const property of ["name", "originalName", "fileName", "uri"] as const) {
+    const candidate = value[property];
+    if (typeof candidate === "string" && candidate) return candidate;
+  }
+  return "Recorded";
 }
 
 const styles = {
@@ -93,7 +140,10 @@ const styles = {
   note: { backgroundColor: "#edf5f2", borderLeftWidth: 4, borderLeftColor: "#147d64" },
   error: { color: "#a23a2a", marginTop: 8, fontSize: 13 },
   navigation: { flexDirection: "row" as const, flexWrap: "wrap" as const, justifyContent: "space-between" as const, gap: 12, marginTop: 12, marginBottom: 12 },
-  draftStatus: { color: "#536b64", fontSize: 12, marginTop: 4, marginBottom: 24 }
+  draftStatus: { color: "#536b64", fontSize: 12, marginTop: 4, marginBottom: 24 },
+  previewIntro: { color: "#536b64", fontSize: 14, marginBottom: 18 },
+  previewAnswer: { color: "#142a24", fontSize: 16 },
+  previewEmpty: { color: "#536b64", fontSize: 15, paddingVertical: 16 }
 };
 
 export function createWhoVaForm(primitives: WhoVaPrimitiveSet): React.ComponentType<WhoVaFormProps> {
@@ -109,15 +159,35 @@ export function createWhoVaForm(primitives: WhoVaPrimitiveSet): React.ComponentT
   });
 
   function Form(props: WhoVaFormProps) {
-    const locale = props.locale ?? "en";
     const instrument = props.instrument ?? whoVa2022Instrument;
-    const [session] = useState(() => props.session ?? createWhoVaSession(
-      instrument,
-      props.initialData ? { initialData: props.initialData } : {}
-    ));
+    const locale = props.locale ?? localeFromLanguageName(instrument.defaultLanguage) ?? "en";
+    const messages = resolveUiMessages(locale, props.uiTranslations);
+    const [restoredNavigation] = useState(() => {
+      const restored = primitives.navigation?.read();
+      return restored?.instrumentId === instrument.id ? restored : undefined;
+    });
+    const [session] = useState(() => {
+      if (props.session) {
+        if (restoredNavigation) {
+          props.session.replaceData(restoredNavigation.data);
+          props.session.goToSection(restoredNavigation.currentSection);
+        }
+        return props.session;
+      }
+      const initialData = props.initialData ?? restoredNavigation?.data;
+      return createWhoVaSession(instrument, {
+        ...(initialData ? { initialData } : {}),
+        ...(restoredNavigation?.currentSection
+          ? { initialSection: restoredNavigation.currentSection }
+          : {}),
+        locale,
+        ...(props.uiTranslations ? { uiTranslations: props.uiTranslations } : {})
+      });
+    });
     const [snapshot, setSnapshot] = useState(() => session.getSnapshot());
+    const [view, setView] = useState<FormView>(restoredNavigation?.view ?? "form");
     const [draftIssues, setDraftIssues] = useState<Record<string, ValidationIssue>>({});
-    const [draftId] = useState(() => props.draftId ?? createDraftId());
+    const [draftId] = useState(() => props.draftId ?? restoredNavigation?.draftId ?? createDraftId());
     const [draftStatus, setDraftStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
     const draftCreatedAt = useRef(new Date().toISOString());
     const scrollViewRef = useRef<unknown>(null);
@@ -132,6 +202,31 @@ export function createWhoVaForm(primitives: WhoVaPrimitiveSet): React.ComponentT
         props.onChange?.(next.data, next);
       });
     }, [session, props.onReady, props.onChange]);
+
+    useEffect(() => {
+      session.setLocale(locale, props.uiTranslations);
+    }, [locale, props.uiTranslations, session]);
+
+    useEffect(() => {
+      session.setInstrument(instrument);
+    }, [instrument, session]);
+
+    useEffect(() => {
+      primitives.navigation?.replace({
+        instrumentId: instrument.id,
+        draftId,
+        currentSection: snapshot.currentSection.name,
+        view,
+        data: snapshot.data
+      });
+    }, [draftId, instrument.id, snapshot.currentSection.name, snapshot.data, view]);
+
+    useEffect(() => primitives.navigation?.subscribe((state) => {
+      if (!state || state.instrumentId !== instrument.id) return;
+      session.replaceData(state.data);
+      session.goToSection(state.currentSection);
+      setView(state.view);
+    }), [instrument.id, session]);
 
     const answer = (question: InstrumentQuestion, value: AnswerValue | undefined) => {
       session.setAnswer(question.name, value);
@@ -208,6 +303,7 @@ export function createWhoVaForm(primitives: WhoVaPrimitiveSet): React.ComponentT
           value={value}
           data={snapshot.data}
           locale={locale}
+          messages={messages}
           issues={issues}
           platform={props.platform}
           onAnswer={(next) => answer(question, next)}
@@ -265,9 +361,51 @@ export function createWhoVaForm(primitives: WhoVaPrimitiveSet): React.ComponentT
       if (result.completed) props.onComplete?.(session.validate());
     };
 
+    const answeredQuestions = instrument.questions.filter((question) => (
+      !["note", "calculated", "system"].includes(question.control)
+      && isQuestionRelevant(instrument, question, snapshot.data)
+      && hasAnswer(snapshot.data[question.name])
+    ));
+
+    if (view === "preview") {
+      return (
+        <ScrollView style={styles.root} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+          <Text style={styles.progress}>{answeredQuestions.length} answered question{answeredQuestions.length === 1 ? "" : "s"}</Text>
+          <Text style={styles.sectionTitle}>Answer preview</Text>
+          <Text style={styles.previewIntro}>Review the answers entered so far. Return to the form to make changes.</Text>
+          {answeredQuestions.length ? answeredQuestions.map((question) => {
+            const value = snapshot.data[question.name];
+            if (!hasAnswer(value)) return null;
+            const label = interviewerQuestionLabel(interpolateSubmissionReferences(
+              localized(question.label, locale, question.name),
+              snapshot.data
+            ));
+            return (
+              <View key={question.name} style={styles.question} testID={`preview-answer-${question.name}`}>
+                <Text style={styles.label}>{label}</Text>
+                <Text style={styles.previewAnswer}>{previewAnswer(question, value, locale)}</Text>
+              </View>
+            );
+          }) : <Text style={styles.previewEmpty}>No answers have been entered yet.</Text>}
+          <View style={styles.navigation}>
+            <Pressable
+              accessibilityRole="button"
+              style={[questionControlStyles.button, questionControlStyles.buttonSecondary]}
+              onPress={() => {
+                setView("form");
+                primitives.navigation?.back();
+              }}
+            >
+              <Text style={questionControlStyles.buttonTextSecondary}>Back to form</Text>
+            </Pressable>
+          </View>
+        </ScrollView>
+      );
+    }
+
     return (
       <ScrollView ref={scrollViewRef} style={styles.root} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-        <Text style={styles.progress}>Section {snapshot.currentSectionIndex + 1} of {snapshot.visibleSectionCount}</Text>
+        <Text style={styles.progress}>{messages.sectionProgress(snapshot.currentSectionIndex + 1, snapshot.visibleSectionCount)}</Text>
         <Text style={styles.sectionTitle}>{localized(snapshot.currentSection.label, locale, snapshot.currentSection.name)}</Text>
         {snapshot.questions.map(renderQuestion)}
         <View style={styles.navigation}>
@@ -277,7 +415,7 @@ export function createWhoVaForm(primitives: WhoVaPrimitiveSet): React.ComponentT
             style={[questionControlStyles.button, questionControlStyles.buttonSecondary, !snapshot.canGoBack && questionControlStyles.buttonDisabled]}
             onPress={() => session.previous()}
           >
-            <Text style={questionControlStyles.buttonTextSecondary}>Back</Text>
+            <Text style={questionControlStyles.buttonTextSecondary}>{messages.back}</Text>
           </Pressable>
           <Pressable
             accessibilityRole="button"
@@ -285,14 +423,31 @@ export function createWhoVaForm(primitives: WhoVaPrimitiveSet): React.ComponentT
             style={[questionControlStyles.button, questionControlStyles.buttonSecondary, (!(props.draftStore ?? primitives.draftStore) || draftStatus === "saving") && questionControlStyles.buttonDisabled]}
             onPress={() => void saveDraft()}
           >
-            <Text style={questionControlStyles.buttonTextSecondary}>{draftStatus === "saving" ? "Saving…" : "Save draft"}</Text>
+            <Text style={questionControlStyles.buttonTextSecondary}>{draftStatus === "saving" ? messages.saving : messages.saveDraft}</Text>
+          </Pressable>
+          <Pressable
+            accessibilityRole="button"
+            style={[questionControlStyles.button, questionControlStyles.buttonSecondary]}
+            onPress={() => {
+              void saveDraft();
+              primitives.navigation?.push({
+                instrumentId: instrument.id,
+                draftId,
+                currentSection: snapshot.currentSection.name,
+                view: "preview",
+                data: snapshot.data
+              });
+              setView("preview");
+            }}
+          >
+            <Text style={questionControlStyles.buttonTextSecondary}>Preview answers</Text>
           </Pressable>
           <Pressable accessibilityRole="button" style={questionControlStyles.button} onPress={advance}>
-            <Text style={questionControlStyles.buttonText}>{snapshot.canGoForward ? "Next" : "Complete"}</Text>
+            <Text style={questionControlStyles.buttonText}>{snapshot.canGoForward ? messages.next : messages.complete}</Text>
           </Pressable>
         </View>
         <Text style={styles.draftStatus}>
-          {draftStatus === "saved" ? `Draft saved · ${draftId}` : draftStatus === "error" ? "Draft could not be saved" : `Draft ID · ${draftId}`}
+          {draftStatus === "saved" ? messages.draftSaved(draftId) : draftStatus === "error" ? messages.draftSaveFailed : messages.draftId(draftId)}
         </Text>
       </ScrollView>
     );

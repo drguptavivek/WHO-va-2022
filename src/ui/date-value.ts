@@ -1,3 +1,7 @@
+/**
+ * Locale-aware conversion between canonical ISO dates and the text-based date
+ * format used when a platform-native date picker is unavailable.
+ */
 type DatePart = "day" | "month" | "year";
 
 function localizedMonthNames(locale: string): string[] {

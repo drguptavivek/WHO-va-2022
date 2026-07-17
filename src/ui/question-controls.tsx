@@ -1,3 +1,7 @@
+/**
+ * Factory and registry for reusable questionnaire controls, with host-injected
+ * primitives and services for dates, audio, images, and files.
+ */
 import React, { useEffect, useRef, useState } from "react";
 
 import {
@@ -14,6 +18,7 @@ import type {
   ValidationIssue
 } from "../types.js";
 import { dateFormatPlaceholder, formatDisplayDate, parseDisplayDate } from "./date-value.js";
+import { ENGLISH_UI_MESSAGES, localizeText, type WhoVaUiMessages } from "../i18n.js";
 
 export interface WhoVaPlatformServices {
   captureAudio?: (question: InstrumentQuestion, data: SubmissionData) => Promise<AnswerValue>;
@@ -59,6 +64,7 @@ export interface WhoVaQuestionControlProps {
   value: AnswerValue | undefined;
   data: SubmissionData;
   locale: string;
+  messages?: WhoVaUiMessages;
   issues: ValidationIssue[];
   platform?: WhoVaPlatformServices | undefined;
   onAnswer: (value: AnswerValue | undefined) => void;
@@ -108,7 +114,7 @@ function plainText(value: string | undefined): string {
 }
 
 function localized(text: Record<string, string | undefined>, locale: string, fallback: string): string {
-  return plainText(text[locale] ?? text.en ?? fallback);
+  return plainText(localizeText(text, locale, fallback));
 }
 
 function questionLabel(question: InstrumentQuestion, locale: string): string {
@@ -116,19 +122,24 @@ function questionLabel(question: InstrumentQuestion, locale: string): string {
     .replace(/^(\([^)]+\))\s*\[([^\]]+)\](.*)$/s, "$1 $2$3");
 }
 
-export function incompleteDateIssue(question: InstrumentQuestion, draft: string | undefined, locale: string): ValidationIssue | undefined {
+export function incompleteDateIssue(
+  question: InstrumentQuestion,
+  draft: string | undefined,
+  locale: string,
+  messages: WhoVaUiMessages = ENGLISH_UI_MESSAGES
+): ValidationIssue | undefined {
   if (question.control !== "date" || !draft) return undefined;
   if (question.appearance === "year") {
     return /^\d{4}$/.test(draft)
       ? undefined
-      : { question: question.name, code: "type", message: "Enter a four-digit year, for example 2026" };
+      : { question: question.name, code: "type", message: messages.fourDigitYear };
   }
   return parseDisplayDate(draft, locale)
     ? undefined
     : {
         question: question.name,
         code: "type",
-        message: `Enter the date as ${dateFormatPlaceholder(locale)}, for example ${formatDisplayDate("2026-07-17", locale)}`
+        message: messages.invalidDate(dateFormatPlaceholder(locale), formatDisplayDate("2026-07-17", locale))
       };
 }
 
@@ -140,6 +151,11 @@ function attachmentDetails(value: AnswerValue | undefined): { uri?: string; name
     ...(typeof value.originalName === "string" ? { name: value.originalName } : typeof value.name === "string" ? { name: value.name } : {}),
     ...(typeof value.mimeType === "string" ? { mimeType: value.mimeType } : {})
   };
+}
+
+function attachmentMimeType(value: AnswerValue | undefined): string | undefined {
+  if (value == null || Array.isArray(value) || typeof value !== "object") return undefined;
+  return typeof value.mimeType === "string" ? value.mimeType : undefined;
 }
 
 function attachmentErrorMessage(error: unknown): string {
@@ -183,7 +199,7 @@ export function createWhoVaQuestionControls(primitives: WhoVaQuestionControlPrim
     );
   }
 
-  function Date({ question, value, data, locale, issues, platform, onAnswer, onDraftIssue }: WhoVaQuestionControlProps) {
+  function Date({ question, value, data, locale, messages = ENGLISH_UI_MESSAGES, issues, platform, onAnswer, onDraftIssue }: WhoVaQuestionControlProps) {
     const [draft, setDraft] = useState<string>();
     const [busy, setBusy] = useState(false);
     const label = questionLabel(question, locale);
@@ -194,7 +210,7 @@ export function createWhoVaQuestionControls(primitives: WhoVaQuestionControlPrim
 
     const updateDraft = (next: string | undefined) => {
       setDraft(next);
-      onDraftIssue?.(question.name, incompleteDateIssue(question, next, locale));
+      onDraftIssue?.(question.name, incompleteDateIssue(question, next, locale, messages));
     };
 
     if (question.appearance === "year") {
@@ -258,7 +274,7 @@ export function createWhoVaQuestionControls(primitives: WhoVaQuestionControlPrim
           }}
         >
           <PrimitiveText style={value == null ? questionControlStyles.hint : questionControlStyles.choiceText}>
-            {busy ? "Opening calendar…" : value == null ? "Select date" : formatDisplayDate(String(value), locale)}
+            {busy ? messages.openingCalendar : value == null ? messages.selectDate : formatDisplayDate(String(value), locale)}
           </PrimitiveText>
         </Pressable>
       );
@@ -328,7 +344,7 @@ export function createWhoVaQuestionControls(primitives: WhoVaQuestionControlPrim
     });
   }
 
-  function Confirm({ question, value, onAnswer }: WhoVaQuestionControlProps) {
+  function Confirm({ question, value, messages = ENGLISH_UI_MESSAGES, onAnswer }: WhoVaQuestionControlProps) {
     return (
       <Pressable
         accessibilityRole="button"
@@ -336,7 +352,7 @@ export function createWhoVaQuestionControls(primitives: WhoVaQuestionControlPrim
         style={[questionControlStyles.button, value === true && questionControlStyles.choiceSelected]}
         onPress={() => onAnswer(true)}
       >
-        <PrimitiveText style={questionControlStyles.buttonText}>{value === true ? "Confirmed" : "Confirm"}</PrimitiveText>
+        <PrimitiveText style={questionControlStyles.buttonText}>{value === true ? messages.confirmed : messages.confirm}</PrimitiveText>
       </Pressable>
     );
   }
@@ -536,6 +552,11 @@ export function createWhoVaQuestionControls(primitives: WhoVaQuestionControlPrim
     const [processingError, setProcessingError] = useState<string>();
     const attachment = attachmentDetails(value);
     const services = { ...primitives.platform, ...platform };
+    const acceptsImages = question.appearance === "image-or-pdf";
+    const acceptedMimeTypes = acceptsImages
+      ? [...WHO_VA_ATTACHMENT_POLICY.image.acceptedMimeTypes, ...WHO_VA_ATTACHMENT_POLICY.pdf.acceptedMimeTypes]
+      : [...WHO_VA_ATTACHMENT_POLICY.pdf.acceptedMimeTypes];
+    const attachmentLabel = acceptsImages ? "attachment" : "PDF";
     return (
       <>
         {attachment.name ? <PrimitiveText style={questionControlStyles.attachmentName}>{attachment.name}</PrimitiveText> : null}
@@ -550,14 +571,23 @@ export function createWhoVaQuestionControls(primitives: WhoVaQuestionControlPrim
               setBusy(true);
               setProcessingError(undefined);
               try {
-                const candidate = await services.selectFile(question, data, ["application/pdf"]);
+                const candidate = await services.selectFile(question, data, acceptedMimeTypes);
                 let selected = candidate;
-                if (candidate !== undefined && !isProcessedPdfAttachment(candidate)) {
-                  if (!services.processPdf) throw new AttachmentProcessingError("pdf-processing-unavailable");
-                  selected = await services.processPdf(candidate, question, data);
+                if (candidate !== undefined && !isProcessedPdfAttachment(candidate) && !(acceptsImages && isProcessedImageAttachment(candidate))) {
+                  if (acceptsImages && WHO_VA_ATTACHMENT_POLICY.image.acceptedMimeTypes.includes(
+                    attachmentMimeType(candidate) as "image/jpeg" | "image/png"
+                  )) {
+                    if (!services.processImage) throw new AttachmentProcessingError("image-processing-unavailable");
+                    selected = await services.processImage(candidate, WHO_VA_ATTACHMENT_POLICY.image, question, data);
+                  } else {
+                    if (!services.processPdf) throw new AttachmentProcessingError("pdf-processing-unavailable");
+                    selected = await services.processPdf(candidate, question, data);
+                  }
                 }
                 if (selected !== undefined) {
-                  if (!isProcessedPdfAttachment(selected)) throw new AttachmentProcessingError("pdf-render-failed");
+                  if (!isProcessedPdfAttachment(selected) && !(acceptsImages && isProcessedImageAttachment(selected))) {
+                    throw new AttachmentProcessingError(acceptsImages ? "image-output-invalid" : "pdf-render-failed");
+                  }
                   if (value !== undefined) await services.removeAttachment?.(value);
                   onAnswer(selected);
                 }
@@ -568,7 +598,7 @@ export function createWhoVaQuestionControls(primitives: WhoVaQuestionControlPrim
               }
             }}
           >
-            <PrimitiveText style={questionControlStyles.buttonText}>{busy ? "Opening files…" : attachment.uri ? "Replace PDF" : "Choose PDF"}</PrimitiveText>
+            <PrimitiveText style={questionControlStyles.buttonText}>{busy ? "Opening files…" : attachment.uri ? `Replace ${attachmentLabel}` : `Choose ${attachmentLabel}`}</PrimitiveText>
           </Pressable>
           {processingError ? <PrimitiveText accessibilityRole="alert" style={questionControlStyles.attachmentError}>{processingError}</PrimitiveText> : null}
           {attachment.uri ? (
@@ -576,7 +606,7 @@ export function createWhoVaQuestionControls(primitives: WhoVaQuestionControlPrim
               if (value !== undefined) void services.removeAttachment?.(value);
               onAnswer(undefined);
             }}>
-              <PrimitiveText style={questionControlStyles.buttonTextDanger}>Remove PDF</PrimitiveText>
+              <PrimitiveText style={questionControlStyles.buttonTextDanger}>Remove {attachmentLabel}</PrimitiveText>
             </Pressable>
           ) : null}
         </View>

@@ -1,3 +1,7 @@
+/**
+ * Cross-platform draft identifiers and the browser localStorage draft-store
+ * adapter. Native hosts provide their own implementation of the same contract.
+ */
 import type { WhoVaDraft, WhoVaDraftStore } from "./types.js";
 
 export const WHO_VA_DRAFT_KEY_PREFIX = "who-va-2022:draft:";

@@ -1,3 +1,7 @@
+/**
+ * Custom-element wrapper that embeds the React web form in non-React pages and
+ * exposes imperative data, validation, draft, and completion APIs.
+ */
 import React from "react";
 import { createRoot, type Root } from "react-dom/client";
 

@@ -30,7 +30,7 @@ describe("WHO VA expression semantics", () => {
       ...whoVa2022Instrument.sections.flatMap((section) => section.relevant ? [section.relevant] : [])
     ];
 
-    expect(expressions).toHaveLength(462);
+    expect(expressions).toHaveLength(463);
     for (const expression of expressions) {
       expect(() => evaluateExpression(
         expression.ast ?? parseExpression(expression.source),

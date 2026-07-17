@@ -1,3 +1,7 @@
+/**
+ * Platform-neutral attachment policies, validation, and processing pipelines.
+ * Browser and native adapters supply the codecs and persistence used here.
+ */
 import { createDraftId } from "./draft.js";
 
 export interface ImageAttachmentPolicy {

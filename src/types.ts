@@ -1,3 +1,9 @@
+/**
+ * Canonical, platform-neutral data contracts for the compiled instrument,
+ * answers, drafts, validation results, and interview sessions.
+ */
+import type { WhoVaUiTranslations } from "./i18n.js";
+
 export type AnswerDataType =
   | "string"
   | "number"
@@ -149,14 +155,20 @@ export interface SessionNavigationResult {
 
 export interface WhoVaSessionOptions {
   initialData?: SubmissionData;
+  initialSection?: string;
+  locale?: string;
+  uiTranslations?: WhoVaUiTranslations;
   now?: () => Date;
   audit?: Record<string, unknown>;
 }
 
 export interface WhoVaSession {
   getSnapshot(): SessionSnapshot;
+  setInstrument(instrument: InstrumentDefinition): void;
   setAnswer(name: string, value: AnswerValue | undefined): void;
   replaceData(data: SubmissionData): void;
+  goToSection(name: string): boolean;
+  setLocale(locale: string, uiTranslations?: WhoVaUiTranslations): void;
   next(): SessionNavigationResult;
   previous(): boolean;
   validate(): SubmissionValidationResult;

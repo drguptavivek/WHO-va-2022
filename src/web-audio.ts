@@ -1,3 +1,7 @@
+/**
+ * Browser MediaRecorder adapter that captures audio and persists it through the
+ * same binary store used by other web attachments.
+ */
 import { createDraftId } from "./draft.js";
 import type { AnswerValue } from "./types.js";
 import type { WebAttachmentBinaryStore } from "./web-attachments.js";

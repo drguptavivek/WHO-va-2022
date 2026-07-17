@@ -1,3 +1,4 @@
+/** Date helpers shared by expression evaluation and session calculations. */
 export function formatLocalDate(value: Date): string {
   const year = value.getFullYear();
   const month = String(value.getMonth() + 1).padStart(2, "0");
