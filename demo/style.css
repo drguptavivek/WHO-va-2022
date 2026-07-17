@@ -32,8 +32,7 @@ body {
   letter-spacing: -0.025em;
 }
 
-.eyebrow,
-.subhead {
+.eyebrow {
   margin: 0;
 }
 
@@ -43,11 +42,6 @@ body {
   font-weight: 750;
   letter-spacing: 0.12em;
   text-transform: uppercase;
-}
-
-.subhead {
-  color: #d2ece4;
-  font-size: 0.88rem;
 }
 
 .status-card {
