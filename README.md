@@ -104,6 +104,38 @@ defineWhoVaElement();
 
 The element exposes `getData()`, `setData(data)`, `getDraftId()`, `validate()`, and `complete()`. Set a `draft-id` attribute before attaching the element to continue a known UUID; otherwise it generates one.
 
+## Web theming
+
+The React web renderer and web component expose namespaced CSS custom properties. Set them on `:root`, an application wrapper, or one form instance; no component fork or `!important` override is needed.
+
+```css
+.my-va-page {
+  --who-2022-web-color-brand: #275dad;
+  --who-2022-web-color-brand-deep: #173b70;
+  --who-2022-web-color-brand-soft: #eaf1fb;
+  --who-2022-web-color-canvas: #f5f7fb;
+  --who-2022-web-color-surface: #ffffff;
+  --who-2022-web-color-ink: #172033;
+  --who-2022-web-color-muted: #5c667a;
+  --who-2022-web-color-border: #dce2eb;
+  --who-2022-web-color-control-border: #9aa8bc;
+  --who-2022-web-radius-control: 10px;
+  --who-2022-web-radius-card: 16px;
+  --who-2022-web-form-max-width: 48rem;
+  --who-2022-web-form-padding: clamp(1rem, 2.5vw, 1.5rem);
+}
+```
+
+```html
+<section class="my-va-page">
+  <who-va-2022-form locale="en"></who-va-2022-form>
+</section>
+```
+
+All web theme properties use the `--who-2022-web-` namespace. Less commonly needed tokens cover guidance, danger, and image-preview colors: `color-ink-subtle`, `color-guidance`, `color-danger`, `color-danger-border`, `color-danger-strong`, `color-danger-soft`, and `color-image-background`.
+
+The form is mobile-first: it fills the available width with responsive padding, then stops growing at `--who-2022-web-form-max-width` (default `48rem`). The same cap applies in portrait and landscape, preventing long question text and controls from stretching across widescreen displays. Set the token on a wrapper or individual form when a host application needs a narrower measure. `--who-2022-web-form-padding` controls both gutters with one CSS length; `--who-2022-web-form-padding-inline` and `--who-2022-web-form-padding-block` can override the horizontal and vertical gutters independently.
+
 ## Headless validation
 
 ```ts

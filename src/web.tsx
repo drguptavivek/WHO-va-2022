@@ -1,5 +1,12 @@
-import type React from "react";
-import { Image, Pressable, ScrollView, Text, TextInput, View } from "react-native-web";
+import React from "react";
+import {
+  Image as WebImage,
+  Pressable as WebPressable,
+  ScrollView as WebScrollView,
+  Text as WebText,
+  TextInput as WebTextInput,
+  View as WebView
+} from "react-native-web";
 
 import { createWhoVaForm } from "./ui/create-who-va-form.js";
 import { createLocalStorageDraftStore } from "./draft.js";
@@ -11,6 +18,72 @@ import {
   processWebPdfAttachment,
   resolveWebAttachmentUri
 } from "./web-attachments.js";
+
+const webThemeValues: Record<string, string> = {
+  "#f6f8f7": "var(--who-2022-web-color-canvas, #f5f7fa)",
+  "#ffffff": "var(--who-2022-web-color-surface, #ffffff)",
+  "#142a24": "var(--who-2022-web-color-ink, #1f2937)",
+  "#213b34": "var(--who-2022-web-color-ink-subtle, #374151)",
+  "#47625b": "var(--who-2022-web-color-muted, #667085)",
+  "#536b64": "var(--who-2022-web-color-muted, #667085)",
+  "#12372d": "var(--who-2022-web-color-brand-deep, #1e3a5f)",
+  "#183d33": "var(--who-2022-web-color-brand-deep, #1e3a5f)",
+  "#147d64": "var(--who-2022-web-color-brand, #2563eb)",
+  "#edf5f2": "var(--who-2022-web-color-brand-soft, #eff6ff)",
+  "#e3f4ee": "var(--who-2022-web-color-brand-soft, #eff6ff)",
+  "#dce6e1": "var(--who-2022-web-color-border, #e2e8f0)",
+  "#9fb4ad": "var(--who-2022-web-color-control-border, #b8c2d1)",
+  "#315e73": "var(--who-2022-web-color-guidance, #475569)",
+  "#a23a2a": "var(--who-2022-web-color-danger, #b42318)",
+  "#b34231": "var(--who-2022-web-color-danger, #b42318)",
+  "#d66552": "var(--who-2022-web-color-danger-border, #d92d20)",
+  "#8c3022": "var(--who-2022-web-color-danger-strong, #912018)",
+  "#fff8f6": "var(--who-2022-web-color-danger-soft, #fff1f0)",
+  "#f3ded9": "var(--who-2022-web-color-danger-soft, #fff1f0)",
+  "#10231e": "var(--who-2022-web-color-image-background, #111827)"
+};
+
+function webThemeStyle(style: unknown): unknown {
+  if (Array.isArray(style)) return style.map(webThemeStyle);
+  if (style == null || typeof style !== "object") return style;
+  const themedStyle = Object.fromEntries(Object.entries(style).map(([property, value]) => [
+    property,
+    property === "maxWidth" && value === 760
+      ? "var(--who-2022-web-form-max-width, 48rem)"
+      : property === "borderRadius" && value === 8
+        ? "var(--who-2022-web-radius-control, 8px)"
+        : property === "borderRadius" && value === 12
+          ? "var(--who-2022-web-radius-card, 12px)"
+          : typeof value === "string" ? webThemeValues[value.toLowerCase()] ?? value : value
+  ]));
+  if ((style as Record<string, unknown>).padding === 20) {
+    delete themedStyle.padding;
+    const sharedFallback = "var(--who-2022-web-form-padding, clamp(1rem, 2.5vw, 1.5rem))";
+    themedStyle.paddingBlock = `var(--who-2022-web-form-padding-block, ${sharedFallback})`;
+    themedStyle.paddingInline = `var(--who-2022-web-form-padding-inline, ${sharedFallback})`;
+  }
+  return themedStyle;
+}
+
+function themedPrimitive(Component: React.ElementType, displayName: string): React.ElementType {
+  const ThemedPrimitive = React.forwardRef<unknown, Record<string, unknown>>(({ style, contentContainerStyle, ...props }, ref) => (
+    <Component
+      {...props}
+      ref={ref}
+      style={webThemeStyle(style)}
+      contentContainerStyle={webThemeStyle(contentContainerStyle)}
+    />
+  ));
+  ThemedPrimitive.displayName = displayName;
+  return ThemedPrimitive;
+}
+
+const View = themedPrimitive(WebView, "WhoVaWebView");
+const Text = themedPrimitive(WebText, "WhoVaWebText");
+const TextInput = themedPrimitive(WebTextInput, "WhoVaWebTextInput");
+const Pressable = themedPrimitive(WebPressable, "WhoVaWebPressable");
+const ScrollView = themedPrimitive(WebScrollView, "WhoVaWebScrollView");
+const Image = themedPrimitive(WebImage, "WhoVaWebImage");
 
 export * from "./index.js";
 export type { WhoVaFormProps, WhoVaPlatformServices } from "./ui/create-who-va-form.js";
