@@ -93,6 +93,8 @@ await save(assessment.data);
 
 This is the same validator used by the native and web form sessions.
 
+When Next or Complete finds validation issues, the shared renderer scrolls to the first invalid question. Web also focuses the first interactive control; Expo and React Native use the question's measured content position with `ScrollView.scrollTo`.
+
 ## Source generation and tests
 
 ```bash

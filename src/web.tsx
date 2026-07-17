@@ -29,11 +29,20 @@ function WebDateInput({ accessibilityLabel, onChangeText, style, testID, ...prop
   );
 }
 
+function scrollToWebQuestion(questionNode: unknown) {
+  if (typeof HTMLElement === "undefined" || !(questionNode instanceof HTMLElement)) return;
+  questionNode.scrollIntoView({ behavior: "smooth", block: "center" });
+  questionNode.querySelector<HTMLElement>(
+    'input, textarea, select, button, [role="radio"], [role="checkbox"], [role="button"]'
+  )?.focus({ preventScroll: true });
+}
+
 export const WhoVaForm = createWhoVaForm({
   View,
   Text,
   TextInput,
   DateInput: WebDateInput,
   Pressable,
-  ScrollView
+  ScrollView,
+  scrollToQuestion: scrollToWebQuestion
 });

@@ -32,6 +32,8 @@ The generated artifact is intentionally checked in. Changes can therefore be rev
 
 Invisible answers are removed from normalized submission output. Calculated values are recomputed from answers. Invalid types and values outside a WHO choice list are rejected before they enter session state.
 
+Question cards report their content position to the shared renderer. Failed Next or Complete validation scrolls to the first issue; the web adapter additionally focuses its first interactive control. This behavior applies equally to ordinary WHO constraints and incomplete date/year drafts.
+
 ## Platform services
 
 The form package does not own device-specific storage, identity, audio recording, upload, encryption, or synchronization. Hosts inject those services or consume callbacks. This keeps the questionnaire portable across Expo SDK versions and deployment environments.

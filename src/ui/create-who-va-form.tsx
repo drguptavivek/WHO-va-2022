@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 
 import type {
   AnswerValue,
@@ -43,6 +43,7 @@ export interface WhoVaPrimitiveSet {
   DateInput?: React.ElementType;
   Pressable: React.ElementType;
   ScrollView: React.ElementType;
+  scrollToQuestion?: (questionNode: unknown, scrollViewNode: unknown, y: number) => void;
 }
 
 function plainText(value: string | undefined): string {
@@ -117,6 +118,9 @@ export function createWhoVaForm(primitives: WhoVaPrimitiveSet): React.ComponentT
     const [snapshot, setSnapshot] = useState(() => session.getSnapshot());
     const [busyQuestion, setBusyQuestion] = useState<string>();
     const [dateDrafts, setDateDrafts] = useState<Record<string, string>>({});
+    const scrollViewRef = useRef<unknown>(null);
+    const questionRefs = useRef<Record<string, unknown>>({});
+    const questionPositions = useRef<Record<string, number>>({});
 
     useEffect(() => {
       props.onReady?.(session);
@@ -128,6 +132,22 @@ export function createWhoVaForm(primitives: WhoVaPrimitiveSet): React.ComponentT
 
     const answer = (question: InstrumentQuestion, value: AnswerValue | undefined) => {
       session.setAnswer(question.name, value);
+    };
+
+    const scrollToIssue = (issue: ValidationIssue | undefined) => {
+      if (!issue) return;
+      const performScroll = () => {
+        const questionNode = questionRefs.current[issue.question];
+        const y = questionPositions.current[issue.question] ?? 0;
+        if (primitives.scrollToQuestion) {
+          primitives.scrollToQuestion(questionNode, scrollViewRef.current, y);
+          return;
+        }
+        const scrollView = scrollViewRef.current as { scrollTo?: (options: { animated: boolean; y: number }) => void } | null;
+        scrollView?.scrollTo?.({ y: Math.max(0, y - 12), animated: true });
+      };
+      if (typeof requestAnimationFrame === "function") requestAnimationFrame(performScroll);
+      else setTimeout(performScroll, 0);
     };
 
     const renderQuestion = (question: InstrumentQuestion) => {
@@ -316,7 +336,18 @@ export function createWhoVaForm(primitives: WhoVaPrimitiveSet): React.ComponentT
       }
 
       return (
-        <View key={question.name} style={[styles.question, question.control === "note" && styles.note, hasIssues && styles.questionError]} testID={`question-card-${question.name}`}>
+        <View
+          key={question.name}
+          ref={(node: unknown) => {
+            if (node == null) delete questionRefs.current[question.name];
+            else questionRefs.current[question.name] = node;
+          }}
+          onLayout={(event: { nativeEvent: { layout: { y: number } } }) => {
+            questionPositions.current[question.name] = event.nativeEvent.layout.y;
+          }}
+          style={[styles.question, question.control === "note" && styles.note, hasIssues && styles.questionError]}
+          testID={`question-card-${question.name}`}
+        >
           <Text style={styles.label}>{label}{question.required && question.control !== "note" ? <Text style={styles.required}> *</Text> : null}</Text>
           {hint ? <Text style={styles.hint}>{hint}</Text> : null}
           {props.showSourceGuidance && guidance ? <Text style={styles.guidance}>{guidance}</Text> : null}
@@ -344,15 +375,19 @@ export function createWhoVaForm(primitives: WhoVaPrimitiveSet): React.ComponentT
       });
       if (incompleteDates.length) {
         props.onValidation?.(incompleteDates);
+        scrollToIssue(incompleteDates[0]);
         return;
       }
       const result = session.next();
-      if (result.issues.length) props.onValidation?.(result.issues);
+      if (result.issues.length) {
+        props.onValidation?.(result.issues);
+        scrollToIssue(result.issues[0]);
+      }
       if (result.completed) props.onComplete?.(session.validate());
     };
 
     return (
-      <ScrollView style={styles.root} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+      <ScrollView ref={scrollViewRef} style={styles.root} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         <Text style={styles.progress}>Section {snapshot.currentSectionIndex + 1} of {snapshot.visibleSectionCount}</Text>
         <Text style={styles.sectionTitle}>{localized(snapshot.currentSection.label, locale, snapshot.currentSection.name)}</Text>
         {snapshot.questions.map(renderQuestion)}
