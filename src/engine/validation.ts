@@ -117,7 +117,7 @@ export function validateSubmission(
   const issues: ValidationIssue[] = [];
   for (const question of instrument.questions) {
     if (!isQuestionRelevant(instrument, question, calculated)) {
-      if (!["calculated", "system"].includes(question.control)) delete normalized[question.name];
+      if (question.control !== "system") delete normalized[question.name];
       continue;
     }
     issues.push(...validateAnswer(question, calculated[question.name], calculated, locale));
