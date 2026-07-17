@@ -23,6 +23,17 @@ const INTERVIEWER_CONSTRAINT_MESSAGES: Record<string, LocalizedText> = {
   }
 };
 
+const RUNTIME_SECTION_LABELS: Record<string, LocalizedText> = {
+  consented: { en: "Interview completion" }
+};
+
+// `consented` is an XLSForm container rather than one contiguous screen. Keep
+// its mid-form guidance with the following injury section; its trailing items
+// then form the actual interview-completion screen.
+const RUNTIME_QUESTION_SECTION_PATHS: Record<string, string[]> = {
+  nmh: ["consented", "injuries_accidents"]
+};
+
 function cellText(value: ExcelJS.CellValue): string {
   if (value == null) return "";
   if (value instanceof Date) return value.toISOString();
@@ -141,11 +152,12 @@ export async function compileWhoVaWorkbook(sourceFile: string): Promise<Instrume
     if (type === "begin group") {
       const name = row.name || `group_${row._row}`;
       const parent = sectionStack.at(-1);
+      const sourceLabel = localized(row, "label");
       sections.push({
         name,
         sourceRow: Number(row._row),
         order: Number(row.order || 0),
-        label: localized(row, "label"),
+        label: { ...sourceLabel, ...RUNTIME_SECTION_LABELS[name] },
         ...(row.agegroup ? { ageGroup: row.agegroup } : {}),
         ...(parent ? { parent } : {}),
         ...(row.relevant ? { relevant: compileExpression(row.relevant, Number(row._row), "relevant") } : {})
@@ -173,7 +185,7 @@ export async function compileWhoVaWorkbook(sourceFile: string): Promise<Instrume
       required: sourceBoolean(row.required),
       readOnly: sourceBoolean(row.read_only),
       constraintMessage: constraintMessage(row),
-      sectionPath: [...sectionStack],
+      sectionPath: [...(RUNTIME_QUESTION_SECTION_PATHS[row.name] ?? sectionStack)],
       ...(row.agegroup ? { ageGroup: row.agegroup } : {}),
       ...(shape.listName ? { listName: shape.listName, choices: choicesByList.get(shape.listName) ?? [] } : {}),
       ...(row.appearance ? { appearance: row.appearance } : {}),

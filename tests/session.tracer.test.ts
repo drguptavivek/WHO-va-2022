@@ -46,4 +46,33 @@ describe("universal instrument session", () => {
     session.setAnswer("Id10010a", 33);
     expect(session.getSnapshot().issues.some((issue) => issue.question === "Id10010a")).toBe(false);
   });
+
+  it("keeps interview completion after the consented questionnaire sections", () => {
+    const sectionNames = new Set(["stillbirth", "injuries_accidents", "consented"]);
+    const questionNames = new Set(["Id10104", "nmh", "Id10077", "Id10481", "noteend", "comment"]);
+    const instrument = {
+      ...whoVa2022Instrument,
+      sections: whoVa2022Instrument.sections.filter((section) => sectionNames.has(section.name)),
+      questions: whoVa2022Instrument.questions.filter((question) => questionNames.has(question.name))
+    };
+    const session = createWhoVaSession(instrument, {
+      initialData: { Id10013: "yes", isNeonatal: "1", Id10114: "no" }
+    });
+
+    expect(session.getSnapshot().currentSection.name).toBe("stillbirth");
+    session.setAnswer("Id10104", "yes");
+    expect(session.next().advanced).toBe(true);
+
+    const injuries = session.getSnapshot();
+    expect(injuries.currentSection.name).toBe("injuries_accidents");
+    expect(injuries.questions.map((question) => question.name)).toEqual(["nmh", "Id10077"]);
+
+    session.setAnswer("Id10077", "no");
+    expect(session.next().advanced).toBe(true);
+    expect(session.getSnapshot().currentSection).toMatchObject({
+      name: "consented",
+      label: { en: "Interview completion" }
+    });
+    expect(session.getSnapshot().questions.map((question) => question.name)).toEqual(["noteend", "comment"]);
+  });
 });

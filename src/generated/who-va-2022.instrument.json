@@ -37,7 +37,7 @@
       "sourceRow": 25,
       "order": 23,
       "label": {
-        "en": "Skip to end if not consented"
+        "en": "Interview completion"
       },
       "ageGroup": "ALL",
       "relevant": {
@@ -8954,7 +8954,8 @@
       "readOnly": false,
       "constraintMessage": {},
       "sectionPath": [
-        "consented"
+        "consented",
+        "injuries_accidents"
       ],
       "ageGroup": "ALL"
     },
