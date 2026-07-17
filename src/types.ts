@@ -100,6 +100,22 @@ export interface InstrumentDefinition {
 export type AnswerValue = string | number | boolean | string[] | Record<string, unknown> | null;
 export type SubmissionData = Record<string, AnswerValue | undefined>;
 
+export interface WhoVaDraft {
+  id: string;
+  instrumentId: string;
+  instrumentVersion: string;
+  currentSection: string;
+  createdAt: string;
+  updatedAt: string;
+  data: SubmissionData;
+}
+
+export interface WhoVaDraftStore {
+  save(draft: WhoVaDraft): void | Promise<void>;
+  load?(id: string): WhoVaDraft | undefined | Promise<WhoVaDraft | undefined>;
+  remove?(id: string): void | Promise<void>;
+}
+
 export interface ValidationIssue {
   question: string;
   code: "required" | "type" | "choice" | "constraint" | "unsupported-expression";

@@ -17,13 +17,21 @@ The runtime does **not** use SurveyJS and does **not** read the Excel workbook. 
 
 ```tsx
 import { SafeAreaView } from "react-native";
-import { WhoVaForm } from "@who-va/instrument/native";
+import { WhoVaForm, type WhoVaDraftStore } from "@who-va/instrument/native";
+
+const draftStore: WhoVaDraftStore = {
+  async save(draft) {
+    // Use Expo SQLite, AsyncStorage, MMKV, or the app database here.
+    await appStorage.set(`who-va-2022:draft:${draft.id}`, JSON.stringify(draft));
+  }
+};
 
 export default function App() {
   return (
     <SafeAreaView style={{ flex: 1 }}>
       <WhoVaForm
         initialData={{ Id10010c: "INT-001" }}
+        draftStore={draftStore}
         platform={{
           pickDate: async (_question, _data, currentValue) => {
             // Open the host app's native date picker and return YYYY-MM-DD.
@@ -34,7 +42,7 @@ export default function App() {
             return { uri: "file:///recordings/va.m4a", mimeType: "audio/mp4" };
           }
         }}
-        onChange={(draft) => saveDraftOffline(draft)}
+        onDraftSaved={(draft) => console.log(`Saved ${draft.id}`)}
         onComplete={(result) => {
           if (result.valid) queueForSubmission(result.data);
         }}
@@ -44,7 +52,7 @@ export default function App() {
 }
 ```
 
-Date picking, audio capture, and draft storage are injected by the host so the module does not force a particular Expo SDK, database, upload service, or file lifecycle. If `pickDate` is omitted on native, full-date questions remain usable as validated text inputs with alphabetic, localized months; order follows the locale (`DD-MMM-YYYY`, `MMM-DD-YYYY`, or `YYYY-MMM-DD`). Stored answers always use canonical `YYYY-MM-DD`. Web renderers use the browser's locale-aware native calendar control automatically. Date fields with the WHO `year` appearance, such as `Id10024`, use a four-digit year input rather than the full-date control.
+Date picking, audio capture, and draft storage are injected by the host so the module does not force a particular Expo SDK, database, upload service, or file lifecycle. The Save draft button and every Next/Complete press write a UUID-addressed envelope through `draftStore`. If `pickDate` is omitted on native, full-date questions remain usable as validated text inputs with alphabetic, localized months; order follows the locale (`DD-MMM-YYYY`, `MMM-DD-YYYY`, or `YYYY-MMM-DD`). Stored answers always use canonical `YYYY-MM-DD`. Web renderers use the browser's locale-aware native calendar control automatically. Date fields with the WHO `year` appearance, such as `Id10024`, use a four-digit year input rather than the full-date control.
 
 ## React web
 
@@ -52,9 +60,13 @@ Date picking, audio capture, and draft storage are injected by the host so the m
 import { WhoVaForm } from "@who-va/instrument/web";
 
 export function VerbalAutopsyPage() {
-  return <WhoVaForm onComplete={(result) => submit(result.data)} />;
+  return <WhoVaForm onDraftSaved={(draft) => console.log(draft.id)} onComplete={(result) => submit(result.data)} />;
 }
 ```
+
+Web uses `localStorage` by default under `who-va-2022:draft:<uuid>`. Pass `draftId` to continue overwriting a known draft, or pass a custom `draftStore` to use another persistence layer.
+
+`localStorage` is unencrypted browser storage. For production VA data, provide a secured storage adapter with the application's encryption, access-control, retention, and device-loss protections.
 
 ## Any web application
 
@@ -70,13 +82,13 @@ defineWhoVaElement();
 <script type="module">
   const form = document.querySelector("who-va-2022-form");
   form.setData(savedDraft);
-  form.addEventListener("who-va-change", event => saveDraft(event.detail));
+  form.addEventListener("who-va-draft-saved", event => console.log(event.detail.id));
   form.addEventListener("who-va-complete", event => submit(event.detail.data));
   const assessment = form.validate();
 </script>
 ```
 
-The element exposes `getData()`, `setData(data)`, `validate()`, and `complete()`.
+The element exposes `getData()`, `setData(data)`, `getDraftId()`, `validate()`, and `complete()`. Set a `draft-id` attribute before attaching the element to continue a known UUID; otherwise it generates one.
 
 ## Headless validation
 

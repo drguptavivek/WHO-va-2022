@@ -1,6 +1,7 @@
 import React from "react";
 import { createRoot, type Root } from "react-dom/client";
 
+import { createDraftId } from "./draft.js";
 import { createWhoVaSession } from "./engine/session.js";
 import { whoVa2022Instrument } from "./instrument.js";
 import type { SubmissionData, SubmissionValidationResult, WhoVaSession } from "./types.js";
@@ -11,6 +12,7 @@ export class WhoVaFormElement extends HTMLElement {
 
   private root: Root | undefined;
   private readonly session: WhoVaSession;
+  private readonly generatedDraftId = createDraftId();
 
   constructor() {
     super();
@@ -46,15 +48,22 @@ export class WhoVaFormElement extends HTMLElement {
     return this.session.complete();
   }
 
+  getDraftId(): string {
+    return this.getAttribute("draft-id") ?? this.generatedDraftId;
+  }
+
   private renderForm(): void {
     this.root ??= createRoot(this);
     this.root.render(
       <WhoVaForm
         session={this.session}
+        draftId={this.getDraftId()}
         locale={this.getAttribute("locale") ?? "en"}
         showSourceGuidance={this.hasAttribute("show-guidance")}
         onChange={(data) => this.dispatchEvent(new CustomEvent("who-va-change", { detail: data, bubbles: true }))}
         onValidation={(issues) => this.dispatchEvent(new CustomEvent("who-va-validation", { detail: issues, bubbles: true }))}
+        onDraftSaved={(draft) => this.dispatchEvent(new CustomEvent("who-va-draft-saved", { detail: draft, bubbles: true }))}
+        onDraftError={(error) => this.dispatchEvent(new CustomEvent("who-va-draft-error", { detail: error, bubbles: true }))}
         onComplete={(result) => this.dispatchEvent(new CustomEvent("who-va-complete", { detail: result, bubbles: true }))}
       />
     );

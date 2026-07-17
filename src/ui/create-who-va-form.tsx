@@ -8,8 +8,11 @@ import type {
   SubmissionData,
   SubmissionValidationResult,
   ValidationIssue,
+  WhoVaDraft,
+  WhoVaDraftStore,
   WhoVaSession
 } from "../types.js";
+import { createDraftId } from "../draft.js";
 import { createWhoVaSession } from "../engine/session.js";
 import { whoVa2022Instrument } from "../instrument.js";
 import { dateFormatPlaceholder, formatDisplayDate, parseDisplayDate } from "./date-value.js";
@@ -30,9 +33,13 @@ export interface WhoVaFormProps {
   locale?: string;
   showSourceGuidance?: boolean;
   platform?: WhoVaPlatformServices;
+  draftId?: string;
+  draftStore?: WhoVaDraftStore;
   onReady?: (session: WhoVaSession) => void;
   onChange?: (data: SubmissionData, snapshot: SessionSnapshot) => void;
   onValidation?: (issues: ValidationIssue[]) => void;
+  onDraftSaved?: (draft: WhoVaDraft) => void;
+  onDraftError?: (error: Error) => void;
   onComplete?: (result: SubmissionValidationResult) => void;
 }
 
@@ -43,6 +50,7 @@ export interface WhoVaPrimitiveSet {
   DateInput?: React.ElementType;
   Pressable: React.ElementType;
   ScrollView: React.ElementType;
+  draftStore?: WhoVaDraftStore;
   scrollToQuestion?: (questionNode: unknown, scrollViewNode: unknown, y: number) => void;
 }
 
@@ -98,12 +106,13 @@ const styles = {
   choiceText: { color: "#213b34" },
   note: { backgroundColor: "#edf5f2", borderLeftWidth: 4, borderLeftColor: "#147d64" },
   error: { color: "#a23a2a", marginTop: 8, fontSize: 13 },
-  navigation: { flexDirection: "row" as const, justifyContent: "space-between" as const, gap: 12, marginTop: 12, marginBottom: 24 },
+  navigation: { flexDirection: "row" as const, flexWrap: "wrap" as const, justifyContent: "space-between" as const, gap: 12, marginTop: 12, marginBottom: 12 },
   button: { minHeight: 44, borderRadius: 8, paddingHorizontal: 18, paddingVertical: 12, backgroundColor: "#147d64", justifyContent: "center" as const },
   buttonSecondary: { backgroundColor: "#dce6e1" },
   buttonDisabled: { opacity: 0.45 },
   buttonText: { color: "#ffffff", fontWeight: "700" as const },
-  buttonTextSecondary: { color: "#183d33", fontWeight: "700" as const }
+  buttonTextSecondary: { color: "#183d33", fontWeight: "700" as const },
+  draftStatus: { color: "#536b64", fontSize: 12, marginTop: 4, marginBottom: 24 }
 };
 
 export function createWhoVaForm(primitives: WhoVaPrimitiveSet): React.ComponentType<WhoVaFormProps> {
@@ -111,13 +120,17 @@ export function createWhoVaForm(primitives: WhoVaPrimitiveSet): React.ComponentT
 
   function Form(props: WhoVaFormProps) {
     const locale = props.locale ?? "en";
+    const instrument = props.instrument ?? whoVa2022Instrument;
     const [session] = useState(() => props.session ?? createWhoVaSession(
-      props.instrument ?? whoVa2022Instrument,
+      instrument,
       props.initialData ? { initialData: props.initialData } : {}
     ));
     const [snapshot, setSnapshot] = useState(() => session.getSnapshot());
     const [busyQuestion, setBusyQuestion] = useState<string>();
     const [dateDrafts, setDateDrafts] = useState<Record<string, string>>({});
+    const [draftId] = useState(() => props.draftId ?? createDraftId());
+    const [draftStatus, setDraftStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
+    const draftCreatedAt = useRef(new Date().toISOString());
     const scrollViewRef = useRef<unknown>(null);
     const questionRefs = useRef<Record<string, unknown>>({});
     const questionPositions = useRef<Record<string, number>>({});
@@ -126,12 +139,39 @@ export function createWhoVaForm(primitives: WhoVaPrimitiveSet): React.ComponentT
       props.onReady?.(session);
       return session.subscribe((next) => {
         setSnapshot(next);
+        setDraftStatus("idle");
         props.onChange?.(next.data, next);
       });
     }, [session, props.onReady, props.onChange]);
 
     const answer = (question: InstrumentQuestion, value: AnswerValue | undefined) => {
       session.setAnswer(question.name, value);
+    };
+
+    const saveDraft = async () => {
+      const store = props.draftStore ?? primitives.draftStore;
+      if (!store) return;
+      const now = new Date().toISOString();
+      const current = session.getSnapshot();
+      const draft: WhoVaDraft = {
+        id: draftId,
+        instrumentId: instrument.id,
+        instrumentVersion: instrument.version,
+        currentSection: current.currentSection.name,
+        createdAt: draftCreatedAt.current,
+        updatedAt: now,
+        data: current.data
+      };
+      setDraftStatus("saving");
+      try {
+        await store.save(draft);
+        setDraftStatus("saved");
+        props.onDraftSaved?.(draft);
+      } catch (error) {
+        const resolved = error instanceof Error ? error : new Error(String(error));
+        setDraftStatus("error");
+        props.onDraftError?.(resolved);
+      }
     };
 
     const scrollToIssue = (issue: ValidationIssue | undefined) => {
@@ -374,11 +414,13 @@ export function createWhoVaForm(primitives: WhoVaPrimitiveSet): React.ComponentT
         return issue ? [issue] : [];
       });
       if (incompleteDates.length) {
+        void saveDraft();
         props.onValidation?.(incompleteDates);
         scrollToIssue(incompleteDates[0]);
         return;
       }
       const result = session.next();
+      void saveDraft();
       if (result.issues.length) {
         props.onValidation?.(result.issues);
         scrollToIssue(result.issues[0]);
@@ -400,10 +442,21 @@ export function createWhoVaForm(primitives: WhoVaPrimitiveSet): React.ComponentT
           >
             <Text style={styles.buttonTextSecondary}>Back</Text>
           </Pressable>
+          <Pressable
+            accessibilityRole="button"
+            disabled={!(props.draftStore ?? primitives.draftStore) || draftStatus === "saving"}
+            style={[styles.button, styles.buttonSecondary, (!(props.draftStore ?? primitives.draftStore) || draftStatus === "saving") && styles.buttonDisabled]}
+            onPress={() => void saveDraft()}
+          >
+            <Text style={styles.buttonTextSecondary}>{draftStatus === "saving" ? "Saving…" : "Save draft"}</Text>
+          </Pressable>
           <Pressable accessibilityRole="button" style={styles.button} onPress={advance}>
             <Text style={styles.buttonText}>{snapshot.canGoForward ? "Next" : "Complete"}</Text>
           </Pressable>
         </View>
+        <Text style={styles.draftStatus}>
+          {draftStatus === "saved" ? `Draft saved · ${draftId}` : draftStatus === "error" ? "Draft could not be saved" : `Draft ID · ${draftId}`}
+        </Text>
       </ScrollView>
     );
   }

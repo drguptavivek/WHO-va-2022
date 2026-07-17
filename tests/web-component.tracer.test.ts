@@ -1,11 +1,12 @@
 // @vitest-environment jsdom
 
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { defineWhoVaElement, type WhoVaFormElement } from "../src/web-component.js";
 
 afterEach(() => {
   document.body.replaceChildren();
+  localStorage.clear();
 });
 
 describe("framework-independent web embedding", () => {
@@ -44,5 +45,45 @@ describe("framework-independent web embedding", () => {
     expect(validationDetail).toEqual(expect.arrayContaining([
       expect.objectContaining({ question: "Id10010", code: "required" })
     ]));
+  });
+
+  it("saves the current form as a UUID-addressed local draft", async () => {
+    defineWhoVaElement("who-va-draft-test");
+    const element = document.createElement("who-va-draft-test") as WhoVaFormElement;
+    let savedDraft: { id: string } | undefined;
+    element.addEventListener("who-va-draft-saved", (event) => {
+      savedDraft = (event as CustomEvent<{ id: string }>).detail;
+    });
+    document.body.append(element);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    const saveDraft = [...element.querySelectorAll('[role="button"]')]
+      .find((button) => button.textContent === "Save draft");
+    saveDraft?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+
+    await vi.waitFor(() => expect(savedDraft).toBeDefined());
+    expect(savedDraft?.id).toBe(element.getDraftId());
+    expect(savedDraft?.id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i);
+    expect(JSON.parse(localStorage.getItem(`who-va-2022:draft:${savedDraft?.id}`) ?? "null")).toEqual(
+      expect.objectContaining({ id: savedDraft?.id, instrumentId: "va_who_2022" })
+    );
+  });
+
+  it("autosaves the latest submission data when Next is pressed", async () => {
+    defineWhoVaElement("who-va-autosave-test");
+    const element = document.createElement("who-va-autosave-test") as WhoVaFormElement;
+    let savedDraft: { data: Record<string, unknown> } | undefined;
+    element.addEventListener("who-va-draft-saved", (event) => {
+      savedDraft = (event as CustomEvent<{ data: Record<string, unknown> }>).detail;
+    });
+    document.body.append(element);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    element.setData({ Id10010: "Autosaved interviewer" });
+
+    const next = [...element.querySelectorAll('[role="button"]')]
+      .find((button) => button.textContent === "Next");
+    next?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+
+    await vi.waitFor(() => expect(savedDraft?.data.Id10010).toBe("Autosaved interviewer"));
   });
 });

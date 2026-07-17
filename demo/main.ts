@@ -6,7 +6,14 @@ const form = document.querySelector<WhoVaFormElement>("#who-va-form");
 const status = document.querySelector<HTMLElement>("#status");
 
 form?.addEventListener("who-va-change", () => {
-  if (status) status.textContent = "Draft updated locally";
+  if (status) status.textContent = "Unsaved changes";
+});
+
+form?.addEventListener("who-va-draft-saved", (event) => {
+  const draft = (event as CustomEvent<{ id: string }>).detail;
+  if (status && !status.textContent?.includes("need attention")) {
+    status.textContent = `Draft ${draft.id} saved locally`;
+  }
 });
 
 form?.addEventListener("who-va-validation", (event) => {

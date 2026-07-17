@@ -2,6 +2,7 @@ import type React from "react";
 import { Pressable, ScrollView, Text, TextInput, View } from "react-native-web";
 
 import { createWhoVaForm } from "./ui/create-who-va-form.js";
+import { createLocalStorageDraftStore } from "./draft.js";
 
 export * from "./index.js";
 export type { WhoVaFormProps, WhoVaPlatformServices } from "./ui/create-who-va-form.js";
@@ -31,7 +32,7 @@ function WebDateInput({ accessibilityLabel, onChangeText, style, testID, ...prop
 
 function scrollToWebQuestion(questionNode: unknown) {
   if (typeof HTMLElement === "undefined" || !(questionNode instanceof HTMLElement)) return;
-  questionNode.scrollIntoView({ behavior: "smooth", block: "center" });
+  questionNode.scrollIntoView?.({ behavior: "smooth", block: "center" });
   questionNode.querySelector<HTMLElement>(
     'input, textarea, select, button, [role="radio"], [role="checkbox"], [role="button"]'
   )?.focus({ preventScroll: true });
@@ -44,5 +45,6 @@ export const WhoVaForm = createWhoVaForm({
   DateInput: WebDateInput,
   Pressable,
   ScrollView,
+  draftStore: createLocalStorageDraftStore(),
   scrollToQuestion: scrollToWebQuestion
 });
