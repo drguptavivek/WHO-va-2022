@@ -14,6 +14,15 @@ import { parseExpression } from "../engine/expression.js";
 
 type SourceRow = Record<string, string> & { _row: string };
 
+const INTERVIEWER_CONSTRAINT_MESSAGES: Record<string, LocalizedText> = {
+  Id10023_a: {
+    en: "Date of death must be on or after the date of birth and cannot be in the future."
+  },
+  Id10023_b: {
+    en: "Date of death cannot be in the future."
+  }
+};
+
 function cellText(value: ExcelJS.CellValue): string {
   if (value == null) return "";
   if (value instanceof Date) return value.toISOString();
@@ -52,6 +61,13 @@ function localized(row: SourceRow, prefix: string): LocalizedText {
     if (locale) result[locale] = value;
   }
   return result;
+}
+
+function constraintMessage(row: SourceRow): LocalizedText {
+  const sourceMessage = localized(row, "constraint_message");
+  return Object.keys(sourceMessage).length > 0
+    ? sourceMessage
+    : INTERVIEWER_CONSTRAINT_MESSAGES[row.name ?? ""] ?? {};
 }
 
 function normalizeType(sourceType: string): string {
@@ -156,7 +172,7 @@ export async function compileWhoVaWorkbook(sourceFile: string): Promise<Instrume
       guidance: localized(row, "guidance_hint"),
       required: sourceBoolean(row.required),
       readOnly: sourceBoolean(row.read_only),
-      constraintMessage: localized(row, "constraint_message"),
+      constraintMessage: constraintMessage(row),
       sectionPath: [...sectionStack],
       ...(row.agegroup ? { ageGroup: row.agegroup } : {}),
       ...(shape.listName ? { listName: shape.listName, choices: choicesByList.get(shape.listName) ?? [] } : {}),

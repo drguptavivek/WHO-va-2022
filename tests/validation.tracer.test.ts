@@ -35,6 +35,17 @@ describe("shared field and submission validation", () => {
     expect(validateAnswer(question, 99, {})).toEqual([]);
   });
 
+  it("explains the date-of-death constraint in interviewer-facing language", () => {
+    const question = getQuestion(whoVa2022Instrument, "Id10023_a");
+    expect(validateAnswer(question, "2026-07-01", { Id10021: "2026-07-05" })).toEqual([
+      {
+        question: "Id10023_a",
+        code: "constraint",
+        message: "Date of death must be on or after the date of birth and cannot be in the future."
+      }
+    ]);
+  });
+
   it("does not require a question when its relevance path is false", () => {
     const result = validateSubmission(whoVa2022Instrument, { Id10013: "no" });
     expect(result.issues.some((issue) => issue.question === "Id10019" && issue.code === "required")).toBe(false);

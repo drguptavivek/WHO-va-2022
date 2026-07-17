@@ -2090,7 +2090,9 @@
       },
       "required": true,
       "readOnly": false,
-      "constraintMessage": {},
+      "constraintMessage": {
+        "en": "Date of death must be on or after the date of birth and cannot be in the future."
+      },
       "sectionPath": [
         "consented",
         "deceased_CRVS",
@@ -2182,7 +2184,9 @@
       },
       "required": true,
       "readOnly": false,
-      "constraintMessage": {},
+      "constraintMessage": {
+        "en": "Date of death cannot be in the future."
+      },
       "sectionPath": [
         "consented",
         "deceased_CRVS",
