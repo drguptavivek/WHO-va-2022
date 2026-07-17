@@ -16,6 +16,7 @@ describe("framework-independent web embedding", () => {
     await new Promise((resolve) => setTimeout(resolve, 0));
 
     expect(element.getData().Id10011).toEqual(expect.any(String));
+    expect(element.textContent).not.toContain("Once filled in ODK Collect");
     element.setData({ Id10010b: "female" });
     expect(element.getData().Id10010b).toBe("female");
     expect(element.validate().valid).toBe(false);

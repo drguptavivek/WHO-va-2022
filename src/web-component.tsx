@@ -7,7 +7,7 @@ import type { SubmissionData, SubmissionValidationResult, WhoVaSession } from ".
 import { WhoVaForm } from "./web.js";
 
 export class WhoVaFormElement extends HTMLElement {
-  static get observedAttributes() { return ["locale"]; }
+  static get observedAttributes() { return ["locale", "show-guidance"]; }
 
   private root: Root | undefined;
   private readonly session: WhoVaSession;
@@ -52,6 +52,7 @@ export class WhoVaFormElement extends HTMLElement {
       <WhoVaForm
         session={this.session}
         locale={this.getAttribute("locale") ?? "en"}
+        showSourceGuidance={this.hasAttribute("show-guidance")}
         onChange={(data) => this.dispatchEvent(new CustomEvent("who-va-change", { detail: data, bubbles: true }))}
         onValidation={(issues) => this.dispatchEvent(new CustomEvent("who-va-validation", { detail: issues, bubbles: true }))}
         onComplete={(result) => this.dispatchEvent(new CustomEvent("who-va-complete", { detail: result, bubbles: true }))}

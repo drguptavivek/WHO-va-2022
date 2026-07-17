@@ -22,6 +22,7 @@ export interface WhoVaFormProps {
   session?: WhoVaSession;
   initialData?: SubmissionData;
   locale?: string;
+  showSourceGuidance?: boolean;
   platform?: WhoVaPlatformServices;
   onReady?: (session: WhoVaSession) => void;
   onChange?: (data: SubmissionData, snapshot: SessionSnapshot) => void;
@@ -187,7 +188,7 @@ export function createWhoVaForm(primitives: WhoVaPrimitiveSet): React.ComponentT
         <View key={question.name} style={[styles.question, question.control === "note" && styles.note]} testID={`question-card-${question.name}`}>
           <Text style={styles.label}>{label}{question.required && question.control !== "note" ? <Text style={styles.required}> *</Text> : null}</Text>
           {hint ? <Text style={styles.hint}>{hint}</Text> : null}
-          {guidance ? <Text style={styles.guidance}>{guidance}</Text> : null}
+          {props.showSourceGuidance && guidance ? <Text style={styles.guidance}>{guidance}</Text> : null}
           {control}
           {issues.map((issue) => <Text key={`${issue.code}-${issue.message}`} style={styles.error}>{issue.message}</Text>)}
         </View>
