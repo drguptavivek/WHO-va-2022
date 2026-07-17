@@ -13,6 +13,18 @@ The runtime and package build do **not** use SurveyJS, Excel, or XLSForm generat
 | `@who-va/instrument/web` | React web `WhoVaForm`, rendered through React Native Web |
 | `@who-va/instrument/web-component` | `<who-va-2022-form>` wrapper for non-React web apps |
 
+## Runtime performance
+
+The offline JSON contract is still bundled and loaded as one artifact. Once an instrument is used, the runtime builds shared indexes for questions by name, questions by section, sections by name, and calculated questions.
+
+Indexes are cached by instrument identity in a `WeakMap`. Sessions and translated instruments can be released normally, while repeated lookups avoid scanning all 450 questions.
+
+Calculations run once after an answer changes and once for full submission validation. Relevance checks reuse that calculated state instead of recalculating the 38 derived fields for every question.
+
+Session snapshots compute the visible section list once and render only its current questions. Answer-preview filtering is memoized and runs only while the preview is open.
+
+Field validation remains real time. Type, choice, and constraint errors appear as the interviewer enters an answer and clear immediately after correction; Next and Complete still perform section or full-form validation.
+
 ## Expo / React Native
 
 ```tsx
@@ -227,7 +239,7 @@ if (!assessment.valid) {
 await save(assessment.data);
 ```
 
-This is the same validator used by the native and web form sessions.
+This is the same validator used by native and web sessions. Interactive sessions also run field validation after each accepted answer, so users see constraint errors before pressing Next.
 
 When Next or Complete finds validation issues, the shared renderer aligns the first invalid question at the top of the screen and highlights its error card. Web also focuses the first interactive control; Expo and React Native use the question's measured content position with `ScrollView.scrollTo`.
 
