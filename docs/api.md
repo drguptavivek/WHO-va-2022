@@ -6,24 +6,24 @@ This is a practical guide to the public package surface. TypeScript declarations
 
 | Import | Use it for |
 | --- | --- |
-| `@who-va/instrument` | Instrument data, sessions, expressions, validation, drafts, localization, and platform-neutral attachments |
-| `@who-va/instrument/native` | Expo/React Native form, controls, and native attachment processing |
-| `@who-va/instrument/web` | React web form, controls, and browser attachment persistence |
-| `@who-va/instrument/web-component` | Custom element plus all web exports |
+| `@drguptavivek/who-2022-va` | Instrument data, sessions, expressions, validation, drafts, localization, and platform-neutral attachments |
+| `@drguptavivek/who-2022-va/native` | Expo/React Native form, controls, and native attachment processing |
+| `@drguptavivek/who-2022-va/web` | React web form, controls, and browser attachment persistence |
+| `@drguptavivek/who-2022-va/web-component` | Custom element plus all web exports |
 
 ## Instrument loading
 
 - `whoVa2022Instrument` is the synchronous, built-in canonical instrument. Importing it through the root entry point includes the JSON contract in that entry's module graph.
 - `loadWhoVa2022Instrument()` lazily imports and caches the canonical instrument.
-- `loadWhoVa2022Language(locale)` loads the instrument and a built-in translation when available.
-- `WHO_VA_2022_LANGUAGES` lists the built-in English, French, and Hindi choices.
+- `loadWhoVa2022Language(locale)` returns the built-in English source instrument. Unsupported locale requests fall back to `en`.
+- `WHO_VA_2022_LANGUAGES` lists the single built-in English choice. Use `createWhoVaLanguageLoader()` for authorized host-provided translations.
 
 Use the lazy loader in applications sensitive to startup parsing cost. Use the synchronous export for headless/server workflows that need immediate access.
 
 ## Headless sessions
 
 ```ts
-import { createWhoVaSession, loadWhoVa2022Instrument } from "@who-va/instrument";
+import { createWhoVaSession, loadWhoVa2022Instrument } from "@drguptavivek/who-2022-va";
 
 const instrument = await loadWhoVa2022Instrument();
 const session = createWhoVaSession(instrument, {
@@ -123,7 +123,7 @@ Attachment answer values are references, not base64 payloads. See [Attachment pr
 ## Web component
 
 ```ts
-import { defineWhoVaElement } from "@who-va/instrument/web-component";
+import { defineWhoVaElement } from "@drguptavivek/who-2022-va/web-component";
 
 defineWhoVaElement();
 ```

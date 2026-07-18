@@ -1,4 +1,4 @@
-import { defineWhoVaElement } from "@who-va/instrument/web-component";
+import { defineWhoVaElement } from "@drguptavivek/who-2022-va/web-component";
 
 defineWhoVaElement();
 

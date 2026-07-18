@@ -1,34 +1,48 @@
-# WHO 2022 Verbal Autopsy Instrument
+# 2022 WHO Verbal Autopsy Instrument for JavaScript
 
-A React Native-first implementation of the **WHO 2022 Verbal Autopsy instrument V1.1**. One checked-in, platform-neutral JSON contract drives Expo, React Native, React Native Web, non-React websites, field validation, and submission validation.
+An independent, React Native-first implementation of the **2022 WHO Verbal Autopsy instrument V1.1**. One checked-in, platform-neutral JSON contract drives Expo, React Native, React Native Web, non-React websites, field validation, and submission validation.
+
+This project is not affiliated with, sponsored by, or endorsed by the World Health Organization (WHO). “WHO” identifies the source instrument only. See [Licensing and attribution](#licensing-and-attribution).
 
 The runtime and package build do **not** use SurveyJS, Excel, or XLSForm generation. The WHO workbook and its `exceljs` compiler are retained only as development fixtures for source-conformance tests; they never write the canonical JSON contract.
 
 ## Documentation
 
-- [Developer guide](docs/development.md) — setup, repository map, common workflows, testing, and contribution rules
-- [API reference](docs/api.md) — entry points and the main headless, form, draft, localization, and attachment APIs
-- [Architecture](docs/architecture.md) — executable contract, runtime boundaries, shared behavior, and platform services
-- [Attachment processing](docs/attachments.md) — validation policy, browser/native lifecycles, and the server boundary
+- [Developer guide](https://github.com/drguptavivek/WHO-va-2022/blob/main/docs/development.md) — setup, repository map, common workflows, testing, and contribution rules
+- [API reference](https://github.com/drguptavivek/WHO-va-2022/blob/main/docs/api.md) — entry points and the main headless, form, draft, localization, and attachment APIs
+- [Architecture](https://github.com/drguptavivek/WHO-va-2022/blob/main/docs/architecture.md) — executable contract, runtime boundaries, shared behavior, and platform services
+- [Attachment processing](https://github.com/drguptavivek/WHO-va-2022/blob/main/docs/attachments.md) — validation policy, browser/native lifecycles, and the server boundary
 
-## Screenshots
+## Installation
 
-| English | Hindi |
-| --- | --- |
-| ![WHO 2022 Verbal Autopsy form in English](docs/images/form-english.jpg) | ![WHO 2022 Verbal Autopsy form in Hindi](docs/images/form-hindi.jpg) |
+```bash
+npm install @drguptavivek/who-2022-va
+```
+
+The headless entry point has no UI peer requirement. Install the peers for the UI entry point you use:
+
+```bash
+# React web or the web component
+npm install react react-dom react-native-web
+
+# Expo / React Native (normally already supplied by the host application)
+npm install react react-native
+```
+
+![2022 WHO Verbal Autopsy form in English](https://raw.githubusercontent.com/drguptavivek/WHO-va-2022/main/docs/images/form-english.jpg)
 
 ## Package entry points
 
 | Import | Purpose |
 | --- | --- |
-| `@who-va/instrument` | Headless instrument, expression, session, and submission APIs |
-| `@who-va/instrument/native` | Expo and React Native `WhoVaForm` |
-| `@who-va/instrument/web` | React web `WhoVaForm`, rendered through React Native Web |
-| `@who-va/instrument/web-component` | `<who-va-2022-form>` wrapper for non-React web apps |
+| `@drguptavivek/who-2022-va` | Headless instrument, expression, session, and submission APIs |
+| `@drguptavivek/who-2022-va/native` | Expo and React Native `WhoVaForm` |
+| `@drguptavivek/who-2022-va/web` | React web `WhoVaForm`, rendered through React Native Web |
+| `@drguptavivek/who-2022-va/web-component` | `<who-va-2022-form>` wrapper for non-React web apps |
 
 ## Runtime performance
 
-The canonical JSON remains one offline artifact, but the `/native` and `/web` form entry points no longer parse it when the application bundle starts. They dynamically load and cache it when a form first needs the default instrument. The root `@who-va/instrument` entry keeps the synchronous `whoVa2022Instrument` export for headless and server compatibility; applications concerned about startup cost can import `loadWhoVa2022Instrument` instead.
+The canonical JSON remains one offline artifact, but the `/native` and `/web` form entry points no longer parse it when the application bundle starts. They dynamically load and cache it when a form first needs the default instrument. The root `@drguptavivek/who-2022-va` entry keeps the synchronous `whoVa2022Instrument` export for headless and server compatibility; applications concerned about startup cost can import `loadWhoVa2022Instrument` instead.
 
 Opening the first default form still parses the complete instrument once. The runtime does not fetch a section at a time: relevance, calculations, navigation, and final validation can refer to questions in other sections, and the instrument must continue working completely offline. This trades a single predictable parse for simpler, reliable interviews; only the current section's controls are rendered. Further section chunking should be considered only if profiling the target low-spec devices shows this deferred parse is still material.
 
@@ -42,13 +56,13 @@ Session snapshots compute the visible section list once and render only its curr
 
 Field validation remains real time. Type, choice, and constraint errors appear as the interviewer enters an answer and clear immediately after correction; Next and Complete still perform section or full-form validation.
 
-Language modules are also loaded on demand. Translation application structurally shares every unchanged section, question, and choice with the English instrument, and the built-in loader retains only the most recently used translated instrument. JavaScript runtimes normally retain an imported language module in their module cache, so selecting a language can keep its translation dictionary resident; the bounded loader specifically prevents an additional unbounded collection of cloned instrument graphs.
+Host-provided language modules are loaded on demand. Translation application structurally shares every unchanged section, question, and choice with the English instrument. JavaScript runtimes normally retain imported language modules in their module cache; applications can bound the loader's translated-instrument cache independently.
 
 ## Expo / React Native
 
 ```tsx
 import { SafeAreaView } from "react-native";
-import { WhoVaForm, type WhoVaDraftStore } from "@who-va/instrument/native";
+import { WhoVaForm, type WhoVaDraftStore } from "@drguptavivek/who-2022-va/native";
 
 const draftStore: WhoVaDraftStore = {
   async save(draft) {
@@ -104,7 +118,7 @@ The default limits protect low-memory devices: images are capped at 10 MB and 16
 ## React web
 
 ```tsx
-import { WhoVaForm } from "@who-va/instrument/web";
+import { WhoVaForm } from "@drguptavivek/who-2022-va/web";
 
 export function VerbalAutopsyPage() {
   return <WhoVaForm onDraftSaved={(draft) => console.log(draft.id)} onComplete={(result) => submit(result.data)} />;
@@ -116,7 +130,7 @@ Web uses `localStorage` by default under `who-va-2022:draft:<uuid>`. Pass `draft
 Upload a stored browser attachment as a `Blob`; do not convert it to base64:
 
 ```ts
-import { loadWhoVaWebAttachmentBlob } from "@who-va/instrument/web";
+import { loadWhoVaWebAttachmentBlob } from "@drguptavivek/who-2022-va/web";
 
 const blob = await loadWhoVaWebAttachmentBlob(attachmentReference);
 if (blob) {
@@ -129,7 +143,7 @@ if (blob) {
 After loading all drafts that must remain on the device, orphaned IndexedDB binaries can be removed explicitly:
 
 ```ts
-import { cleanupWhoVaWebAttachments } from "@who-va/instrument/web";
+import { cleanupWhoVaWebAttachments } from "@drguptavivek/who-2022-va/web";
 
 await cleanupWhoVaWebAttachments(allRetainedDrafts.map((draft) => draft.data));
 ```
@@ -141,7 +155,7 @@ Only call cleanup with the complete set of retained drafts/answers; omitted refe
 ## Any web application
 
 ```ts
-import { defineWhoVaElement } from "@who-va/instrument/web-component";
+import { defineWhoVaElement } from "@drguptavivek/who-2022-va/web-component";
 
 defineWhoVaElement();
 ```
@@ -162,13 +176,13 @@ The element exposes `getData()`, `setData(data)`, `getDraftId()`, `validate()`, 
 
 ## Adding languages
 
-The built-in preview currently exposes English, French, and Hindi through `WHO_VA_2022_LANGUAGES`. French and Hindi are loaded only when selected. Their full instrument text is a machine-generated draft for UI evaluation; the workbook's existing French choice labels are preserved, but clinical and field terminology still requires review by fluent verbal-autopsy specialists before production use.
+The package ships only the unmodified English source instrument as a built-in language. `WHO_VA_2022_LANGUAGES` therefore contains only `en`. Host applications can use the localization APIs with translations for which they have the necessary rights or permissions.
 
 The preferred runtime layout is one independent file per language. Each file is JSON-serializable and owns that locale's section labels, question text, hints, guidance, choice labels, constraint messages, and optional form UI strings:
 
 ```ts
 // languages/fr.ts (languages/fr.json has the same data shape)
-import type { WhoVaLanguageFile } from "@who-va/instrument";
+import type { WhoVaLanguageFile } from "@drguptavivek/who-2022-va";
 
 export default {
   locale: "fr",
@@ -193,8 +207,8 @@ export default {
 Register dynamic imports once. No language file is downloaded until it is selected; loaded files are cached. A regional request such as `fr-CA` falls back to the `fr` file, then to the base English instrument.
 
 ```tsx
-import { createWhoVaLanguageLoader, whoVa2022Instrument } from "@who-va/instrument";
-import { WhoVaForm } from "@who-va/instrument/web";
+import { createWhoVaLanguageLoader, whoVa2022Instrument } from "@drguptavivek/who-2022-va";
+import { WhoVaForm } from "@drguptavivek/who-2022-va/web";
 
 const loadLanguage = createWhoVaLanguageLoader(whoVa2022Instrument, {
   fr: () => import("./languages/fr.js"),
@@ -219,7 +233,7 @@ Changing the loaded `instrument` and `locale` props switches the active language
 XLSForm is not required. A translation may be partial, so another question, hint, choice, or constraint message can be added whenever it becomes available:
 
 ```ts
-import { whoVa2022Instrument, withInstrumentTranslation } from "@who-va/instrument";
+import { whoVa2022Instrument, withInstrumentTranslation } from "@drguptavivek/who-2022-va";
 
 const instrument = withInstrumentTranslation(whoVa2022Instrument, "fr", {
   questions: {
@@ -239,6 +253,8 @@ const instrument = withInstrumentTranslation(whoVa2022Instrument, "fr", {
 ```
 
 Only the supplied fields are added. Existing translations are preserved, untranslated fields fall back to English, and question IDs, choice values, calculations, relevance rules, and stored answers are unchanged. The same `instrument` object can be passed directly to `WhoVaForm`, or the translation object can be placed under `instrument` in a lazy `WhoVaLanguageFile` as shown above.
+
+Translations of the source questionnaire may be adaptations under its CC BY-ND 3.0 IGO licence. Confirm that you have the necessary permission before distributing a translated instrument.
 
 ## Web theming
 
@@ -275,7 +291,7 @@ The form is mobile-first: it fills the available width with responsive padding, 
 ## Headless validation
 
 ```ts
-import { validateSubmission, whoVa2022Instrument } from "@who-va/instrument";
+import { validateSubmission, whoVa2022Instrument } from "@drguptavivek/who-2022-va";
 
 const assessment = validateSubmission(whoVa2022Instrument, incomingPayload);
 if (!assessment.valid) {
@@ -311,4 +327,10 @@ Canonical artifacts:
 
 The package build reads only the checked-in JSON. Tests may compile the retained XLSForm in memory to detect source drift and verify type, coded values, requiredness, relevance AST, constraints, calculations, field validation, and isolated submission validation. The test compiler never regenerates or modifies the JSON.
 
-See the [developer guide](docs/development.md) for the full contributor workflow and [Architecture](docs/architecture.md) for the trust boundaries and extension points.
+See the [developer guide](https://github.com/drguptavivek/WHO-va-2022/blob/main/docs/development.md) for the full contributor workflow and [Architecture](https://github.com/drguptavivek/WHO-va-2022/blob/main/docs/architecture.md) for the trust boundaries and extension points.
+
+## Licensing and attribution
+
+The original software implementation is released under the [MIT License](LICENSE).
+
+The questionnaire content remains copyright World Health Organization and is identified by WHO as licensed under [CC BY-ND 3.0 IGO](https://creativecommons.org/licenses/by-nd/3.0/igo/). See [NOTICE](NOTICE) for attribution, licence boundaries, and the non-endorsement statement.

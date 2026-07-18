@@ -15,7 +15,7 @@ SVG, GIF, HEIC, WebP, renamed executables, renamed PDFs, malformed images, zero-
 
 ## Web lifecycle
 
-`@who-va/instrument/web` provides the complete browser implementation:
+`@drguptavivek/who-2022-va/web` provides the complete browser implementation:
 
 1. The picker accepts only JPEG/PNG for images and PDF for documents.
 2. `processWebImageAttachment()` inspects the real bytes before browser decoding.
@@ -32,7 +32,7 @@ If IndexedDB, decoding, rendering, or storage fails, the control shows a realtim
 The native entry point exports `processNativeImageAttachment()`. It applies the shared byte, signature, dimension, resizing, output-size, UUID, and processed-marker contract while the host supplies device operations:
 
 ```ts
-import { processNativeImageAttachment } from "@who-va/instrument/native";
+import { processNativeImageAttachment } from "@drguptavivek/who-2022-va/native";
 
 const platform = {
   selectImage: async () => {

@@ -1,6 +1,6 @@
 import { SafeAreaView } from "react-native";
 
-import { WhoVaForm } from "@who-va/instrument/native";
+import { WhoVaForm } from "@drguptavivek/who-2022-va/native";
 
 export default function App() {
   return (

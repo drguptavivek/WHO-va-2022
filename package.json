@@ -1,11 +1,30 @@
 {
-  "name": "@who-va/instrument",
+  "name": "@drguptavivek/who-2022-va",
   "version": "0.1.0",
   "type": "module",
-  "description": "React Native-first WHO 2022 verbal autopsy instrument driven by a checked-in JSON contract.",
+  "description": "Independent JavaScript implementation of the 2022 WHO verbal autopsy instrument.",
+  "license": "MIT",
+  "author": "Vivek Gupta",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/drguptavivek/WHO-va-2022.git"
+  },
+  "homepage": "https://github.com/drguptavivek/WHO-va-2022#readme",
+  "bugs": {
+    "url": "https://github.com/drguptavivek/WHO-va-2022/issues"
+  },
+  "keywords": [
+    "verbal-autopsy",
+    "epidemiology",
+    "public-health",
+    "react",
+    "react-native",
+    "web-component"
+  ],
   "files": [
     "dist",
-    "src/generated"
+    "LICENSE",
+    "NOTICE"
   ],
   "exports": {
     ".": {
@@ -38,7 +57,14 @@
     "test:e2e:report": "playwright show-report",
     "typecheck": "tsc --noEmit",
     "build": "tsup",
-    "check": "pnpm typecheck && pnpm test && pnpm build"
+    "check": "pnpm typecheck && pnpm test && pnpm build",
+    "prepublishOnly": "pnpm check"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "engines": {
+    "node": ">=18"
   },
   "peerDependencies": {
     "react": ">=18",
@@ -47,6 +73,9 @@
     "react-native-web": ">=0.19"
   },
   "peerDependenciesMeta": {
+    "react": {
+      "optional": true
+    },
     "react-dom": {
       "optional": true
     },

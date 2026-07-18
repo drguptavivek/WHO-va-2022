@@ -1,6 +1,6 @@
 # Developer guide
 
-This guide covers local development of `@who-va/instrument`. For application integration, start with the [README](../README.md). For exported interfaces and functions, see the [API reference](api.md).
+This guide covers local development of `@drguptavivek/who-2022-va`. For application integration, start with the [README](../README.md). For exported interfaces and functions, see the [API reference](api.md).
 
 ## Prerequisites
 
@@ -104,7 +104,7 @@ Keep native-only APIs in `src/native.tsx` or native adapter modules, and browser
 
 ### Languages
 
-Language files translate interviewer-facing text only. Question names, choice values, expressions, and stored answers remain unchanged. Built-in French and Hindi are draft translations and require specialist review before production deployment. See the README for the language-file shape and lazy-loader example.
+Language files translate interviewer-facing text only. Question names, choice values, expressions, and stored answers remain unchanged. The public package ships only English; experimental translation fixtures in the repository must not be imported into a published entry point. See the README for the language-file shape, rights warning, and lazy-loader example.
 
 ### Attachments
 
@@ -129,7 +129,8 @@ For a normal code change, run the narrowest related Vitest file while iterating,
 - declarations exist for every entry point;
 - the root bundle has no React, browser, React Native, Excel, or workbook dependency;
 - platform-specific code remains behind its documented subpath;
-- generated JSON and language chunks needed at runtime are included.
+- the generated instrument chunk needed at runtime is included;
+- experimental translation fixtures are not included.
 
 ## Data and deployment responsibilities
 
