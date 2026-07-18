@@ -4,7 +4,7 @@ This guide covers local development of `@drguptavivek/who-2022-va`. For applicat
 
 ## Prerequisites
 
-- Node.js 24 (`^24.0.0`); `.nvmrc` pins the recommended contributor version
+- Node.js 24 for the contributor toolchain; `.nvmrc` pins the recommended version. The published runtime remains compatible with Node.js 18 and newer.
 - pnpm 11.9.0 (the version pinned in `package.json`)
 - Chromium installed through Playwright for browser end-to-end tests
 

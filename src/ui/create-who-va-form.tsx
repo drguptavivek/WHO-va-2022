@@ -74,7 +74,7 @@ export interface WhoVaNavigationState {
   draftId: string;
   currentSection: string;
   view: FormView;
-  data: SubmissionData;
+  data?: SubmissionData;
 }
 
 export interface WhoVaNavigationAdapter {
@@ -205,7 +205,7 @@ export function createWhoVaForm(
   });
 
   function ReadyForm(props: WhoVaFormProps & { resolvedInstrument: InstrumentDefinition }) {
-    const { onChange, onReady } = props;
+    const { draftStore, onChange, onDraftError, onReady } = props;
     const instrument = props.resolvedInstrument;
     const locale = props.locale ?? localeFromLanguageName(instrument.defaultLanguage) ?? "en";
     const messages = resolveUiMessages(locale, props.uiTranslations);
@@ -216,7 +216,7 @@ export function createWhoVaForm(
     const [session] = useState(() => {
       if (props.session) {
         if (restoredNavigation) {
-          props.session.replaceData(restoredNavigation.data);
+          if (restoredNavigation.data) props.session.replaceData(restoredNavigation.data);
           props.session.goToSection(restoredNavigation.currentSection);
         }
         return props.session;
@@ -259,6 +259,28 @@ export function createWhoVaForm(
     }, [instrument, session]);
 
     useEffect(() => {
+      if (!restoredNavigation || restoredNavigation.data) return;
+      const store = draftStore ?? primitives.draftStore;
+      let active = true;
+      const restore = async () => {
+        const draft = await store?.load?.(restoredNavigation.draftId);
+        if (!active) return;
+        if (draft && draft.instrumentId === instrument.id && draft.instrumentVersion === instrument.version) {
+          session.replaceData(draft.data);
+        }
+        session.goToSection(restoredNavigation.currentSection);
+        setView(restoredNavigation.view);
+      };
+      void restore().catch((error: unknown) => {
+        if (!active) return;
+        onDraftError?.(error instanceof Error ? error : new Error(String(error)));
+      });
+      return () => {
+        active = false;
+      };
+    }, [instrument.id, instrument.version, draftStore, onDraftError, restoredNavigation, session]);
+
+    useEffect(() => {
       primitives.navigation?.replace({
         instrumentId: instrument.id,
         draftId,
@@ -272,11 +294,26 @@ export function createWhoVaForm(
       () =>
         primitives.navigation?.subscribe((state) => {
           if (!state || state.instrumentId !== instrument.id) return;
-          session.replaceData(state.data);
-          session.goToSection(state.currentSection);
-          setView(state.view);
+          if (state.data) {
+            session.replaceData(state.data);
+            session.goToSection(state.currentSection);
+            setView(state.view);
+            return;
+          }
+          const store = draftStore ?? primitives.draftStore;
+          void Promise.resolve(store?.load?.(state.draftId))
+            .then((draft) => {
+              if (draft?.instrumentId === instrument.id && draft.instrumentVersion === instrument.version) {
+                session.replaceData(draft.data);
+              }
+              session.goToSection(state.currentSection);
+              setView(state.view);
+            })
+            .catch((error: unknown) => {
+              onDraftError?.(error instanceof Error ? error : new Error(String(error)));
+            });
         }),
-      [instrument.id, session]
+      [draftStore, instrument.id, instrument.version, onDraftError, session]
     );
 
     const answer = (question: InstrumentQuestion, value: AnswerValue | undefined) => {
@@ -537,15 +574,15 @@ export function createWhoVaForm(
             accessibilityRole="button"
             style={[questionControlStyles.button, questionControlStyles.buttonSecondary]}
             onPress={() => {
-              void saveDraft();
-              primitives.navigation?.push({
-                instrumentId: instrument.id,
-                draftId,
-                currentSection: snapshot.currentSection.name,
-                view: "preview",
-                data: snapshot.data
+              void saveDraft().then(() => {
+                primitives.navigation?.push({
+                  instrumentId: instrument.id,
+                  draftId,
+                  currentSection: snapshot.currentSection.name,
+                  view: "preview"
+                });
+                setView("preview");
               });
-              setView("preview");
             }}
           >
             <Text style={questionControlStyles.buttonTextSecondary}>{messages.previewAnswers}</Text>

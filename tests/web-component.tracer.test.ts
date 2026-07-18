@@ -3,6 +3,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { defineWhoVaElement, type WhoVaFormElement } from "../src/web-component.js";
+import type { WhoVaPlatformServices } from "../src/web.js";
 
 afterEach(() => {
   document.body.replaceChildren();
@@ -88,6 +89,19 @@ describe("framework-independent web embedding", () => {
     await vi.waitFor(() => expect(save).toHaveBeenCalledOnce());
     expect(save).toHaveBeenCalledWith(expect.objectContaining({ id: element.getDraftId() }));
     expect(localStorage.length).toBe(0);
+  });
+
+  it("accepts host-controlled attachment and recording services before connection", () => {
+    defineWhoVaElement("who-va-secure-platform-test");
+    const element = document.createElement("who-va-secure-platform-test") as WhoVaFormElement;
+    const platform: WhoVaPlatformServices = {
+      removeAttachment: vi.fn(async () => undefined),
+      resolveAttachmentUri: vi.fn(async () => "secure-app://attachment")
+    };
+
+    element.platform = platform;
+
+    expect(element.platform).toBe(platform);
   });
 
   it("autosaves the latest submission data when Next is pressed", async () => {

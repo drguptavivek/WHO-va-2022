@@ -88,4 +88,44 @@ describe("web audio recording", () => {
       })
     ).rejects.toThrow("Audio recording is not supported");
   });
+
+  it("discards recordings that exceed the configured byte limit", async () => {
+    const stopTrack = vi.fn();
+    const stream = { getTracks: () => [{ stop: stopTrack }] } as unknown as MediaStream;
+    const store = memoryStore();
+    const recording = await startWebAudioRecording({
+      store,
+      mediaDevices: { getUserMedia: vi.fn().mockResolvedValue(stream) },
+      MediaRecorderClass: FakeMediaRecorder as unknown as typeof MediaRecorder,
+      policy: { maxDurationMs: 60_000, maxBytes: 5 }
+    });
+
+    await expect(recording.stop()).rejects.toThrow("configured size limit");
+    expect(store.saved.size).toBe(0);
+    expect(stopTrack).toHaveBeenCalled();
+  });
+
+  it("automatically stops at the configured duration limit", async () => {
+    vi.useFakeTimers();
+    try {
+      const stopTrack = vi.fn();
+      const stream = { getTracks: () => [{ stop: stopTrack }] } as unknown as MediaStream;
+      const store = memoryStore();
+      const recording = await startWebAudioRecording({
+        store,
+        mediaDevices: { getUserMedia: vi.fn().mockResolvedValue(stream) },
+        MediaRecorderClass: FakeMediaRecorder as unknown as typeof MediaRecorder,
+        createId: () => "duration-limited",
+        policy: { maxDurationMs: 1_000, maxBytes: 1024 }
+      });
+
+      await vi.advanceTimersByTimeAsync(1_000);
+      await expect(recording.stop()).resolves.toEqual(
+        expect.objectContaining({ id: "duration-limited", durationMs: 1_000 })
+      );
+      expect(stopTrack).toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });

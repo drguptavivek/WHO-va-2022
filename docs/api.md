@@ -85,7 +85,7 @@ Prefer `validateSubmission()` at server ingress even if the client already valid
 
 Web forms use a browser draft store by default. Native hosts should inject a `WhoVaDraftStore` suitable for their app.
 
-The web component exposes the same storage seam as its `draftStore` JavaScript property. Assign a `WhoVaDraftStore` before appending the element to the document so production VA data never passes through the unencrypted `localStorage` default.
+The web component exposes `draftStore` and `platform` JavaScript properties. Assign a `WhoVaDraftStore` and host-controlled attachment/recording services before appending the element so production VA data does not pass through the default unencrypted browser stores.
 
 ## Reusable question controls
 

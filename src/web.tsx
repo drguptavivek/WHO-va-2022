@@ -55,27 +55,39 @@ const ScrollView = themedPrimitive(WebScrollView, "WhoVaWebScrollView");
 const Image = themedPrimitive(WebImage, "WhoVaWebImage");
 
 const navigationStateKey = "__whoVaFormNavigation";
-const browserNavigationStates = new Map<string, WhoVaNavigationState>();
-
-function createBrowserNavigationId(): string {
-  return (
-    globalThis.crypto?.randomUUID?.() ?? `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`
-  );
-}
 
 function readBrowserNavigationState(): WhoVaNavigationState | undefined {
   if (typeof window === "undefined") return undefined;
   const historyState = window.history.state;
   if (historyState == null || typeof historyState !== "object") return undefined;
-  const navigationId = (historyState as Record<string, unknown>)[navigationStateKey];
-  return typeof navigationId === "string" ? browserNavigationStates.get(navigationId) : undefined;
+  const state = (historyState as Record<string, unknown>)[navigationStateKey];
+  if (state == null || typeof state !== "object") return undefined;
+  const candidate = state as Partial<WhoVaNavigationState>;
+  if (
+    typeof candidate.instrumentId !== "string" ||
+    typeof candidate.draftId !== "string" ||
+    typeof candidate.currentSection !== "string" ||
+    (candidate.view !== "form" && candidate.view !== "preview")
+  )
+    return undefined;
+  return {
+    instrumentId: candidate.instrumentId,
+    draftId: candidate.draftId,
+    currentSection: candidate.currentSection,
+    view: candidate.view
+  };
 }
 
-function browserHistoryEnvelope(navigationId: string): Record<string, unknown> {
+function browserHistoryEnvelope(state: WhoVaNavigationState): Record<string, unknown> {
   const current = window.history.state;
   return {
     ...(current != null && typeof current === "object" ? (current as Record<string, unknown>) : {}),
-    [navigationStateKey]: navigationId
+    [navigationStateKey]: {
+      instrumentId: state.instrumentId,
+      draftId: state.draftId,
+      currentSection: state.currentSection,
+      view: state.view
+    }
   };
 }
 
@@ -83,21 +95,11 @@ const browserNavigation: WhoVaNavigationAdapter = {
   read: readBrowserNavigationState,
   replace(state) {
     if (typeof window === "undefined") return;
-    const current = window.history.state;
-    const storedNavigationId =
-      current != null && typeof current === "object"
-        ? (current as Record<string, unknown>)[navigationStateKey]
-        : undefined;
-    const navigationId =
-      typeof storedNavigationId === "string" ? storedNavigationId : createBrowserNavigationId();
-    browserNavigationStates.set(navigationId, state);
-    window.history.replaceState(browserHistoryEnvelope(navigationId), "");
+    window.history.replaceState(browserHistoryEnvelope(state), "");
   },
   push(state) {
     if (typeof window === "undefined") return;
-    const navigationId = createBrowserNavigationId();
-    browserNavigationStates.set(navigationId, state);
-    window.history.pushState(browserHistoryEnvelope(navigationId), "");
+    window.history.pushState(browserHistoryEnvelope(state), "");
   },
   back() {
     if (typeof window !== "undefined") window.history.back();

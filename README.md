@@ -127,7 +127,7 @@ export function VerbalAutopsyPage() {
 }
 ```
 
-Web uses `localStorage` by default under `who-va-2022:draft:<uuid>`. Pass `draftId` to continue overwriting a known draft, or pass a custom `draftStore` to use another persistence layer. Audio questions use the browser microphone: press **Record audio**, then **Stop and save recording**. The browser will request microphone permission, and recording requires a secure context (`https://` or localhost).
+Web uses `localStorage` by default under `who-va-2022:draft:<uuid>`. Pass `draftId` to continue overwriting a known draft, or pass a custom `draftStore` to use another persistence layer. Browser history stores only draft and navigation metadata; reload restoration reads answers from the configured draft store. Audio questions use the browser microphone: press **Record audio**, then **Stop and save recording**. The browser will request microphone permission, and recording requires a secure context (`https://` or localhost). Browser recordings stop automatically after 30 minutes and are discarded if encoded chunks exceed 25 MB.
 
 Upload a stored browser attachment as a `Blob`; do not convert it to base64:
 
@@ -170,6 +170,7 @@ defineWhoVaElement();
   form.setAttribute("locale", "en");
   // Configure production storage before the element is connected.
   form.draftStore = secureDraftStore;
+  form.platform = secureAttachmentAndRecordingServices;
   form.setData(savedDraft);
   form.addEventListener("who-va-draft-saved", (event) => console.log(event.detail.id));
   form.addEventListener("who-va-complete", (event) => submit(event.detail.data));
@@ -178,7 +179,7 @@ defineWhoVaElement();
 </script>
 ```
 
-The element exposes the `draftStore` property plus `getData()`, `setData(data)`, `getDraftId()`, `validate()`, and `complete()`. Set `draftStore` and any `draft-id` attribute before attaching the element; otherwise drafts use unencrypted `localStorage` and the element generates a new UUID.
+The element exposes `draftStore` and `platform` properties plus `getData()`, `setData(data)`, `getDraftId()`, `validate()`, and `complete()`. Set secure draft and attachment services plus any `draft-id` attribute before attaching the element; otherwise drafts and attachment binaries use the default unencrypted browser stores and the element generates a new UUID.
 
 ## Adding languages
 

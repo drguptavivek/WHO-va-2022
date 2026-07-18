@@ -2,7 +2,7 @@
 
 import React from "react";
 import { createRoot } from "react-dom/client";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { createWhoVaSession, type InstrumentDefinition } from "../src/index.js";
 import { WhoVaForm } from "../src/web.js";
@@ -122,16 +122,16 @@ describe("answer preview", () => {
     firstRoot.render(<WhoVaForm instrument={previewInstrument} session={session} />);
     await new Promise((resolve) => setTimeout(resolve, 0));
     button(container, "Preview answers")?.click();
-    await new Promise((resolve) => setTimeout(resolve, 0));
+    await vi.waitFor(() => expect(container.textContent).toContain("Answer preview"));
     expect(container.textContent).toContain("Answer preview");
+    expect(JSON.stringify(history.state)).not.toContain('"data"');
+    expect(Object.keys(localStorage).some((key) => key.startsWith("who-va-2022:draft:"))).toBe(true);
     firstRoot.unmount();
 
     const reloadedRoot = createRoot(container);
     reloadedRoot.render(<WhoVaForm instrument={previewInstrument} />);
-    await new Promise((resolve) => setTimeout(resolve, 0));
-
+    await vi.waitFor(() => expect(container.textContent).toContain("Amina"));
     expect(container.textContent).toContain("Answer preview");
-    expect(container.textContent).toContain("Amina");
     expect(container.textContent).toContain("Fever");
     button(container, "Back to form")?.click();
     await new Promise((resolve) => setTimeout(resolve, 0));

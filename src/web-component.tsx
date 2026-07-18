@@ -10,6 +10,7 @@ import { createWhoVaSession } from "./engine/session.js";
 import { whoVa2022Instrument } from "./instrument.js";
 import { loadWhoVa2022Language } from "./instrument-loader.js";
 import type { SubmissionData, SubmissionValidationResult, WhoVaDraftStore, WhoVaSession } from "./types.js";
+import type { WhoVaPlatformServices } from "./ui/create-who-va-form.js";
 import { WhoVaForm } from "./web.js";
 
 export class WhoVaFormElement extends HTMLElement {
@@ -21,6 +22,7 @@ export class WhoVaFormElement extends HTMLElement {
   private readonly session: WhoVaSession;
   private readonly generatedDraftId = createDraftId();
   private configuredDraftStore: WhoVaDraftStore | undefined;
+  private configuredPlatform: WhoVaPlatformServices | undefined;
   private renderVersion = 0;
 
   constructor() {
@@ -75,6 +77,17 @@ export class WhoVaFormElement extends HTMLElement {
     if (this.isConnected) void this.renderForm();
   }
 
+  /** Host-controlled attachment, recording, picker, and lifecycle services. */
+  get platform(): WhoVaPlatformServices | undefined {
+    return this.configuredPlatform;
+  }
+
+  set platform(platform: WhoVaPlatformServices | undefined) {
+    if (platform === this.configuredPlatform) return;
+    this.configuredPlatform = platform;
+    if (this.isConnected) void this.renderForm();
+  }
+
   private async renderForm(): Promise<void> {
     const renderVersion = ++this.renderVersion;
     const requestedLocale = this.getAttribute("locale") ?? "en";
@@ -89,6 +102,7 @@ export class WhoVaFormElement extends HTMLElement {
         session={this.session}
         draftId={this.getDraftId()}
         {...(this.configuredDraftStore ? { draftStore: this.configuredDraftStore } : {})}
+        {...(this.configuredPlatform ? { platform: this.configuredPlatform } : {})}
         locale={language.locale}
         uiTranslations={language.uiTranslations}
         showSourceGuidance={this.hasAttribute("show-guidance")}

@@ -25,6 +25,8 @@ SVG, GIF, HEIC, WebP, renamed executables, renamed PDFs, malformed images, zero-
 6. The answer and local-storage draft contain only `who-va-attachment:` or `who-va-pdf-pages:` UUID references and metadata.
 7. Preview URLs are temporary `blob:` URLs and are revoked when no longer used.
 
+Browser audio recording uses the same binary store. `WHO_VA_WEB_AUDIO_POLICY` limits a recording to 30 minutes and 25 MB of encoded chunks; the recorder stops automatically at the duration ceiling and discards recordings that exceed the byte ceiling.
+
 If IndexedDB, decoding, rendering, or storage fails, the control shows a realtime error and does not set an answer.
 
 ## Expo and React Native lifecycle
