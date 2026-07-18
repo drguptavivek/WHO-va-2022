@@ -5,8 +5,12 @@
 import type { AnswerValue, ExpressionNode, SubmissionData } from "../types.js";
 import { formatLocalDate } from "./date.js";
 
-type TokenType = "number" | "string" | "reference" | "identifier" | "dot" | "operator" | "left" | "right" | "comma" | "eof";
-interface Token { type: TokenType; value: string }
+type TokenType =
+  "number" | "string" | "reference" | "identifier" | "dot" | "operator" | "left" | "right" | "comma" | "eof";
+interface Token {
+  type: TokenType;
+  value: string;
+}
 
 const binaryPrecedence: Record<string, number> = {
   or: 1,
@@ -30,7 +34,10 @@ function tokenize(source: string): Token[] {
   while (index < source.length) {
     const character = source[index];
     if (!character) break;
-    if (/\s/.test(character)) { index += 1; continue; }
+    if (/\s/.test(character)) {
+      index += 1;
+      continue;
+    }
     if (source.startsWith("${", index)) {
       const end = source.indexOf("}", index + 2);
       if (end < 0) throw new Error(`Unclosed reference at character ${index}`);
@@ -45,11 +52,19 @@ function tokenize(source: string): Token[] {
       while (index < source.length) {
         const next = source[index];
         if (next === quote) {
-          if (source[index + 1] === quote) { value += quote; index += 2; continue; }
+          if (source[index + 1] === quote) {
+            value += quote;
+            index += 2;
+            continue;
+          }
           index += 1;
           break;
         }
-        if (next === "\\" && source[index + 1]) { value += source[index + 1]; index += 2; continue; }
+        if (next === "\\" && source[index + 1]) {
+          value += source[index + 1];
+          index += 2;
+          continue;
+        }
         value += next;
         index += 1;
       }
@@ -74,10 +89,26 @@ function tokenize(source: string): Token[] {
       index += 1;
       continue;
     }
-    if (character === ".") { tokens.push({ type: "dot", value: character }); index += 1; continue; }
-    if (character === "(") { tokens.push({ type: "left", value: character }); index += 1; continue; }
-    if (character === ")") { tokens.push({ type: "right", value: character }); index += 1; continue; }
-    if (character === ",") { tokens.push({ type: "comma", value: character }); index += 1; continue; }
+    if (character === ".") {
+      tokens.push({ type: "dot", value: character });
+      index += 1;
+      continue;
+    }
+    if (character === "(") {
+      tokens.push({ type: "left", value: character });
+      index += 1;
+      continue;
+    }
+    if (character === ")") {
+      tokens.push({ type: "right", value: character });
+      index += 1;
+      continue;
+    }
+    if (character === ",") {
+      tokens.push({ type: "comma", value: character });
+      index += 1;
+      continue;
+    }
     const identifier = source.slice(index).match(/^[A-Za-z_][A-Za-z0-9_-]*/);
     if (identifier) {
       const value = identifier[0];
@@ -141,10 +172,22 @@ class Parser {
 
   private parsePrimary(): ExpressionNode {
     const token = this.peek();
-    if (token.type === "number") { this.consume(); return { type: "literal", value: Number(token.value) }; }
-    if (token.type === "string") { this.consume(); return { type: "literal", value: token.value }; }
-    if (token.type === "reference") { this.consume(); return { type: "reference", name: token.value }; }
-    if (token.type === "dot") { this.consume(); return { type: "current" }; }
+    if (token.type === "number") {
+      this.consume();
+      return { type: "literal", value: Number(token.value) };
+    }
+    if (token.type === "string") {
+      this.consume();
+      return { type: "literal", value: token.value };
+    }
+    if (token.type === "reference") {
+      this.consume();
+      return { type: "reference", name: token.value };
+    }
+    if (token.type === "dot") {
+      this.consume();
+      return { type: "current" };
+    }
     if (token.type === "left") {
       this.consume("left");
       const nested = this.parseBinary(1);
@@ -153,7 +196,8 @@ class Parser {
     }
     if (token.type === "identifier") {
       this.consume("identifier");
-      if (token.value === "true" || token.value === "false") return { type: "literal", value: token.value === "true" };
+      if (token.value === "true" || token.value === "false")
+        return { type: "literal", value: token.value === "true" };
       if (token.value === "null") return { type: "literal", value: null };
       this.consume("left");
       const arguments_: ExpressionNode[] = [];
@@ -169,8 +213,17 @@ class Parser {
         if (arguments_.length !== 1 || !arguments_[0]) throw new Error("not() requires one argument");
         return { type: "unary", operator: "not", operand: arguments_[0] };
       }
-      const supported = ["selected", "count-selected", "string-length", "int", "if", "today", "date"] as const;
-      if (!supported.includes(token.value as (typeof supported)[number])) throw new Error(`Unsupported function '${token.value}'`);
+      const supported = [
+        "selected",
+        "count-selected",
+        "string-length",
+        "int",
+        "if",
+        "today",
+        "date"
+      ] as const;
+      if (!supported.includes(token.value as (typeof supported)[number]))
+        throw new Error(`Unsupported function '${token.value}'`);
       return { type: "call", name: token.value as (typeof supported)[number], arguments: arguments_ };
     }
     throw new Error(`Unexpected token '${token.value}'`);
@@ -228,37 +281,62 @@ export function evaluateExpression(
   options: ExpressionEvaluationOptions = {}
 ): unknown {
   switch (node.type) {
-    case "literal": return node.value;
-    case "reference": return data[node.name];
-    case "current": return options.currentValue;
+    case "literal":
+      return node.value;
+    case "reference":
+      return data[node.name];
+    case "current":
+      return options.currentValue;
     case "unary": {
       const value = evaluateExpression(node.operand, data, options);
       return node.operator === "not" ? !asBoolean(value) : -asNumber(value);
     }
     case "binary": {
-      if (node.operator === "and") return asBoolean(evaluateExpression(node.left, data, options)) && asBoolean(evaluateExpression(node.right, data, options));
-      if (node.operator === "or") return asBoolean(evaluateExpression(node.left, data, options)) || asBoolean(evaluateExpression(node.right, data, options));
+      if (node.operator === "and")
+        return (
+          asBoolean(evaluateExpression(node.left, data, options)) &&
+          asBoolean(evaluateExpression(node.right, data, options))
+        );
+      if (node.operator === "or")
+        return (
+          asBoolean(evaluateExpression(node.left, data, options)) ||
+          asBoolean(evaluateExpression(node.right, data, options))
+        );
       const left = evaluateExpression(node.left, data, options);
       const right = evaluateExpression(node.right, data, options);
       switch (node.operator) {
-        case "=": return equal(left, right);
-        case "!=": return !equal(left, right);
-        case ">": return asNumber(left) > asNumber(right);
-        case ">=": return asNumber(left) >= asNumber(right);
-        case "<": return asNumber(left) < asNumber(right);
-        case "<=": return asNumber(left) <= asNumber(right);
-        case "+": return asNumber(left) + asNumber(right);
-        case "-": return asNumber(left) - asNumber(right);
-        case "*": return asNumber(left) * asNumber(right);
-        case "div": return asNumber(left) / asNumber(right);
-        case "mod": return asNumber(left) % asNumber(right);
+        case "=":
+          return equal(left, right);
+        case "!=":
+          return !equal(left, right);
+        case ">":
+          return asNumber(left) > asNumber(right);
+        case ">=":
+          return asNumber(left) >= asNumber(right);
+        case "<":
+          return asNumber(left) < asNumber(right);
+        case "<=":
+          return asNumber(left) <= asNumber(right);
+        case "+":
+          return asNumber(left) + asNumber(right);
+        case "-":
+          return asNumber(left) - asNumber(right);
+        case "*":
+          return asNumber(left) * asNumber(right);
+        case "div":
+          return asNumber(left) / asNumber(right);
+        case "mod":
+          return asNumber(left) % asNumber(right);
       }
+      return undefined;
     }
     case "call": {
       if (node.name === "if") {
         const condition = node.arguments[0];
         if (!condition) return undefined;
-        const branch = asBoolean(evaluateExpression(condition, data, options)) ? node.arguments[1] : node.arguments[2];
+        const branch = asBoolean(evaluateExpression(condition, data, options))
+          ? node.arguments[1]
+          : node.arguments[2];
         return branch ? evaluateExpression(branch, data, options) : undefined;
       }
       const arguments_ = node.arguments.map((argument) => evaluateExpression(argument, data, options));
@@ -274,9 +352,12 @@ export function evaluateExpression(
           if (typeof value === "string" && value.trim()) return value.trim().split(/\s+/).length;
           return 0;
         }
-        case "string-length": return isEmpty(arguments_[0]) ? 0 : String(arguments_[0]).length;
-        case "int": return Math.trunc(asNumber(arguments_[0]));
-        case "today": return formatLocalDate(options.now ?? new Date());
+        case "string-length":
+          return isEmpty(arguments_[0]) ? 0 : String(arguments_[0]).length;
+        case "int":
+          return Math.trunc(asNumber(arguments_[0]));
+        case "today":
+          return formatLocalDate(options.now ?? new Date());
         case "date": {
           const value = arguments_[0];
           if (isIsoDate(value)) return value.slice(0, 10);

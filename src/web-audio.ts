@@ -46,7 +46,9 @@ function stopStream(stream: MediaStream): void {
   for (const track of stream.getTracks()) track.stop();
 }
 
-export async function startWebAudioRecording(options: StartWebAudioRecordingOptions): Promise<WebAudioRecordingSession> {
+export async function startWebAudioRecording(
+  options: StartWebAudioRecordingOptions
+): Promise<WebAudioRecordingSession> {
   const mediaDevices = options.mediaDevices ?? globalThis.navigator?.mediaDevices;
   const MediaRecorderClass = options.MediaRecorderClass ?? globalThis.MediaRecorder;
   if (!mediaDevices?.getUserMedia || !MediaRecorderClass) {
@@ -75,37 +77,45 @@ export async function startWebAudioRecording(options: StartWebAudioRecordingOpti
   return {
     stop() {
       stopping ??= new Promise<AnswerValue>((resolve, reject) => {
-        recorder.addEventListener("error", () => {
-          stopStream(stream);
-          reject(new Error("The browser could not complete the audio recording."));
-        }, { once: true });
-        recorder.addEventListener("stop", async () => {
-          stopStream(stream);
-          if (cancelled) return;
-          const recordedMimeType = recorder.mimeType || mimeType || chunks[0]?.type || "audio/webm";
-          const blob = new Blob(chunks, { type: recordedMimeType });
-          if (blob.size === 0) {
-            reject(new Error("No audio was recorded. Check the microphone and try again."));
-            return;
-          }
-          const id = (options.createId ?? createDraftId)();
-          const name = `${id}.${extensionForMimeType(recordedMimeType)}`;
-          try {
-            await options.store.save(id, blob);
-            resolve({
-              id,
-              uri: `who-va-attachment:${id}`,
-              name,
-              originalName: name,
-              mimeType: recordedMimeType,
-              size: blob.size,
-              durationMs: Math.max(0, (options.now ?? Date.now)() - startedAt),
-              processed: true
-            } satisfies WebStoredAudioReference);
-          } catch (error) {
-            reject(new Error("The audio recording could not be saved on this device.", { cause: error }));
-          }
-        }, { once: true });
+        recorder.addEventListener(
+          "error",
+          () => {
+            stopStream(stream);
+            reject(new Error("The browser could not complete the audio recording."));
+          },
+          { once: true }
+        );
+        recorder.addEventListener(
+          "stop",
+          async () => {
+            stopStream(stream);
+            if (cancelled) return;
+            const recordedMimeType = recorder.mimeType || mimeType || chunks[0]?.type || "audio/webm";
+            const blob = new Blob(chunks, { type: recordedMimeType });
+            if (blob.size === 0) {
+              reject(new Error("No audio was recorded. Check the microphone and try again."));
+              return;
+            }
+            const id = (options.createId ?? createDraftId)();
+            const name = `${id}.${extensionForMimeType(recordedMimeType)}`;
+            try {
+              await options.store.save(id, blob);
+              resolve({
+                id,
+                uri: `who-va-attachment:${id}`,
+                name,
+                originalName: name,
+                mimeType: recordedMimeType,
+                size: blob.size,
+                durationMs: Math.max(0, (options.now ?? Date.now)() - startedAt),
+                processed: true
+              } satisfies WebStoredAudioReference);
+            } catch (error) {
+              reject(new Error("The audio recording could not be saved on this device.", { cause: error }));
+            }
+          },
+          { once: true }
+        );
         recorder.stop();
       });
       return stopping;

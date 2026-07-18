@@ -8,11 +8,13 @@ import type {
   AnswerValue,
   InstrumentDefinition,
   InstrumentQuestion,
+  InstrumentSection,
   SubmissionData,
   SubmissionValidationResult,
   ValidationIssue
 } from "../types.js";
 import { ENGLISH_UI_MESSAGES, localizeText, type WhoVaUiMessages } from "../i18n.js";
+import { isValidIsoDate } from "../date.js";
 
 function expressionAst(expression: { source: string; ast?: ReturnType<typeof parseExpression> }) {
   return expression.ast ?? parseExpression(expression.source);
@@ -30,18 +32,40 @@ function validationLabel(question: InstrumentQuestion, locale: string): string {
   return localizeText(question.label, locale, question.name).replace(/\[([^\]]+)\]/g, "$1");
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value != null && !Array.isArray(value);
+}
+
+function isNonEmptyString(value: unknown): value is string {
+  return typeof value === "string" && value.trim().length > 0;
+}
+
 function typeIsValid(question: InstrumentQuestion, value: unknown): boolean {
   switch (question.dataType) {
-    case "string": return typeof value === "string";
-    case "number": return typeof value === "number" && Number.isFinite(value) && Number.isInteger(value);
-    case "boolean": return typeof value === "boolean";
-    case "date": return typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value) && !Number.isNaN(Date.parse(`${value}T00:00:00Z`));
-    case "dateTime": return typeof value === "string" && !Number.isNaN(Date.parse(value));
-    case "string[]": return Array.isArray(value) && value.every((item) => typeof item === "string");
-    case "attachment": return typeof value === "string" || (typeof value === "object" && value != null && !Array.isArray(value));
-    case "audit": return typeof value === "object" && value != null && !Array.isArray(value);
+    case "string":
+      return typeof value === "string";
+    case "number":
+      return typeof value === "number" && Number.isFinite(value) && Number.isInteger(value);
+    case "boolean":
+      return typeof value === "boolean";
+    case "date":
+      return isValidIsoDate(value);
+    case "dateTime":
+      return typeof value === "string" && !Number.isNaN(Date.parse(value));
+    case "string[]":
+      return Array.isArray(value) && value.every((item) => typeof item === "string");
+    case "attachment":
+      return isNonEmptyString(value) || (isRecord(value) && isNonEmptyString(value.uri));
+    case "audit":
+      return (
+        isRecord(value) &&
+        isNonEmptyString(value.startedAt) &&
+        /^\d{4}-\d{2}-\d{2}T/.test(value.startedAt) &&
+        !Number.isNaN(Date.parse(value.startedAt))
+      );
     case "calculated":
-    case "none": return true;
+    case "none":
+      return true;
   }
 }
 
@@ -55,7 +79,10 @@ export function applyCalculations(instrument: InstrumentDefinition, data: Submis
   const calculated: SubmissionData = { ...data };
   for (const question of getInstrumentRuntimeIndex(instrument).calculatedQuestions) {
     if (!question.calculation) continue;
-    calculated[question.name] = evaluateExpression(expressionAst(question.calculation), calculated) as AnswerValue;
+    calculated[question.name] = evaluateExpression(
+      expressionAst(question.calculation),
+      calculated
+    ) as AnswerValue;
   }
   return calculated;
 }
@@ -84,6 +111,24 @@ export function isQuestionRelevantWithCalculatedData(
   return true;
 }
 
+/** Evaluates an XLSForm group independently from the questions it contains. */
+export function isSectionRelevantWithCalculatedData(
+  instrument: InstrumentDefinition,
+  section: InstrumentSection,
+  calculated: SubmissionData
+): boolean {
+  const { sectionsByName } = getInstrumentRuntimeIndex(instrument);
+  let current: InstrumentSection | undefined = section;
+  const visited = new Set<string>();
+  while (current) {
+    if (visited.has(current.name)) throw new Error(`Circular section hierarchy at '${current.name}'`);
+    visited.add(current.name);
+    if (current.relevant && !evaluateExpression(expressionAst(current.relevant), calculated)) return false;
+    current = current.parent ? sectionsByName.get(current.parent) : undefined;
+  }
+  return true;
+}
+
 export function validateAnswer(
   question: InstrumentQuestion,
   value: AnswerValue | undefined,
@@ -91,19 +136,34 @@ export function validateAnswer(
   locale = "en",
   messages: WhoVaUiMessages = ENGLISH_UI_MESSAGES
 ): ValidationIssue[] {
-  if (["note", "calculated", "system"].includes(question.control)) return [];
+  if (["note", "calculated"].includes(question.control)) return [];
   if (isEmpty(value)) {
     return question.required
-      ? [{ question: question.name, code: "required", message: messages.required(validationLabel(question, locale)) }]
+      ? [
+          {
+            question: question.name,
+            code: "required",
+            message: messages.required(validationLabel(question, locale))
+          }
+        ]
       : [];
   }
   if (!typeIsValid(question, value)) {
-    return [{ question: question.name, code: "type", message: messages.invalidType(question.name, question.dataType) }];
+    return [
+      {
+        question: question.name,
+        code: "type",
+        message: messages.invalidType(question.name, question.dataType)
+      }
+    ];
   }
   if (question.choices) {
     const allowed = new Set(question.choices.map((choice) => choice.value));
     const values = Array.isArray(value) ? value : [value];
-    if (values.some((item) => typeof item !== "string" || !allowed.has(item)) || new Set(values).size !== values.length) {
+    if (
+      values.some((item) => typeof item !== "string" || !allowed.has(item)) ||
+      new Set(values).size !== values.length
+    ) {
       return [{ question: question.name, code: "choice", message: messages.invalidChoice(question.name) }];
     }
   }
@@ -111,18 +171,22 @@ export function validateAnswer(
     try {
       const valid = evaluateExpression(expressionAst(question.constraint), data, { currentValue: value });
       if (!valid) {
-        return [{
-          question: question.name,
-          code: "constraint",
-          message: message(question, locale, messages.invalidConstraint(question.name))
-        }];
+        return [
+          {
+            question: question.name,
+            code: "constraint",
+            message: message(question, locale, messages.invalidConstraint(question.name))
+          }
+        ];
       }
     } catch (error) {
-      return [{
-        question: question.name,
-        code: "unsupported-expression",
-        message: error instanceof Error ? error.message : String(error)
-      }];
+      return [
+        {
+          question: question.name,
+          code: "unsupported-expression",
+          message: error instanceof Error ? error.message : String(error)
+        }
+      ];
     }
   }
   return [];

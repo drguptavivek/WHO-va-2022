@@ -33,7 +33,8 @@ describe("WHO XLSForm compiler tracer", () => {
       .map((question) => question.name);
 
     expect(missingMessages).toEqual([]);
-    expect(instrument.questions.find((question) => question.name === "Id10023_b")?.constraintMessage.en)
-      .toBe("Date of death cannot be in the future.");
+    expect(instrument.questions.find((question) => question.name === "Id10023_b")?.constraintMessage.en).toBe(
+      "Date of death cannot be in the future."
+    );
   });
 });

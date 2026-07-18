@@ -37,14 +37,16 @@ describe("framework-independent web embedding", () => {
     await new Promise((resolve) => setTimeout(resolve, 0));
 
     expect(element.querySelector('[data-testid="question-Id10010"]')).not.toBeNull();
-    const next = [...element.querySelectorAll('[role="button"]')].find((button) => button.textContent === "Next");
+    const next = [...element.querySelectorAll('[role="button"]')].find(
+      (button) => button.textContent === "Next"
+    );
     expect(next).toBeDefined();
     next?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
     await new Promise((resolve) => setTimeout(resolve, 0));
 
-    expect(validationDetail).toEqual(expect.arrayContaining([
-      expect.objectContaining({ question: "Id10010", code: "required" })
-    ]));
+    expect(validationDetail).toEqual(
+      expect.arrayContaining([expect.objectContaining({ question: "Id10010", code: "required" })])
+    );
   });
 
   it("saves the current form as a UUID-addressed local draft", async () => {
@@ -57,8 +59,9 @@ describe("framework-independent web embedding", () => {
     document.body.append(element);
     await new Promise((resolve) => setTimeout(resolve, 0));
 
-    const saveDraft = [...element.querySelectorAll('[role="button"]')]
-      .find((button) => button.textContent === "Save draft");
+    const saveDraft = [...element.querySelectorAll('[role="button"]')].find(
+      (button) => button.textContent === "Save draft"
+    );
     saveDraft?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
 
     await vi.waitFor(() => expect(savedDraft).toBeDefined());
@@ -67,6 +70,24 @@ describe("framework-independent web embedding", () => {
     expect(JSON.parse(localStorage.getItem(`who-va-2022:draft:${savedDraft?.id}`) ?? "null")).toEqual(
       expect.objectContaining({ id: savedDraft?.id, instrumentId: "va_who_2022" })
     );
+  });
+
+  it("uses a host-provided draft store instead of unencrypted localStorage", async () => {
+    defineWhoVaElement("who-va-secure-draft-test");
+    const element = document.createElement("who-va-secure-draft-test") as WhoVaFormElement;
+    const save = vi.fn();
+    element.draftStore = { save };
+    document.body.append(element);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    const saveDraft = [...element.querySelectorAll('[role="button"]')].find(
+      (button) => button.textContent === "Save draft"
+    );
+    saveDraft?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+
+    await vi.waitFor(() => expect(save).toHaveBeenCalledOnce());
+    expect(save).toHaveBeenCalledWith(expect.objectContaining({ id: element.getDraftId() }));
+    expect(localStorage.length).toBe(0);
   });
 
   it("autosaves the latest submission data when Next is pressed", async () => {
@@ -80,8 +101,9 @@ describe("framework-independent web embedding", () => {
     await new Promise((resolve) => setTimeout(resolve, 0));
     element.setData({ Id10010: "Autosaved interviewer" });
 
-    const next = [...element.querySelectorAll('[role="button"]')]
-      .find((button) => button.textContent === "Next");
+    const next = [...element.querySelectorAll('[role="button"]')].find(
+      (button) => button.textContent === "Next"
+    );
     next?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
 
     await vi.waitFor(() => expect(savedDraft?.data.Id10010).toBe("Autosaved interviewer"));

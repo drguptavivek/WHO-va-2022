@@ -70,7 +70,9 @@ describe("web audio control", () => {
         data={{}}
         locale="en"
         issues={[]}
-        platform={{ startAudioRecording: vi.fn().mockRejectedValue(new DOMException("Denied", "NotAllowedError")) }}
+        platform={{
+          startAudioRecording: vi.fn().mockRejectedValue(new DOMException("Denied", "NotAllowedError"))
+        }}
         onAnswer={onAnswer}
       />
     );
@@ -78,8 +80,11 @@ describe("web audio control", () => {
 
     container.querySelector<HTMLElement>('[role="button"]')?.click();
 
-    await vi.waitFor(() => expect(container.querySelector('[role="alert"]')?.textContent)
-      .toContain("Microphone permission was denied"));
+    await vi.waitFor(() =>
+      expect(container.querySelector('[role="alert"]')?.textContent).toContain(
+        "Microphone permission was denied"
+      )
+    );
     expect(onAnswer).not.toHaveBeenCalled();
     root.unmount();
   });

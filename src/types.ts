@@ -58,7 +58,11 @@ export type ExpressionNode =
       left: ExpressionNode;
       right: ExpressionNode;
     }
-  | { type: "call"; name: "selected" | "count-selected" | "string-length" | "int" | "if" | "today" | "date"; arguments: ExpressionNode[] };
+  | {
+      type: "call";
+      name: "selected" | "count-selected" | "string-length" | "int" | "if" | "today" | "date";
+      arguments: ExpressionNode[];
+    };
 
 export interface InstrumentQuestion {
   name: string;
@@ -105,7 +109,17 @@ export interface InstrumentDefinition {
   questions: InstrumentQuestion[];
 }
 
-export type AnswerValue = string | number | boolean | string[] | Record<string, unknown> | null;
+export interface AttachmentAnswer {
+  uri: string;
+  [key: string]: unknown;
+}
+
+export interface AuditAnswer {
+  startedAt: string;
+  [key: string]: unknown;
+}
+
+export type AnswerValue = string | number | boolean | string[] | AttachmentAnswer | AuditAnswer | null;
 export type SubmissionData = Record<string, AnswerValue | undefined>;
 
 export interface WhoVaDraft {
@@ -159,7 +173,7 @@ export interface WhoVaSessionOptions {
   locale?: string;
   uiTranslations?: WhoVaUiTranslations;
   now?: () => Date;
-  audit?: Record<string, unknown>;
+  audit?: AuditAnswer;
 }
 
 export interface WhoVaSession {

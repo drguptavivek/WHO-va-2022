@@ -11,14 +11,78 @@ interface AgeScenario {
 }
 
 const ageScenarios: AgeScenario[] = [
-  { name: "27-day neonate", born: "2026-06-20", ageInDays: 27, ageInYears: 0, classification: "isNeonatal", displayQuestion: "displayAgeNeonate", displayText: "NEONATE was 27 days old." },
-  { name: "28-day child", born: "2026-06-19", ageInDays: 28, ageInYears: 0, classification: "isChild", displayQuestion: "displayAgeChild", displayText: "CHILD was 0 years 0 months and 28 days old." },
-  { name: "4-year-old child", born: "2022-07-17", ageInDays: 1461, ageInYears: 4, classification: "isChild", displayQuestion: "displayAgeChild", displayText: "CHILD was 4 years 0 months and 0 days old." },
-  { name: "8-year-old child", born: "2018-07-17", ageInDays: 2922, ageInYears: 8, classification: "isChild", displayQuestion: "displayAgeChild", displayText: "CHILD was 8 years 0 months and 0 days old." },
-  { name: "10-year-old child", born: "2016-07-16", ageInDays: 3653, ageInYears: 10, classification: "isChild", displayQuestion: "displayAgeChild", displayText: "CHILD was 10 years 0 months and 0 days old." },
-  { name: "12-year-old adult", born: "2014-07-16", ageInDays: 4384, ageInYears: 12, classification: "isAdult", displayQuestion: "displayAgeAdult", displayText: "ADULT was 12 years old." },
-  { name: "40-year-old adult", born: "1986-07-16", ageInDays: 14611, ageInYears: 40, classification: "isAdult", displayQuestion: "displayAgeAdult", displayText: "ADULT was 40 years old." },
-  { name: "50-year-old adult", born: "1976-07-16", ageInDays: 18263, ageInYears: 50, classification: "isAdult", displayQuestion: "displayAgeAdult", displayText: "ADULT was 50 years old." }
+  {
+    name: "27-day neonate",
+    born: "2026-06-20",
+    ageInDays: 27,
+    ageInYears: 0,
+    classification: "isNeonatal",
+    displayQuestion: "displayAgeNeonate",
+    displayText: "NEONATE was 27 days old."
+  },
+  {
+    name: "28-day child",
+    born: "2026-06-19",
+    ageInDays: 28,
+    ageInYears: 0,
+    classification: "isChild",
+    displayQuestion: "displayAgeChild",
+    displayText: "CHILD was 0 years 0 months and 28 days old."
+  },
+  {
+    name: "4-year-old child",
+    born: "2022-07-17",
+    ageInDays: 1461,
+    ageInYears: 4,
+    classification: "isChild",
+    displayQuestion: "displayAgeChild",
+    displayText: "CHILD was 4 years 0 months and 0 days old."
+  },
+  {
+    name: "8-year-old child",
+    born: "2018-07-17",
+    ageInDays: 2922,
+    ageInYears: 8,
+    classification: "isChild",
+    displayQuestion: "displayAgeChild",
+    displayText: "CHILD was 8 years 0 months and 0 days old."
+  },
+  {
+    name: "10-year-old child",
+    born: "2016-07-16",
+    ageInDays: 3653,
+    ageInYears: 10,
+    classification: "isChild",
+    displayQuestion: "displayAgeChild",
+    displayText: "CHILD was 10 years 0 months and 0 days old."
+  },
+  {
+    name: "12-year-old adult",
+    born: "2014-07-16",
+    ageInDays: 4384,
+    ageInYears: 12,
+    classification: "isAdult",
+    displayQuestion: "displayAgeAdult",
+    displayText: "ADULT was 12 years old."
+  },
+  {
+    name: "40-year-old adult",
+    born: "1986-07-16",
+    ageInDays: 14611,
+    ageInYears: 40,
+    classification: "isAdult",
+    displayQuestion: "displayAgeAdult",
+    displayText: "ADULT was 40 years old."
+  },
+  {
+    name: "50-year-old adult",
+    born: "1976-07-16",
+    ageInDays: 18263,
+    ageInYears: 50,
+    classification: "isAdult",
+    displayQuestion: "displayAgeAdult",
+    displayText: "ADULT was 50 years old."
+  }
 ];
 
 async function fill(page: Page, question: string, value: string): Promise<void> {
@@ -104,7 +168,9 @@ test("required and constraint errors appear, then clear after correction", async
 
   await fill(page, "Id10010", "Browser E2E Interviewer");
   await fill(page, "Id10010a", "3");
-  await expect(page.getByTestId("question-card-Id10010a").getByRole("alert")).toContainText("Interviewer should be an adult");
+  await expect(page.getByTestId("question-card-Id10010a").getByRole("alert")).toContainText(
+    "Interviewer should be an adult"
+  );
 
   await fill(page, "Id10010a", "35");
   await expect(page.getByTestId("question-card-Id10010a").getByRole("alert")).toHaveCount(0);
@@ -117,7 +183,9 @@ test("required and constraint errors appear, then clear after correction", async
 });
 
 for (const scenario of ageScenarios) {
-  test(`${scenario.name}: fills the browser form and shows correct calculations`, async ({ page }, testInfo) => {
+  test(`${scenario.name}: fills the browser form and shows correct calculations`, async ({
+    page
+  }, testInfo) => {
     await openEnglishForm(page);
     await reachDeceasedScreen(page);
     await fillDeceasedScreen(page, scenario);
@@ -131,7 +199,9 @@ for (const scenario of ageScenarios) {
     expect(data.ageInDays).toBe(scenario.ageInDays);
     expect(data.ageInYears).toBe(scenario.ageInYears);
     expect(data[scenario.classification]).toBe("1");
-    for (const other of ["isNeonatal", "isChild", "isAdult"].filter((name) => name !== scenario.classification)) {
+    for (const other of ["isNeonatal", "isChild", "isAdult"].filter(
+      (name) => name !== scenario.classification
+    )) {
       expect(data[other]).toBe("0");
     }
 

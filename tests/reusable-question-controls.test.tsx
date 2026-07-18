@@ -4,7 +4,14 @@ import React from "react";
 import { createRoot } from "react-dom/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { AttachmentProcessingError, whoVa2022Instrument, type InstrumentQuestion } from "../src/index.js";
+import {
+  AttachmentProcessingError,
+  resolveUiMessages,
+  whoVa2022Instrument,
+  type InstrumentQuestion
+} from "../src/index.js";
+import frenchLanguage from "../src/languages/fr.js";
+import hindiLanguage from "../src/languages/hi.js";
 import { WhoVaQuestionControls } from "../src/web.js";
 
 const textQuestion: InstrumentQuestion = {
@@ -60,7 +67,9 @@ describe("reusable question controls", () => {
     );
     await new Promise((resolve) => setTimeout(resolve, 0));
 
-    expect(container.querySelector<HTMLInputElement>('[data-testid="question-standalone_text"]')?.value).toBe("Existing answer");
+    expect(container.querySelector<HTMLInputElement>('[data-testid="question-standalone_text"]')?.value).toBe(
+      "Existing answer"
+    );
     root.unmount();
   });
 
@@ -92,7 +101,13 @@ describe("reusable question controls", () => {
     const root = createRoot(container);
     root.render(
       <WhoVaQuestionControls.Image
-        question={{ ...textQuestion, name: "photo", sourceType: "image", dataType: "attachment", control: "image" }}
+        question={{
+          ...textQuestion,
+          name: "photo",
+          sourceType: "image",
+          dataType: "attachment",
+          control: "image"
+        }}
         value={{ uri: "data:image/png;base64,iVBORw0KGgo=", name: "certificate.png", mimeType: "image/png" }}
         data={{}}
         locale="en"
@@ -103,23 +118,107 @@ describe("reusable question controls", () => {
     await new Promise((resolve) => setTimeout(resolve, 0));
 
     expect(container.querySelector('[data-testid="question-photo-preview"]')).not.toBeNull();
-    for (const action of ["Camera", "Replace image", "Hide image", "Rotate", "Zoom in", "Zoom out", "Remove image"]) {
+    for (const action of [
+      "Camera",
+      "Replace image",
+      "Hide image",
+      "Rotate",
+      "Zoom in",
+      "Zoom out",
+      "Remove image"
+    ]) {
       expect(container.textContent).toContain(action);
     }
-    const action = (label: string) => Array.from(container.querySelectorAll<HTMLElement>('[role="button"]'))
-      .find((button) => button.textContent === label);
+    const action = (label: string) =>
+      Array.from(container.querySelectorAll<HTMLElement>('[role="button"]')).find(
+        (button) => button.textContent === label
+      );
     action("Rotate")?.click();
-    await vi.waitFor(() => expect(
-      container.querySelector<HTMLElement>('[data-testid="question-photo-preview"]')?.style.transform
-    ).toContain("rotate(90deg)"));
+    await vi.waitFor(() =>
+      expect(
+        container.querySelector<HTMLElement>('[data-testid="question-photo-preview"]')?.style.transform
+      ).toContain("rotate(90deg)")
+    );
     action("Zoom in")?.click();
-    await vi.waitFor(() => expect(
-      container.querySelector<HTMLElement>('[data-testid="question-photo-preview"]')?.style.transform
-    ).toContain("scale(1.25)"));
+    await vi.waitFor(() =>
+      expect(
+        container.querySelector<HTMLElement>('[data-testid="question-photo-preview"]')?.style.transform
+      ).toContain("scale(1.25)")
+    );
     action("Hide image")?.click();
-    await vi.waitFor(() => expect(container.querySelector('[data-testid="question-photo-preview"]')).toBeNull());
+    await vi.waitFor(() =>
+      expect(container.querySelector('[data-testid="question-photo-preview"]')).toBeNull()
+    );
     action("View image")?.click();
-    await vi.waitFor(() => expect(container.querySelector('[data-testid="question-photo-preview"]')).not.toBeNull());
+    await vi.waitFor(() =>
+      expect(container.querySelector('[data-testid="question-photo-preview"]')).not.toBeNull()
+    );
+    root.unmount();
+  });
+
+  it("localizes reusable audio, image, and file workflows", async () => {
+    const frenchMessages = resolveUiMessages("fr", { fr: frenchLanguage.ui });
+    const hindiMessages = resolveUiMessages("hi", { hi: hindiLanguage.ui });
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+    root.render(
+      <>
+        <WhoVaQuestionControls.Audio
+          question={{
+            ...textQuestion,
+            name: "audio",
+            sourceType: "audio",
+            dataType: "attachment",
+            control: "audio"
+          }}
+          value={undefined}
+          data={{}}
+          locale="fr"
+          messages={frenchMessages}
+          issues={[]}
+          onAnswer={vi.fn()}
+        />
+        <WhoVaQuestionControls.Image
+          question={{
+            ...textQuestion,
+            name: "photo",
+            sourceType: "image",
+            dataType: "attachment",
+            control: "image"
+          }}
+          value={{ uri: "data:image/png;base64,iVBORw0KGgo=", mimeType: "image/png" }}
+          data={{}}
+          locale="fr"
+          messages={frenchMessages}
+          issues={[]}
+          onAnswer={vi.fn()}
+        />
+        <WhoVaQuestionControls.File
+          question={{
+            ...textQuestion,
+            name: "document",
+            sourceType: "file",
+            dataType: "attachment",
+            control: "file"
+          }}
+          value={undefined}
+          data={{}}
+          locale="hi"
+          messages={hindiMessages}
+          issues={[]}
+          onAnswer={vi.fn()}
+        />
+      </>
+    );
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(container.textContent).toContain("Enregistrer un audio");
+    expect(container.textContent).toContain("Remplacer l’image");
+    expect(container.textContent).toContain("PDF चुनें");
+    expect(container.textContent).not.toContain("Record audio");
+    expect(container.textContent).not.toContain("Replace image");
+    expect(container.textContent).not.toContain("Choose PDF");
     root.unmount();
   });
 
@@ -169,7 +268,8 @@ describe("reusable question controls", () => {
     await new Promise((resolve) => setTimeout(resolve, 0));
 
     Array.from(container.querySelectorAll<HTMLElement>('[role="button"]'))
-      .find((button) => button.textContent === "Choose image")?.click();
+      .find((button) => button.textContent === "Choose image")
+      ?.click();
 
     await vi.waitFor(() => expect(onAnswer).toHaveBeenCalledWith(processedJpg));
     expect(selectImage).toHaveBeenCalledWith(question, data);
@@ -189,23 +289,35 @@ describe("reusable question controls", () => {
     const root = createRoot(container);
     root.render(
       <WhoVaQuestionControls.Image
-        question={{ ...textQuestion, name: "photo", sourceType: "image", dataType: "attachment", control: "image" }}
+        question={{
+          ...textQuestion,
+          name: "photo",
+          sourceType: "image",
+          dataType: "attachment",
+          control: "image"
+        }}
         value={undefined}
         data={{}}
         locale="en"
         issues={[]}
-        platform={{ selectImage: vi.fn().mockRejectedValue(new AttachmentProcessingError("image-type-not-allowed")) }}
+        platform={{
+          selectImage: vi.fn().mockRejectedValue(new AttachmentProcessingError("image-type-not-allowed"))
+        }}
         onAnswer={onAnswer}
       />
     );
     await new Promise((resolve) => setTimeout(resolve, 0));
 
-    const chooseImage = Array.from(container.querySelectorAll<HTMLElement>('[role="button"]'))
-      .find((button) => button.textContent === "Choose image");
+    const chooseImage = Array.from(container.querySelectorAll<HTMLElement>('[role="button"]')).find(
+      (button) => button.textContent === "Choose image"
+    );
     chooseImage?.click();
 
-    await vi.waitFor(() => expect(container.querySelector('[role="alert"]')?.textContent)
-      .toContain("Choose a valid JPEG or PNG image"));
+    await vi.waitFor(() =>
+      expect(container.querySelector('[role="alert"]')?.textContent).toContain(
+        "Choose a valid JPEG or PNG image"
+      )
+    );
     expect(onAnswer).not.toHaveBeenCalled();
     root.unmount();
   });
@@ -217,22 +329,34 @@ describe("reusable question controls", () => {
     const root = createRoot(container);
     root.render(
       <WhoVaQuestionControls.Image
-        question={{ ...textQuestion, name: "photo", sourceType: "image", dataType: "attachment", control: "image" }}
+        question={{
+          ...textQuestion,
+          name: "photo",
+          sourceType: "image",
+          dataType: "attachment",
+          control: "image"
+        }}
         value={undefined}
         data={{}}
         locale="en"
         issues={[]}
-        platform={{ selectImage: vi.fn().mockResolvedValue({ uri: "file:///camera/raw.heic", name: "raw.heic" }) }}
+        platform={{
+          selectImage: vi.fn().mockResolvedValue({ uri: "file:///camera/raw.heic", name: "raw.heic" })
+        }}
         onAnswer={onAnswer}
       />
     );
     await new Promise((resolve) => setTimeout(resolve, 0));
 
     Array.from(container.querySelectorAll<HTMLElement>('[role="button"]'))
-      .find((button) => button.textContent === "Choose image")?.click();
+      .find((button) => button.textContent === "Choose image")
+      ?.click();
 
-    await vi.waitFor(() => expect(container.querySelector('[role="alert"]')?.textContent)
-      .toContain("Image processing is unavailable"));
+    await vi.waitFor(() =>
+      expect(container.querySelector('[role="alert"]')?.textContent).toContain(
+        "Image processing is unavailable"
+      )
+    );
     expect(onAnswer).not.toHaveBeenCalled();
     root.unmount();
   });
@@ -282,8 +406,9 @@ describe("reusable question controls", () => {
     );
     await new Promise((resolve) => setTimeout(resolve, 0));
 
-    const choosePdf = Array.from(container.querySelectorAll<HTMLElement>('[role="button"]'))
-      .find((button) => button.textContent === "Choose PDF");
+    const choosePdf = Array.from(container.querySelectorAll<HTMLElement>('[role="button"]')).find(
+      (button) => button.textContent === "Choose PDF"
+    );
     choosePdf?.click();
     await vi.waitFor(() => expect(onAnswer).toHaveBeenCalledWith(processedPdf));
     expect(selectFile).toHaveBeenCalledWith(question, data, ["application/pdf"]);
@@ -294,7 +419,12 @@ describe("reusable question controls", () => {
   it.each([
     {
       kind: "JPG",
-      raw: { uri: "file:///picker/certificate.jpg", name: "certificate.jpg", mimeType: "image/jpeg", size: 120_000 },
+      raw: {
+        uri: "file:///picker/certificate.jpg",
+        name: "certificate.jpg",
+        mimeType: "image/jpeg",
+        size: 120_000
+      },
       processed: {
         id: "certificate-image",
         uri: "who-va-attachment:certificate-image",
@@ -310,7 +440,12 @@ describe("reusable question controls", () => {
     },
     {
       kind: "PDF",
-      raw: { uri: "file:///picker/certificate.pdf", name: "certificate.pdf", mimeType: "application/pdf", size: 120_000 },
+      raw: {
+        uri: "file:///picker/certificate.pdf",
+        name: "certificate.pdf",
+        mimeType: "application/pdf",
+        size: 120_000
+      },
       processed: {
         uri: "who-va-pdf-pages:certificate",
         name: "certificate-pages",
@@ -325,7 +460,9 @@ describe("reusable question controls", () => {
       processor: "pdf"
     }
   ])("accepts and processes a $kind medical-certificate upload", async ({ raw, processed, processor }) => {
-    const question = whoVa2022Instrument.questions.find((candidate) => candidate.name === "custom_medical_certificate_upload");
+    const question = whoVa2022Instrument.questions.find(
+      (candidate) => candidate.name === "custom_medical_certificate_upload"
+    );
     expect(question).toBeDefined();
     const selectFile = vi.fn().mockResolvedValue(raw);
     const processImage = vi.fn().mockResolvedValue(processed);
@@ -347,14 +484,12 @@ describe("reusable question controls", () => {
     );
     await new Promise((resolve) => setTimeout(resolve, 0));
 
-    container.querySelector<HTMLElement>('[data-testid="question-custom_medical_certificate_upload"]')?.click();
+    container
+      .querySelector<HTMLElement>('[data-testid="question-custom_medical_certificate_upload"]')
+      ?.click();
 
     await vi.waitFor(() => expect(onAnswer).toHaveBeenCalledWith(processed));
-    expect(selectFile).toHaveBeenCalledWith(
-      question,
-      {},
-      ["image/jpeg", "image/png", "application/pdf"]
-    );
+    expect(selectFile).toHaveBeenCalledWith(question, {}, ["image/jpeg", "image/png", "application/pdf"]);
     if (processor === "image") {
       expect(processImage).toHaveBeenCalledWith(raw, expect.anything(), question, {});
       expect(processPdf).not.toHaveBeenCalled();

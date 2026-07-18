@@ -53,7 +53,7 @@ export async function processNativeImageAttachment(
   options: ProcessNativeImageAttachmentOptions = {}
 ): Promise<NativeProcessedImageReference> {
   const policy = options.policy ?? WHO_VA_ATTACHMENT_POLICY.image;
-  if (await adapter.getSize(selection.uri) > policy.maxInputBytes) {
+  if ((await adapter.getSize(selection.uri)) > policy.maxInputBytes) {
     throw new AttachmentProcessingError("image-input-too-large");
   }
 
@@ -72,15 +72,19 @@ export async function processNativeImageAttachment(
     };
     const processed = adapter.inspect
       ? await processInspectedImageAttachment(
-        selection.name,
-        await adapter.inspect(selection.uri),
-        transcoder,
-        processingOptions
-      )
-      : await processImageAttachment({
-        name: selection.name,
-        bytes: await adapter.read(selection.uri)
-      }, transcoder, processingOptions);
+          selection.name,
+          await adapter.inspect(selection.uri),
+          transcoder,
+          processingOptions
+        )
+      : await processImageAttachment(
+          {
+            name: selection.name,
+            bytes: await adapter.read(selection.uri)
+          },
+          transcoder,
+          processingOptions
+        );
     if (!temporaryUri) throw new AttachmentProcessingError("image-output-invalid");
 
     let durableUri: string;

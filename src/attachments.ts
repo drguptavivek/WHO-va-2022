@@ -65,9 +65,11 @@ export type AttachmentProcessingErrorCode =
 
 const ERROR_MESSAGES: Record<AttachmentProcessingErrorCode, string> = {
   "image-input-too-large": "Choose an image smaller than 10 MB.",
-  "image-type-not-allowed": "Choose a valid JPEG or PNG image. Renamed and unsupported files are not accepted.",
+  "image-type-not-allowed":
+    "Choose a valid JPEG or PNG image. Renamed and unsupported files are not accepted.",
   "image-dimensions-invalid": "This image has invalid dimensions and cannot be used.",
-  "image-dimensions-too-large": "This image has too many pixels. Choose a smaller image or retake the photograph.",
+  "image-dimensions-too-large":
+    "This image has too many pixels. Choose a smaller image or retake the photograph.",
   "image-decode-failed": "This file could not be decoded as a safe image.",
   "image-output-invalid": "The processed image could not be verified as a JPEG.",
   "image-output-too-large": "This image could not be reduced below 2 MB. Retake it at a lower resolution.",
@@ -128,7 +130,10 @@ export interface ProcessedImageAttachment {
   bytes: Uint8Array;
 }
 
-export function isProcessedImageAttachment(value: unknown, policy: ImageAttachmentPolicy = WHO_VA_ATTACHMENT_POLICY.image): value is Record<string, unknown> & {
+export function isProcessedImageAttachment(
+  value: unknown,
+  policy: ImageAttachmentPolicy = WHO_VA_ATTACHMENT_POLICY.image
+): value is Record<string, unknown> & {
   uri: string;
   name: string;
   mimeType: "image/jpeg";
@@ -137,14 +142,16 @@ export function isProcessedImageAttachment(value: unknown, policy: ImageAttachme
 } {
   if (value == null || Array.isArray(value) || typeof value !== "object") return false;
   const candidate = value as Record<string, unknown>;
-  return candidate.processed === true
-    && candidate.mimeType === "image/jpeg"
-    && typeof candidate.uri === "string"
-    && typeof candidate.name === "string"
-    && candidate.name.toLowerCase().endsWith(".jpg")
-    && typeof candidate.size === "number"
-    && candidate.size > 0
-    && candidate.size <= policy.maxOutputBytes;
+  return (
+    candidate.processed === true &&
+    candidate.mimeType === "image/jpeg" &&
+    typeof candidate.uri === "string" &&
+    typeof candidate.name === "string" &&
+    candidate.name.toLowerCase().endsWith(".jpg") &&
+    typeof candidate.size === "number" &&
+    candidate.size > 0 &&
+    candidate.size <= policy.maxOutputBytes
+  );
 }
 
 export interface ProcessImageAttachmentOptions {
@@ -245,7 +252,10 @@ export interface ProcessedPdfAttachment {
   pages: ProcessedPdfPage[];
 }
 
-export function isProcessedPdfAttachment(value: unknown, policy: PdfAttachmentPolicy = WHO_VA_ATTACHMENT_POLICY.pdf): value is Record<string, unknown> & {
+export function isProcessedPdfAttachment(
+  value: unknown,
+  policy: PdfAttachmentPolicy = WHO_VA_ATTACHMENT_POLICY.pdf
+): value is Record<string, unknown> & {
   uri: string;
   mimeType: "application/vnd.who-va.pdf-pages+json";
   pageCount: number;
@@ -256,18 +266,20 @@ export function isProcessedPdfAttachment(value: unknown, policy: PdfAttachmentPo
 } {
   if (value == null || Array.isArray(value) || typeof value !== "object") return false;
   const candidate = value as Record<string, unknown>;
-  return candidate.processed === true
-    && candidate.originalRetained === false
-    && candidate.mimeType === "application/vnd.who-va.pdf-pages+json"
-    && typeof candidate.uri === "string"
-    && typeof candidate.pageCount === "number"
-    && candidate.pageCount > 0
-    && candidate.pageCount <= policy.maxPages
-    && Array.isArray(candidate.pages)
-    && candidate.pages.length === candidate.pageCount
-    && typeof candidate.size === "number"
-    && candidate.size > 0
-    && candidate.size <= policy.maxOutputBytes;
+  return (
+    candidate.processed === true &&
+    candidate.originalRetained === false &&
+    candidate.mimeType === "application/vnd.who-va.pdf-pages+json" &&
+    typeof candidate.uri === "string" &&
+    typeof candidate.pageCount === "number" &&
+    candidate.pageCount > 0 &&
+    candidate.pageCount <= policy.maxPages &&
+    Array.isArray(candidate.pages) &&
+    candidate.pages.length === candidate.pageCount &&
+    typeof candidate.size === "number" &&
+    candidate.size > 0 &&
+    candidate.size <= policy.maxOutputBytes
+  );
 }
 
 export interface ProcessPdfAttachmentOptions {
@@ -281,7 +293,9 @@ function uint16(bytes: Uint8Array, offset: number): number {
 
 function inspectJpeg(bytes: Uint8Array): InspectedRasterImage | undefined {
   if (bytes[0] !== 0xff || bytes[1] !== 0xd8 || bytes[2] !== 0xff) return undefined;
-  const startOfFrameMarkers = new Set([0xc0, 0xc1, 0xc2, 0xc3, 0xc5, 0xc6, 0xc7, 0xc9, 0xca, 0xcb, 0xcd, 0xce, 0xcf]);
+  const startOfFrameMarkers = new Set([
+    0xc0, 0xc1, 0xc2, 0xc3, 0xc5, 0xc6, 0xc7, 0xc9, 0xca, 0xcb, 0xcd, 0xce, 0xcf
+  ]);
   let offset = 2;
   while (offset + 8 < bytes.length) {
     if (bytes[offset] !== 0xff) {
@@ -317,7 +331,8 @@ function inspectPng(bytes: Uint8Array): InspectedRasterImage | undefined {
 export function inspectRasterImage(bytes: Uint8Array, _filename?: string): InspectedRasterImage {
   const inspected = inspectPng(bytes) ?? inspectJpeg(bytes);
   if (!inspected) throw new AttachmentProcessingError("image-type-not-allowed");
-  if (inspected.width <= 0 || inspected.height <= 0) throw new AttachmentProcessingError("image-dimensions-invalid");
+  if (inspected.width <= 0 || inspected.height <= 0)
+    throw new AttachmentProcessingError("image-dimensions-invalid");
   return inspected;
 }
 
@@ -331,10 +346,11 @@ function targetDimensions(width: number, height: number, maximum: number): { wid
 
 function validateInputDimensions(image: InspectedRasterImage, policy: ImageAttachmentPolicy) {
   if (
-    image.width > policy.maxInputWidthOrHeight
-    || image.height > policy.maxInputWidthOrHeight
-    || image.width * image.height > policy.maxPixels
-  ) throw new AttachmentProcessingError("image-dimensions-too-large");
+    image.width > policy.maxInputWidthOrHeight ||
+    image.height > policy.maxInputWidthOrHeight ||
+    image.width * image.height > policy.maxPixels
+  )
+    throw new AttachmentProcessingError("image-dimensions-too-large");
 }
 
 export async function processImageAttachment(
@@ -343,7 +359,8 @@ export async function processImageAttachment(
   options: ProcessImageAttachmentOptions = {}
 ): Promise<ProcessedImageAttachment> {
   const policy = options.policy ?? WHO_VA_ATTACHMENT_POLICY.image;
-  if (selection.bytes.byteLength > policy.maxInputBytes) throw new AttachmentProcessingError("image-input-too-large");
+  if (selection.bytes.byteLength > policy.maxInputBytes)
+    throw new AttachmentProcessingError("image-input-too-large");
 
   const inspected = inspectRasterImage(selection.bytes, selection.name);
   return encodeInspectedImage(selection.name, inspected, transcoder, selection.bytes, options);
@@ -353,12 +370,13 @@ function hasPdfSignature(bytes: Uint8Array): boolean {
   const limit = Math.min(bytes.byteLength - 4, 1024);
   for (let offset = 0; offset <= limit; offset += 1) {
     if (
-      bytes[offset] === 0x25
-      && bytes[offset + 1] === 0x50
-      && bytes[offset + 2] === 0x44
-      && bytes[offset + 3] === 0x46
-      && bytes[offset + 4] === 0x2d
-    ) return true;
+      bytes[offset] === 0x25 &&
+      bytes[offset + 1] === 0x50 &&
+      bytes[offset + 2] === 0x44 &&
+      bytes[offset + 3] === 0x46 &&
+      bytes[offset + 4] === 0x2d
+    )
+      return true;
   }
   return false;
 }
@@ -369,7 +387,8 @@ export async function processPdfAttachment(
   options: ProcessPdfAttachmentOptions = {}
 ): Promise<ProcessedPdfAttachment> {
   const policy = options.policy ?? WHO_VA_ATTACHMENT_POLICY.pdf;
-  if (selection.bytes.byteLength > policy.maxInputBytes) throw new AttachmentProcessingError("pdf-input-too-large");
+  if (selection.bytes.byteLength > policy.maxInputBytes)
+    throw new AttachmentProcessingError("pdf-input-too-large");
   if (!hasPdfSignature(selection.bytes)) throw new AttachmentProcessingError("pdf-type-not-allowed");
 
   let renderedPages: RasterizedPdfPage[];
@@ -397,11 +416,12 @@ export async function processPdfAttachment(
       throw new AttachmentProcessingError("pdf-render-failed", error);
     }
     if (
-      inspected.mimeType !== "image/jpeg"
-      || inspected.width !== page.width
-      || inspected.height !== page.height
-      || Math.max(inspected.width, inspected.height) > policy.maxPageWidthOrHeight
-    ) throw new AttachmentProcessingError("pdf-render-failed");
+      inspected.mimeType !== "image/jpeg" ||
+      inspected.width !== page.width ||
+      inspected.height !== page.height ||
+      Math.max(inspected.width, inspected.height) > policy.maxPageWidthOrHeight
+    )
+      throw new AttachmentProcessingError("pdf-render-failed");
     totalSize += page.bytes.byteLength;
     return {
       id: `${id}-page-${String(index + 1).padStart(3, "0")}`,

@@ -16,10 +16,12 @@ describe("WHO VA expression semantics", () => {
     [". <= today()", {}, "2026-07-17", true],
     ["if(true, 1, null)", {}, undefined, 1]
   ])("evaluates %s", (source, data, currentValue, expected) => {
-    expect(evaluateExpression(parseExpression(source as string), data, {
-      currentValue,
-      now: new Date("2026-07-17T10:30:00.000Z")
-    })).toEqual(expected);
+    expect(
+      evaluateExpression(parseExpression(source as string), data, {
+        currentValue,
+        now: new Date("2026-07-17T10:30:00.000Z")
+      })
+    ).toEqual(expected);
   });
 
   it("can evaluate every compiled calculation, relevance, and constraint AST", () => {
@@ -27,16 +29,20 @@ describe("WHO VA expression semantics", () => {
       ...whoVa2022Instrument.questions.flatMap((question) =>
         [question.calculation, question.relevant, question.constraint].filter((value) => value != null)
       ),
-      ...whoVa2022Instrument.sections.flatMap((section) => section.relevant ? [section.relevant] : [])
+      ...whoVa2022Instrument.sections.flatMap((section) => (section.relevant ? [section.relevant] : []))
     ];
 
     expect(expressions).toHaveLength(463);
     for (const expression of expressions) {
-      expect(() => evaluateExpression(
-        expression.ast ?? parseExpression(expression.source),
-        {},
-        { currentValue: undefined, now: new Date("2026-07-17T10:30:00.000Z") }
-      ), expression.source).not.toThrow();
+      expect(
+        () =>
+          evaluateExpression(
+            expression.ast ?? parseExpression(expression.source),
+            {},
+            { currentValue: undefined, now: new Date("2026-07-17T10:30:00.000Z") }
+          ),
+        expression.source
+      ).not.toThrow();
     }
   });
 });

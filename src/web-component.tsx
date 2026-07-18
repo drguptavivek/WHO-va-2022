@@ -9,15 +9,18 @@ import { createDraftId } from "./draft.js";
 import { createWhoVaSession } from "./engine/session.js";
 import { whoVa2022Instrument } from "./instrument.js";
 import { loadWhoVa2022Language } from "./instrument-loader.js";
-import type { SubmissionData, SubmissionValidationResult, WhoVaSession } from "./types.js";
+import type { SubmissionData, SubmissionValidationResult, WhoVaDraftStore, WhoVaSession } from "./types.js";
 import { WhoVaForm } from "./web.js";
 
 export class WhoVaFormElement extends HTMLElement {
-  static get observedAttributes() { return ["locale", "show-guidance"]; }
+  static get observedAttributes() {
+    return ["locale", "show-guidance"];
+  }
 
   private root: Root | undefined;
   private readonly session: WhoVaSession;
   private readonly generatedDraftId = createDraftId();
+  private configuredDraftStore: WhoVaDraftStore | undefined;
   private renderVersion = 0;
 
   constructor() {
@@ -58,6 +61,20 @@ export class WhoVaFormElement extends HTMLElement {
     return this.getAttribute("draft-id") ?? this.generatedDraftId;
   }
 
+  /**
+   * Host-provided durable storage. Assign this property before connecting the
+   * element to avoid ever using the unencrypted localStorage default.
+   */
+  get draftStore(): WhoVaDraftStore | undefined {
+    return this.configuredDraftStore;
+  }
+
+  set draftStore(store: WhoVaDraftStore | undefined) {
+    if (store === this.configuredDraftStore) return;
+    this.configuredDraftStore = store;
+    if (this.isConnected) void this.renderForm();
+  }
+
   private async renderForm(): Promise<void> {
     const renderVersion = ++this.renderVersion;
     const requestedLocale = this.getAttribute("locale") ?? "en";
@@ -71,14 +88,25 @@ export class WhoVaFormElement extends HTMLElement {
         instrument={language.instrument}
         session={this.session}
         draftId={this.getDraftId()}
+        {...(this.configuredDraftStore ? { draftStore: this.configuredDraftStore } : {})}
         locale={language.locale}
         uiTranslations={language.uiTranslations}
         showSourceGuidance={this.hasAttribute("show-guidance")}
-        onChange={(data) => this.dispatchEvent(new CustomEvent("who-va-change", { detail: data, bubbles: true }))}
-        onValidation={(issues) => this.dispatchEvent(new CustomEvent("who-va-validation", { detail: issues, bubbles: true }))}
-        onDraftSaved={(draft) => this.dispatchEvent(new CustomEvent("who-va-draft-saved", { detail: draft, bubbles: true }))}
-        onDraftError={(error) => this.dispatchEvent(new CustomEvent("who-va-draft-error", { detail: error, bubbles: true }))}
-        onComplete={(result) => this.dispatchEvent(new CustomEvent("who-va-complete", { detail: result, bubbles: true }))}
+        onChange={(data) =>
+          this.dispatchEvent(new CustomEvent("who-va-change", { detail: data, bubbles: true }))
+        }
+        onValidation={(issues) =>
+          this.dispatchEvent(new CustomEvent("who-va-validation", { detail: issues, bubbles: true }))
+        }
+        onDraftSaved={(draft) =>
+          this.dispatchEvent(new CustomEvent("who-va-draft-saved", { detail: draft, bubbles: true }))
+        }
+        onDraftError={(error) =>
+          this.dispatchEvent(new CustomEvent("who-va-draft-error", { detail: error, bubbles: true }))
+        }
+        onComplete={(result) =>
+          this.dispatchEvent(new CustomEvent("who-va-complete", { detail: result, bubbles: true }))
+        }
       />
     );
   }

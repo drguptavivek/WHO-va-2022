@@ -5,7 +5,8 @@ import {
   isQuestionRelevant,
   validateAnswer,
   validateSubmission,
-  whoVa2022Instrument
+  whoVa2022Instrument,
+  type AnswerValue
 } from "../src/index.js";
 
 describe("shared field and submission validation", () => {
@@ -37,7 +38,8 @@ describe("shared field and submission validation", () => {
 
   it("enforces the complete labour-duration coding rule for Id10382", () => {
     const question = getQuestion(whoVa2022Instrument, "Id10382");
-    const expectedMessage = "Enter a whole number of hours from 0 to 98. Use 0 for less than 1 hour; use 23 or 25 when only the less-than or more-than-24-hour estimate is known; use 88 for refused; and use 99 for don't know. If the actual duration was 88 hours, enter 87.";
+    const expectedMessage =
+      "Enter a whole number of hours from 0 to 98. Use 0 for less than 1 hour; use 23 or 25 when only the less-than or more-than-24-hour estimate is known; use 88 for refused; and use 99 for don't know. If the actual duration was 88 hours, enter 87.";
 
     expect(validateAnswer(question, -1, {})).toEqual([
       expect.objectContaining({ question: "Id10382", code: "constraint", message: expectedMessage })
@@ -64,19 +66,94 @@ describe("shared field and submission validation", () => {
     ]);
   });
 
+  it.each(["2026-02-29", "2026-02-30", "2026-04-31", "2026-13-01"])(
+    "rejects the impossible ISO date %s at the public validation boundary",
+    (value) => {
+      const question = getQuestion(whoVa2022Instrument, "Id10021");
+      expect(validateAnswer(question, value, { Id10021: value })).toEqual([
+        expect.objectContaining({ question: "Id10021", code: "type" })
+      ]);
+    }
+  );
+
+  it("accepts a valid leap day at the public validation boundary", () => {
+    const question = getQuestion(whoVa2022Instrument, "Id10021");
+    expect(validateAnswer(question, "2024-02-29", { Id10021: "2024-02-29" })).toEqual([]);
+  });
+
+  it.each([{}, { name: "orphaned.jpg" }, { uri: "" }, { uri: "   " }])(
+    "rejects the malformed attachment answer %j",
+    (value) => {
+      const question = {
+        ...getQuestion(whoVa2022Instrument, "Id10010"),
+        name: "attachment",
+        control: "file" as const,
+        dataType: "attachment" as const
+      };
+
+      expect(validateAnswer(question, value as AnswerValue, {})).toEqual([
+        expect.objectContaining({ question: "attachment", code: "type" })
+      ]);
+    }
+  );
+
+  it("accepts an attachment object with a non-empty locator", () => {
+    const question = {
+      ...getQuestion(whoVa2022Instrument, "Id10010"),
+      name: "attachment",
+      control: "file" as const,
+      dataType: "attachment" as const
+    };
+
+    expect(validateAnswer(question, { uri: "who-va-attachment:stored-id" }, {})).toEqual([]);
+  });
+
+  it.each([{}, { startedAt: "" }, { startedAt: "not-a-timestamp" }, { startedAt: "0" }])(
+    "rejects the malformed audit answer %j",
+    (value) => {
+      const question = {
+        ...getQuestion(whoVa2022Instrument, "Id10010"),
+        name: "audit",
+        sourceType: "audit",
+        control: "system" as const,
+        dataType: "audit" as const
+      };
+
+      expect(validateAnswer(question, value as AnswerValue, {})).toEqual([
+        expect.objectContaining({ question: "audit", code: "type" })
+      ]);
+    }
+  );
+
+  it("accepts a timestamped audit record through the system-control boundary", () => {
+    const question = {
+      ...getQuestion(whoVa2022Instrument, "Id10010"),
+      name: "audit",
+      sourceType: "audit",
+      control: "system" as const,
+      dataType: "audit" as const
+    };
+
+    expect(validateAnswer(question, { startedAt: "2026-07-18T12:00:00.000Z" }, {})).toEqual([]);
+  });
+
   it("accepts a baby reported as neither under 2.5 kg nor over 4.5 kg", () => {
     const question = getQuestion(whoVa2022Instrument, "Id10365");
     const data = { Id10363: "no", Id10365: "no" };
 
     expect(validateAnswer(question, "no", data)).toEqual([]);
-    expect(validateSubmission(
-      { ...whoVa2022Instrument, sections: [], questions: [{ ...question, sectionPath: [] }] },
-      data
-    )).toMatchObject({ valid: true, issues: [] });
+    expect(
+      validateSubmission(
+        { ...whoVa2022Instrument, sections: [], questions: [{ ...question, sectionPath: [] }] },
+        data
+      )
+    ).toMatchObject({ valid: true, issues: [] });
   });
 
   it("does not require a question when its relevance path is false", () => {
     const result = validateSubmission(whoVa2022Instrument, { Id10013: "no" });
-    expect(result.issues.some((issue) => issue.question === "Id10019" && issue.code === "required")).toBe(false);
+    expect(result.issues.some((issue) => issue.question === "Id10019" && issue.code === "required")).toBe(
+      false
+    );
   });
 });

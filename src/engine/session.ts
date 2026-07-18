@@ -7,6 +7,7 @@ import {
   applyCalculations,
   getQuestion,
   isQuestionRelevantWithCalculatedData,
+  isSectionRelevantWithCalculatedData,
   validateAnswer,
   validateSubmission
 } from "./validation.js";
@@ -26,14 +27,19 @@ import type {
 } from "../types.js";
 import { resolveUiMessages, type WhoVaUiMessages, type WhoVaUiTranslations } from "../i18n.js";
 
-function directQuestions(instrument: InstrumentDefinition, section: InstrumentSection): readonly InstrumentQuestion[] {
+function directQuestions(
+  instrument: InstrumentDefinition,
+  section: InstrumentSection
+): readonly InstrumentQuestion[] {
   return getInstrumentRuntimeIndex(instrument).questionsBySection.get(section.name) ?? [];
 }
 
-function sectionIsRelevant(instrument: InstrumentDefinition, section: InstrumentSection, data: SubmissionData): boolean {
-  const sample = directQuestions(instrument, section)[0];
-  if (sample) return isQuestionRelevantWithCalculatedData(instrument, sample, data);
-  return false;
+function sectionIsRelevant(
+  instrument: InstrumentDefinition,
+  section: InstrumentSection,
+  data: SubmissionData
+): boolean {
+  return isSectionRelevantWithCalculatedData(instrument, section, data);
 }
 
 function blocksDraftMutation(issue: ValidationIssue): boolean {
@@ -49,16 +55,22 @@ class UniversalWhoVaSession implements WhoVaSession {
   private locale: string;
   private messages: WhoVaUiMessages;
 
-  constructor(private instrument: InstrumentDefinition, options: WhoVaSessionOptions = {}) {
+  constructor(
+    private instrument: InstrumentDefinition,
+    options: WhoVaSessionOptions = {}
+  ) {
     this.now = options.now ?? (() => new Date());
     this.locale = options.locale ?? "en";
     this.messages = resolveUiMessages(this.locale, options.uiTranslations);
     const startedAt = this.now();
     this.data = { ...(options.initialData ?? {}) };
     for (const question of instrument.questions) {
-      if (question.sourceType === "today" && this.data[question.name] == null) this.data[question.name] = formatLocalDate(startedAt);
-      if (question.sourceType === "start" && this.data[question.name] == null) this.data[question.name] = startedAt.toISOString();
-      if (question.sourceType === "audit" && options.audit && this.data[question.name] == null) this.data[question.name] = options.audit;
+      if (question.sourceType === "today" && this.data[question.name] == null)
+        this.data[question.name] = formatLocalDate(startedAt);
+      if (question.sourceType === "start" && this.data[question.name] == null)
+        this.data[question.name] = startedAt.toISOString();
+      if (question.sourceType === "audit" && options.audit && this.data[question.name] == null)
+        this.data[question.name] = options.audit;
     }
     this.data = applyCalculations(instrument, this.data);
     const first = this.visibleSections()[0];
@@ -71,7 +83,11 @@ class UniversalWhoVaSession implements WhoVaSession {
 
   private visibleSections(): InstrumentSection[] {
     return this.instrument.sections
-      .filter((section) => directQuestions(this.instrument, section).length > 0 && sectionIsRelevant(this.instrument, section, this.data))
+      .filter(
+        (section) =>
+          directQuestions(this.instrument, section).length > 0 &&
+          sectionIsRelevant(this.instrument, section, this.data)
+      )
       .sort((left, right) => {
         const leftOrder = directQuestions(this.instrument, left)[0]?.order ?? left.order;
         const rightOrder = directQuestions(this.instrument, right)[0]?.order ?? right.order;
@@ -80,13 +96,18 @@ class UniversalWhoVaSession implements WhoVaSession {
   }
 
   private currentSection(visible = this.visibleSections()): InstrumentSection {
-    return visible.find((section) => section.name === this.currentSectionName) ?? visible[0] ?? this.instrument.sections[0] as InstrumentSection;
+    return (
+      visible.find((section) => section.name === this.currentSectionName) ??
+      visible[0] ??
+      (this.instrument.sections[0] as InstrumentSection)
+    );
   }
 
   private currentQuestions(section = this.currentSection()): InstrumentQuestion[] {
     return directQuestions(this.instrument, section).filter(
-      (question) => !["calculated", "system"].includes(question.control)
-        && isQuestionRelevantWithCalculatedData(this.instrument, question, this.data)
+      (question) =>
+        !["calculated", "system"].includes(question.control) &&
+        isQuestionRelevantWithCalculatedData(this.instrument, question, this.data)
     );
   }
 
@@ -98,7 +119,10 @@ class UniversalWhoVaSession implements WhoVaSession {
   getSnapshot(): SessionSnapshot {
     const sections = this.visibleSections();
     const currentSection = this.currentSection(sections);
-    const index = Math.max(0, sections.findIndex((section) => section.name === currentSection.name));
+    const index = Math.max(
+      0,
+      sections.findIndex((section) => section.name === currentSection.name)
+    );
     return {
       data: { ...this.data },
       currentSection,
@@ -134,10 +158,7 @@ class UniversalWhoVaSession implements WhoVaSession {
     const blocking = fieldIssues.filter(blocksDraftMutation);
     if (blocking.length) throw new Error(blocking[0]?.message ?? `${name} is invalid`);
     this.data = calculatedNextData;
-    this.issues = [
-      ...this.issues.filter((issue) => issue.question !== name),
-      ...fieldIssues
-    ];
+    this.issues = [...this.issues.filter((issue) => issue.question !== name), ...fieldIssues];
     this.notify();
   }
 
@@ -150,7 +171,13 @@ class UniversalWhoVaSession implements WhoVaSession {
     for (const [name, value] of Object.entries(data)) {
       const question = getQuestion(this.instrument, name);
       if (["calculated", "system"].includes(question.control)) continue;
-      const errors = validateAnswer(question, value, { ...replacement, [name]: value }, this.locale, this.messages).filter(blocksDraftMutation);
+      const errors = validateAnswer(
+        question,
+        value,
+        { ...replacement, [name]: value },
+        this.locale,
+        this.messages
+      ).filter(blocksDraftMutation);
       if (errors.length) throw new Error(errors[0]?.message ?? `${name} is invalid`);
       replacement[name] = value;
     }
@@ -179,7 +206,9 @@ class UniversalWhoVaSession implements WhoVaSession {
   next(): SessionNavigationResult {
     const sections = this.visibleSections();
     const currentSection = this.currentSection(sections);
-    const currentIssues = this.currentQuestions(currentSection).flatMap((question) => validateAnswer(question, this.data[question.name], this.data, this.locale, this.messages));
+    const currentIssues = this.currentQuestions(currentSection).flatMap((question) =>
+      validateAnswer(question, this.data[question.name], this.data, this.locale, this.messages)
+    );
     this.issues = currentIssues;
     if (currentIssues.length) {
       this.notify();
@@ -214,7 +243,8 @@ class UniversalWhoVaSession implements WhoVaSession {
 
   complete(): SubmissionValidationResult {
     const completedAt = this.now().toISOString();
-    for (const question of this.instrument.questions) if (question.sourceType === "end") this.data[question.name] = completedAt;
+    for (const question of this.instrument.questions)
+      if (question.sourceType === "end") this.data[question.name] = completedAt;
     const result = validateSubmission(this.instrument, this.data, this.locale, this.messages);
     this.data = result.data;
     this.issues = result.issues;

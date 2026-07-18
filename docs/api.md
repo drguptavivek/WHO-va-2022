@@ -4,12 +4,12 @@ This is a practical guide to the public package surface. TypeScript declarations
 
 ## Entry points
 
-| Import | Use it for |
-| --- | --- |
-| `@drguptavivek/who-2022-va` | Instrument data, sessions, expressions, validation, drafts, localization, and platform-neutral attachments |
-| `@drguptavivek/who-2022-va/native` | Expo/React Native form, controls, and native attachment processing |
-| `@drguptavivek/who-2022-va/web` | React web form, controls, and browser attachment persistence |
-| `@drguptavivek/who-2022-va/web-component` | Custom element plus all web exports |
+| Import                                    | Use it for                                                                                                 |
+| ----------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| `@drguptavivek/who-2022-va`               | Instrument data, sessions, expressions, validation, drafts, localization, and platform-neutral attachments |
+| `@drguptavivek/who-2022-va/native`        | Expo/React Native form, controls, and native attachment processing                                         |
+| `@drguptavivek/who-2022-va/web`           | React web form, controls, and browser attachment persistence                                               |
+| `@drguptavivek/who-2022-va/web-component` | Custom element plus all web exports                                                                        |
 
 ## Instrument loading
 
@@ -39,17 +39,17 @@ const result = session.complete();
 
 The session exposes:
 
-| Method | Result |
-| --- | --- |
-| `getSnapshot()` | Current normalized data, visible section, questions, issues, and navigation flags |
-| `setAnswer(name, value)` | Validate and apply one answer, then recompute derived values |
-| `replaceData(data)` | Replace session answers as a unit |
-| `setInstrument(instrument)` | Switch to another compatible instrument, such as a translated instance |
-| `goToSection(name)` | Navigate to a visible section by name |
-| `setLocale(locale, translations?)` | Change display locale and UI messages |
-| `next()` / `previous()` | Validate and navigate the interview |
-| `validate()` / `complete()` | Return normalized data and validation issues |
-| `subscribe(listener)` | Observe snapshots; returns an unsubscribe function |
+| Method                             | Result                                                                            |
+| ---------------------------------- | --------------------------------------------------------------------------------- |
+| `getSnapshot()`                    | Current normalized data, visible section, questions, issues, and navigation flags |
+| `setAnswer(name, value)`           | Validate and apply one answer, then recompute derived values                      |
+| `replaceData(data)`                | Replace session answers as a unit                                                 |
+| `setInstrument(instrument)`        | Switch to another compatible instrument, such as a translated instance            |
+| `goToSection(name)`                | Navigate to a visible section by name                                             |
+| `setLocale(locale, translations?)` | Change display locale and UI messages                                             |
+| `next()` / `previous()`            | Validate and navigate the interview                                               |
+| `validate()` / `complete()`        | Return normalized data and validation issues                                      |
+| `subscribe(listener)`              | Observe snapshots; returns an unsubscribe function                                |
 
 ## Stateless engine functions
 
@@ -67,23 +67,25 @@ Prefer `validateSubmission()` at server ingress even if the client already valid
 
 `WhoVaForm` is exported by `/native` and `/web`. Important props include:
 
-| Prop | Purpose |
-| --- | --- |
-| `instrument` | Use a supplied canonical or translated instrument instead of the built-in default |
-| `session` | Reuse a caller-owned session |
-| `initialData` | Seed a new session |
-| `locale` / `uiTranslations` | Control question localization and form chrome |
-| `showSourceGuidance` | Display source guidance text |
-| `platform` | Inject date, audio, image, file, and attachment lifecycle services |
-| `draftId` / `draftStore` | Control durable draft identity and persistence |
-| `onReady` | Receive the initialized session |
-| `onChange` | Receive answer data and the current snapshot |
-| `onValidation` | Receive current validation issues |
-| `onDraftSaved` / `onDraftError` | Observe draft persistence |
-| `onInstrumentError` | Handle default-instrument loading failures |
-| `onComplete` | Receive the normalized submission result |
+| Prop                            | Purpose                                                                           |
+| ------------------------------- | --------------------------------------------------------------------------------- |
+| `instrument`                    | Use a supplied canonical or translated instrument instead of the built-in default |
+| `session`                       | Reuse a caller-owned session                                                      |
+| `initialData`                   | Seed a new session                                                                |
+| `locale` / `uiTranslations`     | Control question localization and form chrome                                     |
+| `showSourceGuidance`            | Display source guidance text                                                      |
+| `platform`                      | Inject date, audio, image, file, and attachment lifecycle services                |
+| `draftId` / `draftStore`        | Control durable draft identity and persistence                                    |
+| `onReady`                       | Receive the initialized session                                                   |
+| `onChange`                      | Receive answer data and the current snapshot                                      |
+| `onValidation`                  | Receive current validation issues                                                 |
+| `onDraftSaved` / `onDraftError` | Observe draft persistence                                                         |
+| `onInstrumentError`             | Handle default-instrument loading failures                                        |
+| `onComplete`                    | Receive the normalized submission result                                          |
 
 Web forms use a browser draft store by default. Native hosts should inject a `WhoVaDraftStore` suitable for their app.
+
+The web component exposes the same storage seam as its `draftStore` JavaScript property. Assign a `WhoVaDraftStore` before appending the element to the document so production VA data never passes through the unencrypted `localStorage` default.
 
 ## Reusable question controls
 

@@ -61,11 +61,28 @@ afterEach(() => {
 });
 
 function button(container: HTMLElement, label: string): HTMLElement | undefined {
-  return Array.from(container.querySelectorAll<HTMLElement>('[role="button"]'))
-    .find((candidate) => candidate.textContent === label);
+  return Array.from(container.querySelectorAll<HTMLElement>('[role="button"]')).find(
+    (candidate) => candidate.textContent === label
+  );
 }
 
 describe("answer preview", () => {
+  it("keeps answers out of browser history state", async () => {
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+    const session = createWhoVaSession(previewInstrument, {
+      initialData: { name: "Sensitive respondent name" }
+    });
+
+    root.render(<WhoVaForm instrument={previewInstrument} session={session} />);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(JSON.stringify(history.state)).not.toContain("Sensitive respondent name");
+    expect(JSON.stringify(history.state)).not.toContain('"data"');
+    root.unmount();
+  });
+
   it("returns to the same section with responses preserved", async () => {
     const container = document.createElement("div");
     document.body.append(container);

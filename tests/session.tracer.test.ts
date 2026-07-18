@@ -3,6 +3,41 @@ import { describe, expect, it } from "vitest";
 import { createWhoVaSession, whoVa2022Instrument } from "../src/index.js";
 
 describe("universal instrument session", () => {
+  it("applies XLSForm group relevance separately from question relevance", () => {
+    const sourceSection = whoVa2022Instrument.sections.find((section) => section.name === "illhistory");
+    const neonatalQuestion = whoVa2022Instrument.questions.find((question) => question.name === "Id10351");
+    const childQuestion = whoVa2022Instrument.questions.find((question) => question.name === "Id10408");
+    if (!sourceSection || !neonatalQuestion || !childQuestion?.relevant || !neonatalQuestion.relevant) {
+      throw new Error("Canonical illhistory fixtures are unavailable");
+    }
+    const { parent: _parent, ...topLevelSection } = sourceSection;
+    const instrument = {
+      ...whoVa2022Instrument,
+      sections: [topLevelSection],
+      questions: [
+        { ...neonatalQuestion, sectionPath: [sourceSection.name] },
+        { ...childQuestion, sectionPath: [sourceSection.name] }
+      ]
+    };
+
+    const childSession = createWhoVaSession(instrument, {
+      initialData: { isChild: "1", isNeonatal: "0", Id10114: "no" }
+    });
+    expect(childSession.getSnapshot().currentSection.name).toBe("illhistory");
+    expect(childSession.getSnapshot().questions.map((question) => question.name)).toEqual(["Id10408"]);
+
+    const groupGatedInstrument = {
+      ...instrument,
+      sections: [{ ...topLevelSection, relevant: neonatalQuestion.relevant }],
+      questions: [{ ...childQuestion, sectionPath: [sourceSection.name] }]
+    };
+    expect(() =>
+      createWhoVaSession(groupGatedInstrument, {
+        initialData: { isChild: "1", isNeonatal: "0", Id10114: "no" }
+      })
+    ).toThrow("Instrument has no visible sections");
+  });
+
   it("initializes system metadata and exposes the first WHO section", () => {
     const now = new Date("2026-07-17T10:30:00.000Z");
     const session = createWhoVaSession(whoVa2022Instrument, { now: () => now });
@@ -16,7 +51,9 @@ describe("universal instrument session", () => {
   it("uses the same validator before navigation and submission", () => {
     const session = createWhoVaSession(whoVa2022Instrument);
     expect(session.next().advanced).toBe(false);
-    expect(session.getSnapshot().issues.some((issue) => issue.question === "Id10010" && issue.code === "required")).toBe(true);
+    expect(
+      session.getSnapshot().issues.some((issue) => issue.question === "Id10010" && issue.code === "required")
+    ).toBe(true);
 
     session.setAnswer("Id10010", "Interviewer One");
     session.setAnswer("Id10010a", 35);
@@ -52,9 +89,9 @@ describe("universal instrument session", () => {
 
     expect(() => session.setAnswer("Id10010a", 3)).not.toThrow();
     expect(session.getSnapshot().data.Id10010a).toBe(3);
-    expect(session.getSnapshot().issues).toEqual(expect.arrayContaining([
-      expect.objectContaining({ question: "Id10010a", code: "constraint" })
-    ]));
+    expect(session.getSnapshot().issues).toEqual(
+      expect.arrayContaining([expect.objectContaining({ question: "Id10010a", code: "constraint" })])
+    );
 
     session.setAnswer("Id10010a", 33);
     expect(session.getSnapshot().issues.some((issue) => issue.question === "Id10010a")).toBe(false);

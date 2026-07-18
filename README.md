@@ -33,12 +33,12 @@ npm install react react-native
 
 ## Package entry points
 
-| Import | Purpose |
-| --- | --- |
-| `@drguptavivek/who-2022-va` | Headless instrument, expression, session, and submission APIs |
-| `@drguptavivek/who-2022-va/native` | Expo and React Native `WhoVaForm` |
-| `@drguptavivek/who-2022-va/web` | React web `WhoVaForm`, rendered through React Native Web |
-| `@drguptavivek/who-2022-va/web-component` | `<who-va-2022-form>` wrapper for non-React web apps |
+| Import                                    | Purpose                                                       |
+| ----------------------------------------- | ------------------------------------------------------------- |
+| `@drguptavivek/who-2022-va`               | Headless instrument, expression, session, and submission APIs |
+| `@drguptavivek/who-2022-va/native`        | Expo and React Native `WhoVaForm`                             |
+| `@drguptavivek/who-2022-va/web`           | React web `WhoVaForm`, rendered through React Native Web      |
+| `@drguptavivek/who-2022-va/web-component` | `<who-va-2022-form>` wrapper for non-React web apps           |
 
 ## Runtime performance
 
@@ -121,7 +121,9 @@ The default limits protect low-memory devices: images are capped at 10 MB and 16
 import { WhoVaForm } from "@drguptavivek/who-2022-va/web";
 
 export function VerbalAutopsyPage() {
-  return <WhoVaForm onDraftSaved={(draft) => console.log(draft.id)} onComplete={(result) => submit(result.data)} />;
+  return (
+    <WhoVaForm onDraftSaved={(draft) => console.log(draft.id)} onComplete={(result) => submit(result.data)} />
+  );
 }
 ```
 
@@ -161,18 +163,22 @@ defineWhoVaElement();
 ```
 
 ```html
-<who-va-2022-form locale="en"></who-va-2022-form>
+<div id="who-va-form-container"></div>
 
 <script type="module">
-  const form = document.querySelector("who-va-2022-form");
+  const form = document.createElement("who-va-2022-form");
+  form.setAttribute("locale", "en");
+  // Configure production storage before the element is connected.
+  form.draftStore = secureDraftStore;
   form.setData(savedDraft);
-  form.addEventListener("who-va-draft-saved", event => console.log(event.detail.id));
-  form.addEventListener("who-va-complete", event => submit(event.detail.data));
+  form.addEventListener("who-va-draft-saved", (event) => console.log(event.detail.id));
+  form.addEventListener("who-va-complete", (event) => submit(event.detail.data));
+  document.querySelector("#who-va-form-container").append(form);
   const assessment = form.validate();
 </script>
 ```
 
-The element exposes `getData()`, `setData(data)`, `getDraftId()`, `validate()`, and `complete()`. Set a `draft-id` attribute before attaching the element to continue a known UUID; otherwise it generates one.
+The element exposes the `draftStore` property plus `getData()`, `setData(data)`, `getDraftId()`, `validate()`, and `complete()`. Set `draftStore` and any `draft-id` attribute before attaching the element; otherwise drafts use unencrypted `localStorage` and the element generates a new UUID.
 
 ## Adding languages
 

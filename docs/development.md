@@ -4,7 +4,7 @@ This guide covers local development of `@drguptavivek/who-2022-va`. For applicat
 
 ## Prerequisites
 
-- Node.js compatible with the versions supported by the current dependencies
+- Node.js 24 (`^24.0.0`); `.nvmrc` pins the recommended contributor version
 - pnpm 11.9.0 (the version pinned in `package.json`)
 - Chromium installed through Playwright for browser end-to-end tests
 
@@ -26,40 +26,40 @@ This starts the Vite demo at `http://127.0.0.1:5173`. The demo uses the same web
 
 Useful commands:
 
-| Command | Purpose |
-| --- | --- |
-| `pnpm typecheck` | Check TypeScript without emitting files |
-| `pnpm test` | Run Vitest unit, integration, tracer, and source-conformance tests |
-| `pnpm test:watch` | Run Vitest in watch mode |
-| `pnpm test:e2e` | Run Playwright against the Vite demo |
-| `pnpm test:e2e:headed` | Run the browser suite visibly and sequentially |
-| `pnpm test:e2e:report` | Open the latest Playwright HTML report |
-| `pnpm build` | Build ESM bundles, declarations, and source maps into `dist/` |
-| `pnpm build:demo` | Produce a static demo build |
-| `pnpm check` | Run type checking, Vitest, and the package build |
+| Command                | Purpose                                                            |
+| ---------------------- | ------------------------------------------------------------------ |
+| `pnpm typecheck`       | Check TypeScript without emitting files                            |
+| `pnpm test`            | Run Vitest unit, integration, tracer, and source-conformance tests |
+| `pnpm test:watch`      | Run Vitest in watch mode                                           |
+| `pnpm test:e2e`        | Run Playwright against the Vite demo                               |
+| `pnpm test:e2e:headed` | Run the browser suite visibly and sequentially                     |
+| `pnpm test:e2e:report` | Open the latest Playwright HTML report                             |
+| `pnpm build`           | Build ESM bundles, declarations, and source maps into `dist/`      |
+| `pnpm build:demo`      | Produce a static demo build                                        |
+| `pnpm check`           | Run type checking, Vitest, and the package build                   |
 
 `pnpm check` intentionally does not include Playwright. Run `pnpm test:e2e` separately when a change affects controls, navigation, browser persistence, or form behavior.
 
 ## Repository map
 
-| Path | Responsibility |
-| --- | --- |
-| `src/index.ts` | Root, headless package entry point |
-| `src/native.tsx` | Expo and React Native entry point |
-| `src/web.tsx` | React web entry point and browser adapters |
-| `src/web-component.tsx` | Custom-element wrapper for non-React sites |
-| `src/engine/` | Expression parsing/evaluation, calculations, validation, indexes, and session state |
-| `src/ui/` | Shared form and reusable question-control factories |
-| `src/generated/` | Checked-in canonical instrument and question audit |
-| `src/languages/` | Lazily imported built-in language files |
-| `src/attachments.ts` | Platform-neutral attachment policy and processing contracts |
-| `src/web-attachments.ts` | IndexedDB, browser image processing, and PDF.js adapters |
-| `src/native-attachments.ts` | Native image-processing adapter seam |
-| `tests/` | Vitest tests, including workbook conformance checks |
-| `e2e/` | Playwright form automation |
-| `examples/` | Minimal React web, Expo, and plain-web integrations |
-| `demo/` | Local Vite preview used by developers and Playwright |
-| `whova2022_xls_form_for_odk.xlsx` | WHO source workbook retained as provenance and a test fixture |
+| Path                              | Responsibility                                                                      |
+| --------------------------------- | ----------------------------------------------------------------------------------- |
+| `src/index.ts`                    | Root, headless package entry point                                                  |
+| `src/native.tsx`                  | Expo and React Native entry point                                                   |
+| `src/web.tsx`                     | React web entry point and browser adapters                                          |
+| `src/web-component.tsx`           | Custom-element wrapper for non-React sites                                          |
+| `src/engine/`                     | Expression parsing/evaluation, calculations, validation, indexes, and session state |
+| `src/ui/`                         | Shared form and reusable question-control factories                                 |
+| `src/generated/`                  | Checked-in canonical instrument and question audit                                  |
+| `src/languages/`                  | Lazily imported built-in language files                                             |
+| `src/attachments.ts`              | Platform-neutral attachment policy and processing contracts                         |
+| `src/web-attachments.ts`          | IndexedDB, browser image processing, and PDF.js adapters                            |
+| `src/native-attachments.ts`       | Native image-processing adapter seam                                                |
+| `tests/`                          | Vitest tests, including workbook conformance checks                                 |
+| `e2e/`                            | Playwright form automation                                                          |
+| `examples/`                       | Minimal React web, Expo, and plain-web integrations                                 |
+| `demo/`                           | Local Vite preview used by developers and Playwright                                |
+| `whova2022_xls_form_for_odk.xlsx` | WHO source workbook retained as provenance and a test fixture                       |
 
 ## Source-of-truth rules
 

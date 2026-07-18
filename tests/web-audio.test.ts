@@ -9,9 +9,15 @@ function memoryStore(): WebAttachmentBinaryStore & { saved: Map<string, Blob> } 
   const saved = new Map<string, Blob>();
   return {
     saved,
-    async save(id, blob) { saved.set(id, blob); },
-    async load(id) { return saved.get(id); },
-    async remove(id) { saved.delete(id); }
+    async save(id, blob) {
+      saved.set(id, blob);
+    },
+    async load(id) {
+      return saved.get(id);
+    },
+    async remove(id) {
+      saved.delete(id);
+    }
   };
 }
 
@@ -74,10 +80,12 @@ describe("web audio recording", () => {
   });
 
   it("reports unsupported browsers without requesting a microphone", async () => {
-    await expect(startWebAudioRecording({
-      store: memoryStore(),
-      mediaDevices: undefined,
-      MediaRecorderClass: undefined
-    })).rejects.toThrow("Audio recording is not supported");
+    await expect(
+      startWebAudioRecording({
+        store: memoryStore(),
+        mediaDevices: undefined,
+        MediaRecorderClass: undefined
+      })
+    ).rejects.toThrow("Audio recording is not supported");
   });
 });

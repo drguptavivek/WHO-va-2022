@@ -25,13 +25,29 @@ function png(width: number, height: number): Uint8Array {
 
 function jpeg(width: number, height: number): Uint8Array {
   return new Uint8Array([
-    0xff, 0xd8,
-    0xff, 0xe0, 0x00, 0x04, 0x00, 0x00,
-    0xff, 0xc0, 0x00, 0x0b, 0x08,
-    (height >> 8) & 0xff, height & 0xff,
-    (width >> 8) & 0xff, width & 0xff,
-    0x01, 0x01, 0x11, 0x00,
-    0xff, 0xd9
+    0xff,
+    0xd8,
+    0xff,
+    0xe0,
+    0x00,
+    0x04,
+    0x00,
+    0x00,
+    0xff,
+    0xc0,
+    0x00,
+    0x0b,
+    0x08,
+    (height >> 8) & 0xff,
+    height & 0xff,
+    (width >> 8) & 0xff,
+    width & 0xff,
+    0x01,
+    0x01,
+    0x11,
+    0x00,
+    0xff,
+    0xd9
   ]);
 }
 
@@ -45,10 +61,18 @@ function memoryStore(): WebAttachmentBinaryStore & { saved: Map<string, Blob> } 
   const saved = new Map<string, Blob>();
   return {
     saved,
-    async save(id, blob) { saved.set(id, blob); },
-    async load(id) { return saved.get(id); },
-    async remove(id) { saved.delete(id); },
-    async listIds() { return [...saved.keys()]; }
+    async save(id, blob) {
+      saved.set(id, blob);
+    },
+    async load(id) {
+      return saved.get(id);
+    },
+    async remove(id) {
+      saved.delete(id);
+    },
+    async listIds() {
+      return [...saved.keys()];
+    }
   };
 }
 
@@ -59,7 +83,9 @@ describe("web attachment processing", () => {
       name: "certificate.png",
       size: original.byteLength,
       type: "image/png",
-      async arrayBuffer() { return arrayBuffer(original); }
+      async arrayBuffer() {
+        return arrayBuffer(original);
+      }
     };
     const output = jpeg(2048, 1365);
     const transcoder: ImageTranscoder = { encodeJpeg: vi.fn().mockResolvedValue(output) };
@@ -118,8 +144,9 @@ describe("web attachment processing", () => {
     await store.save("stored-image", new Blob([arrayBuffer(jpeg(100, 100))], { type: "image/jpeg" }));
     const createObjectURL = vi.fn(() => "blob:preview-url");
 
-    await expect(resolveWebAttachmentUri({ id: "stored-image" }, store, createObjectURL))
-      .resolves.toBe("blob:preview-url");
+    await expect(resolveWebAttachmentUri({ id: "stored-image" }, store, createObjectURL)).resolves.toBe(
+      "blob:preview-url"
+    );
     expect(createObjectURL).toHaveBeenCalledWith(expect.any(Blob));
     await expect(loadWebAttachmentBlob({ id: "stored-image" }, store)).resolves.toBeInstanceOf(Blob);
   });
@@ -133,10 +160,12 @@ describe("web attachment processing", () => {
       arrayBuffer
     };
 
-    await expect(processWebImageAttachment(file, {
-      store: memoryStore(),
-      transcoder: { encodeJpeg: vi.fn() }
-    })).rejects.toMatchObject({ code: "image-input-too-large" });
+    await expect(
+      processWebImageAttachment(file, {
+        store: memoryStore(),
+        transcoder: { encodeJpeg: vi.fn() }
+      })
+    ).rejects.toMatchObject({ code: "image-input-too-large" });
     expect(arrayBuffer).not.toHaveBeenCalled();
   });
 
@@ -147,7 +176,9 @@ describe("web attachment processing", () => {
       name: "interview-notes.pdf",
       size: original.byteLength,
       type: "application/pdf",
-      async arrayBuffer() { return arrayBuffer(original); }
+      async arrayBuffer() {
+        return arrayBuffer(original);
+      }
     };
     const firstPage = jpeg(1131, 1600);
     const secondPage = jpeg(1131, 1600);
@@ -183,16 +214,18 @@ describe("web attachment processing", () => {
     await store.save("kept", new Blob(["kept"]));
     await store.save("kept-page", new Blob(["kept page"]));
     await store.save("orphan", new Blob(["orphan"]));
-    const references = [{
-      data: {
-        imageAnswer: { id: "kept", uri: "who-va-attachment:kept" },
-        documentAnswer: {
-          id: "pdf",
-          uri: "who-va-pdf-pages:pdf",
-          pages: [{ id: "kept-page", uri: "who-va-attachment:kept-page" }]
+    const references = [
+      {
+        data: {
+          imageAnswer: { id: "kept", uri: "who-va-attachment:kept" },
+          documentAnswer: {
+            id: "pdf",
+            uri: "who-va-pdf-pages:pdf",
+            pages: [{ id: "kept-page", uri: "who-va-attachment:kept-page" }]
+          }
         }
       }
-    }];
+    ];
 
     await expect(cleanupOrphanedWebAttachments(references, store)).resolves.toBe(1);
     expect(store.saved.has("kept")).toBe(true);

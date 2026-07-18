@@ -40,7 +40,7 @@ export function createLocalStorageDraftStore(storage?: DraftKeyValueStorage): Wh
     },
     load(id) {
       const serialized = resolveStorage().getItem(`${WHO_VA_DRAFT_KEY_PREFIX}${id}`);
-      return serialized ? JSON.parse(serialized) as WhoVaDraft : undefined;
+      return serialized ? (JSON.parse(serialized) as WhoVaDraft) : undefined;
     },
     remove(id) {
       resolveStorage().removeItem(`${WHO_VA_DRAFT_KEY_PREFIX}${id}`);

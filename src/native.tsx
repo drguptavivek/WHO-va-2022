@@ -9,7 +9,11 @@ import { createWhoVaQuestionControls } from "./ui/question-controls.js";
 import { loadWhoVa2022Instrument } from "./instrument-loader.js";
 
 export * from "./core.js";
-export { WHO_VA_2022_LANGUAGES, loadWhoVa2022Instrument, loadWhoVa2022Language } from "./instrument-loader.js";
+export {
+  WHO_VA_2022_LANGUAGES,
+  loadWhoVa2022Instrument,
+  loadWhoVa2022Language
+} from "./instrument-loader.js";
 export { processNativeImageAttachment } from "./native-attachments.js";
 export type * from "./native-attachments.js";
 export type { WhoVaFormProps, WhoVaPlatformServices } from "./ui/create-who-va-form.js";

@@ -11,14 +11,10 @@ import {
   isProcessedPdfAttachment,
   type ImageAttachmentPolicy
 } from "../attachments.js";
-import type {
-  AnswerValue,
-  InstrumentQuestion,
-  SubmissionData,
-  ValidationIssue
-} from "../types.js";
+import type { AnswerValue, InstrumentQuestion, SubmissionData, ValidationIssue } from "../types.js";
 import { dateFormatPlaceholder, formatDisplayDate, parseDisplayDate } from "./date-value.js";
 import { ENGLISH_UI_MESSAGES, localizeText, type WhoVaUiMessages } from "../i18n.js";
+import { withWebTheme } from "./web-theme.js";
 
 export interface WhoVaPlatformServices {
   captureAudio?: (question: InstrumentQuestion, data: SubmissionData) => Promise<AnswerValue>;
@@ -82,25 +78,77 @@ export interface WhoVaQuestionControlPrimitives {
 }
 
 export const questionControlStyles = {
-  input: { borderWidth: 1, borderColor: "#9fb4ad", borderRadius: 8, minHeight: 44, paddingHorizontal: 12, paddingVertical: 9, color: "#142a24", backgroundColor: "#ffffff" },
+  input: withWebTheme(
+    {
+      borderWidth: 1,
+      borderColor: "#9fb4ad",
+      borderRadius: 8,
+      minHeight: 44,
+      paddingHorizontal: 12,
+      paddingVertical: 9,
+      color: "#142a24",
+      backgroundColor: "#ffffff"
+    },
+    { borderColor: "controlBorder", borderRadius: "controlRadius", color: "ink", backgroundColor: "surface" }
+  ),
   narrativeInput: { minHeight: 160, textAlignVertical: "top" as const },
-  inputError: { borderColor: "#b34231", backgroundColor: "#fff8f6" },
-  choice: { borderWidth: 1, borderColor: "#9fb4ad", borderRadius: 8, padding: 12, marginTop: 7, backgroundColor: "#ffffff" },
-  choiceSelected: { borderColor: "#147d64", backgroundColor: "#e3f4ee" },
-  choiceText: { color: "#213b34" },
-  hint: { color: "#536b64", fontSize: 13, marginBottom: 10 },
+  inputError: withWebTheme(
+    { borderColor: "#b34231", backgroundColor: "#fff8f6" },
+    { borderColor: "danger", backgroundColor: "dangerSoft" }
+  ),
+  choice: withWebTheme(
+    {
+      borderWidth: 1,
+      borderColor: "#9fb4ad",
+      borderRadius: 8,
+      padding: 12,
+      marginTop: 7,
+      backgroundColor: "#ffffff"
+    },
+    { borderColor: "controlBorder", borderRadius: "controlRadius", backgroundColor: "surface" }
+  ),
+  choiceSelected: withWebTheme(
+    { borderColor: "#147d64", backgroundColor: "#e3f4ee" },
+    { borderColor: "brand", backgroundColor: "brandSoft" }
+  ),
+  choiceText: withWebTheme({ color: "#213b34" }, { color: "inkSubtle" }),
+  hint: withWebTheme({ color: "#536b64", fontSize: 13, marginBottom: 10 }, { color: "muted" }),
   actions: { flexDirection: "row" as const, flexWrap: "wrap" as const, gap: 8, marginTop: 8 },
-  button: { minHeight: 44, borderRadius: 8, paddingHorizontal: 18, paddingVertical: 12, backgroundColor: "#147d64", justifyContent: "center" as const },
-  buttonSecondary: { backgroundColor: "#dce6e1" },
-  buttonDanger: { backgroundColor: "#f3ded9" },
+  button: withWebTheme(
+    {
+      minHeight: 44,
+      borderRadius: 8,
+      paddingHorizontal: 18,
+      paddingVertical: 12,
+      backgroundColor: "#147d64",
+      justifyContent: "center" as const
+    },
+    { borderRadius: "controlRadius", backgroundColor: "brand" }
+  ),
+  buttonSecondary: withWebTheme({ backgroundColor: "#dce6e1" }, { backgroundColor: "border" }),
+  buttonDanger: withWebTheme({ backgroundColor: "#f3ded9" }, { backgroundColor: "dangerSoft" }),
   buttonDisabled: { opacity: 0.45 },
-  buttonText: { color: "#ffffff", fontWeight: "700" as const },
-  buttonTextSecondary: { color: "#183d33", fontWeight: "700" as const },
-  buttonTextDanger: { color: "#8c3022", fontWeight: "700" as const },
-  imageFrame: { overflow: "hidden" as const, minHeight: 220, borderRadius: 8, backgroundColor: "#10231e", alignItems: "center" as const, justifyContent: "center" as const, marginTop: 8 },
+  buttonText: withWebTheme({ color: "#ffffff", fontWeight: "700" as const }, { color: "surface" }),
+  buttonTextSecondary: withWebTheme({ color: "#183d33", fontWeight: "700" as const }, { color: "brandDeep" }),
+  buttonTextDanger: withWebTheme({ color: "#8c3022", fontWeight: "700" as const }, { color: "dangerStrong" }),
+  imageFrame: withWebTheme(
+    {
+      overflow: "hidden" as const,
+      minHeight: 220,
+      borderRadius: 8,
+      backgroundColor: "#10231e",
+      alignItems: "center" as const,
+      justifyContent: "center" as const,
+      marginTop: 8
+    },
+    { borderRadius: "controlRadius", backgroundColor: "imageBackground" }
+  ),
   image: { width: "100%", height: 260, resizeMode: "contain" as const },
-  attachmentName: { color: "#213b34", marginTop: 10 },
-  attachmentError: { color: "#a23a2a", fontSize: 13, fontWeight: "700" as const, marginTop: 8 }
+  attachmentName: withWebTheme({ color: "#213b34", marginTop: 10 }, { color: "inkSubtle" }),
+  attachmentError: withWebTheme(
+    { color: "#a23a2a", fontSize: 13, fontWeight: "700" as const, marginTop: 8 },
+    { color: "danger" }
+  )
 };
 
 function plainText(value: string | undefined): string {
@@ -118,8 +166,10 @@ function localized(text: Record<string, string | undefined>, locale: string, fal
 }
 
 function questionLabel(question: InstrumentQuestion, locale: string): string {
-  return localized(question.label, locale, question.name)
-    .replace(/^(\([^)]+\))\s*\[([^\]]+)\](.*)$/s, "$1 $2$3");
+  return localized(question.label, locale, question.name).replace(
+    /^(\([^)]+\))\s*\[([^\]]+)\](.*)$/s,
+    "$1 $2$3"
+  );
 }
 
 export function incompleteDateIssue(
@@ -143,12 +193,20 @@ export function incompleteDateIssue(
       };
 }
 
-function attachmentDetails(value: AnswerValue | undefined): { uri?: string; name?: string; mimeType?: string } {
+function attachmentDetails(value: AnswerValue | undefined): {
+  uri?: string;
+  name?: string;
+  mimeType?: string;
+} {
   if (typeof value === "string") return { uri: value, name: value.split("/").at(-1) ?? value };
   if (value == null || Array.isArray(value) || typeof value !== "object") return {};
   return {
     ...(typeof value.uri === "string" ? { uri: value.uri } : {}),
-    ...(typeof value.originalName === "string" ? { name: value.originalName } : typeof value.name === "string" ? { name: value.name } : {}),
+    ...(typeof value.originalName === "string"
+      ? { name: value.originalName }
+      : typeof value.name === "string"
+        ? { name: value.name }
+        : {}),
     ...(typeof value.mimeType === "string" ? { mimeType: value.mimeType } : {})
   };
 }
@@ -158,10 +216,26 @@ function attachmentMimeType(value: AnswerValue | undefined): string | undefined 
   return typeof value.mimeType === "string" ? value.mimeType : undefined;
 }
 
-function attachmentErrorMessage(error: unknown): string {
-  return error instanceof AttachmentProcessingError
-    ? error.userMessage
-    : "The selected attachment could not be processed and was discarded.";
+function attachmentErrorMessage(error: unknown, messages: WhoVaUiMessages): string {
+  if (!(error instanceof AttachmentProcessingError)) return messages.attachmentProcessingFailed;
+  const localized = {
+    "image-input-too-large": messages.imageInputTooLarge,
+    "image-type-not-allowed": messages.imageTypeNotAllowed,
+    "image-dimensions-invalid": messages.imageDimensionsInvalid,
+    "image-dimensions-too-large": messages.imageDimensionsTooLarge,
+    "image-decode-failed": messages.imageDecodeFailed,
+    "image-output-invalid": messages.imageOutputInvalid,
+    "image-output-too-large": messages.imageOutputTooLarge,
+    "image-processing-unavailable": messages.imageProcessingUnavailable,
+    "attachment-storage-failed": messages.attachmentStorageFailed,
+    "pdf-input-too-large": messages.pdfInputTooLarge,
+    "pdf-type-not-allowed": messages.pdfTypeNotAllowed,
+    "pdf-render-failed": messages.pdfRenderFailed,
+    "pdf-too-many-pages": messages.pdfTooManyPages,
+    "pdf-output-too-large": messages.pdfOutputTooLarge,
+    "pdf-processing-unavailable": messages.pdfProcessingUnavailable
+  } satisfies Record<typeof error.code, string>;
+  return localized[error.code];
 }
 
 export function createWhoVaQuestionControls(primitives: WhoVaQuestionControlPrimitives) {
@@ -173,7 +247,11 @@ export function createWhoVaQuestionControls(primitives: WhoVaQuestionControlPrim
       <TextInput
         accessibilityLabel={questionLabel(question, locale)}
         testID={`question-${question.name}`}
-        style={[questionControlStyles.input, multiline && questionControlStyles.narrativeInput, issues.length > 0 && questionControlStyles.inputError]}
+        style={[
+          questionControlStyles.input,
+          multiline && questionControlStyles.narrativeInput,
+          issues.length > 0 && questionControlStyles.inputError
+        ]}
         aria-invalid={issues.length > 0 || undefined}
         value={value == null ? "" : String(value)}
         multiline={multiline}
@@ -199,7 +277,17 @@ export function createWhoVaQuestionControls(primitives: WhoVaQuestionControlPrim
     );
   }
 
-  function Date({ question, value, data, locale, messages = ENGLISH_UI_MESSAGES, issues, platform, onAnswer, onDraftIssue }: WhoVaQuestionControlProps) {
+  function Date({
+    question,
+    value,
+    data,
+    locale,
+    messages = ENGLISH_UI_MESSAGES,
+    issues,
+    platform,
+    onAnswer,
+    onDraftIssue
+  }: WhoVaQuestionControlProps) {
     const [draft, setDraft] = useState<string>();
     const [busy, setBusy] = useState(false);
     const label = questionLabel(question, locale);
@@ -261,20 +349,34 @@ export function createWhoVaQuestionControls(primitives: WhoVaQuestionControlPrim
           accessibilityLabel={label}
           accessibilityState={{ disabled: busy }}
           testID={`question-${question.name}`}
-          style={[questionControlStyles.input, hasIssues && questionControlStyles.inputError, busy && questionControlStyles.buttonDisabled]}
+          style={[
+            questionControlStyles.input,
+            hasIssues && questionControlStyles.inputError,
+            busy && questionControlStyles.buttonDisabled
+          ]}
           disabled={busy}
           onPress={async () => {
             setBusy(true);
             try {
-              const selected = await services.pickDate?.(question, data, typeof value === "string" ? value : undefined);
+              const selected = await services.pickDate?.(
+                question,
+                data,
+                typeof value === "string" ? value : undefined
+              );
               if (selected !== undefined) onAnswer(selected);
             } finally {
               setBusy(false);
             }
           }}
         >
-          <PrimitiveText style={value == null ? questionControlStyles.hint : questionControlStyles.choiceText}>
-            {busy ? messages.openingCalendar : value == null ? messages.selectDate : formatDisplayDate(String(value), locale)}
+          <PrimitiveText
+            style={value == null ? questionControlStyles.hint : questionControlStyles.choiceText}
+          >
+            {busy
+              ? messages.openingCalendar
+              : value == null
+                ? messages.selectDate
+                : formatDisplayDate(String(value), locale)}
           </PrimitiveText>
         </Pressable>
       );
@@ -319,7 +421,9 @@ export function createWhoVaQuestionControls(primitives: WhoVaQuestionControlPrim
           style={[questionControlStyles.choice, selected && questionControlStyles.choiceSelected]}
           onPress={() => onAnswer(choice.value)}
         >
-          <PrimitiveText style={questionControlStyles.choiceText}>{localized(choice.label, locale, choice.value)}</PrimitiveText>
+          <PrimitiveText style={questionControlStyles.choiceText}>
+            {localized(choice.label, locale, choice.value)}
+          </PrimitiveText>
         </Pressable>
       );
     });
@@ -336,9 +440,17 @@ export function createWhoVaQuestionControls(primitives: WhoVaQuestionControlPrim
           accessibilityState={{ checked: selected }}
           testID={`question-${question.name}-choice-${choice.value}`}
           style={[questionControlStyles.choice, selected && questionControlStyles.choiceSelected]}
-          onPress={() => onAnswer(selected ? selectedValues.filter((item) => item !== choice.value) : [...selectedValues, choice.value])}
+          onPress={() =>
+            onAnswer(
+              selected
+                ? selectedValues.filter((item) => item !== choice.value)
+                : [...selectedValues, choice.value]
+            )
+          }
         >
-          <PrimitiveText style={questionControlStyles.choiceText}>{localized(choice.label, locale, choice.value)}</PrimitiveText>
+          <PrimitiveText style={questionControlStyles.choiceText}>
+            {localized(choice.label, locale, choice.value)}
+          </PrimitiveText>
         </Pressable>
       );
     });
@@ -352,30 +464,47 @@ export function createWhoVaQuestionControls(primitives: WhoVaQuestionControlPrim
         style={[questionControlStyles.button, value === true && questionControlStyles.choiceSelected]}
         onPress={() => onAnswer(true)}
       >
-        <PrimitiveText style={questionControlStyles.buttonText}>{value === true ? messages.confirmed : messages.confirm}</PrimitiveText>
+        <PrimitiveText style={questionControlStyles.buttonText}>
+          {value === true ? messages.confirmed : messages.confirm}
+        </PrimitiveText>
       </Pressable>
     );
   }
 
-  function Audio({ question, value, data, platform, onAnswer }: WhoVaQuestionControlProps) {
+  function Audio({
+    question,
+    value,
+    data,
+    platform,
+    messages = ENGLISH_UI_MESSAGES,
+    onAnswer
+  }: WhoVaQuestionControlProps) {
     const [phase, setPhase] = useState<"idle" | "starting" | "recording" | "stopping">("idle");
     const [recordingError, setRecordingError] = useState<string>();
     const session = useRef<WhoVaAudioRecordingSession | undefined>(undefined);
     const services = { ...primitives.platform, ...platform };
-    const disabled = phase === "starting" || phase === "stopping"
-      || (phase === "idle" && !services.startAudioRecording && !services.captureAudio);
+    const disabled =
+      phase === "starting" ||
+      phase === "stopping" ||
+      (phase === "idle" && !services.startAudioRecording && !services.captureAudio);
 
-    useEffect(() => () => {
-      if (session.current) void session.current.cancel();
-    }, []);
+    useEffect(
+      () => () => {
+        if (session.current) void session.current.cancel();
+      },
+      []
+    );
 
-    const label = phase === "starting"
-      ? "Starting microphone…"
-      : phase === "recording"
-        ? "Stop and save recording"
-        : phase === "stopping"
-          ? "Saving recording…"
-          : value ? "Replace audio" : "Record audio";
+    const label =
+      phase === "starting"
+        ? messages.startingMicrophone
+        : phase === "recording"
+          ? messages.stopAndSaveRecording
+          : phase === "stopping"
+            ? messages.savingRecording
+            : value
+              ? messages.replaceAudio
+              : messages.recordAudio;
 
     return (
       <View>
@@ -412,20 +541,35 @@ export function createWhoVaQuestionControls(primitives: WhoVaQuestionControlPrim
             } catch (error) {
               session.current = undefined;
               setPhase("idle");
-              setRecordingError(typeof DOMException !== "undefined" && error instanceof DOMException && error.name === "NotAllowedError"
-                ? "Microphone permission was denied. Allow microphone access in the browser and try again."
-                : error instanceof Error && error.message ? error.message : "Audio recording failed. Please try again.");
+              setRecordingError(
+                typeof DOMException !== "undefined" &&
+                  error instanceof DOMException &&
+                  error.name === "NotAllowedError"
+                  ? messages.microphonePermissionDenied
+                  : messages.audioRecordingFailed
+              );
             }
           }}
         >
           <PrimitiveText style={questionControlStyles.buttonText}>{label}</PrimitiveText>
         </Pressable>
-        {recordingError ? <PrimitiveText accessibilityRole="alert" style={questionControlStyles.attachmentError}>{recordingError}</PrimitiveText> : null}
+        {recordingError ? (
+          <PrimitiveText accessibilityRole="alert" style={questionControlStyles.attachmentError}>
+            {recordingError}
+          </PrimitiveText>
+        ) : null}
       </View>
     );
   }
 
-  function ImagePicker({ question, value, data, platform, onAnswer }: WhoVaQuestionControlProps) {
+  function ImagePicker({
+    question,
+    value,
+    data,
+    platform,
+    messages = ENGLISH_UI_MESSAGES,
+    onAnswer
+  }: WhoVaQuestionControlProps) {
     const attachment = attachmentDetails(value);
     const [busy, setBusy] = useState<"camera" | "library">();
     const [rotation, setRotation] = useState(0);
@@ -443,24 +587,35 @@ export function createWhoVaQuestionControls(primitives: WhoVaQuestionControlPrim
       const attachmentValue = value;
       if (!attachment.uri) {
         setPreviewUri(undefined);
-        return () => { active = false; };
+        return () => {
+          active = false;
+        };
       }
-      if (!resolveAttachmentUri || attachmentValue === undefined || typeof attachmentValue === "string" || !attachment.uri.startsWith("who-va-attachment:")) {
+      if (
+        !resolveAttachmentUri ||
+        attachmentValue === undefined ||
+        typeof attachmentValue === "string" ||
+        !attachment.uri.startsWith("who-va-attachment:")
+      ) {
         setPreviewUri(attachment.uri);
-        return () => { active = false; };
+        return () => {
+          active = false;
+        };
       }
       setPreviewUri(undefined);
-      void resolveAttachmentUri(attachmentValue).then((uri) => {
-        resolvedUri = uri;
-        if (active) setPreviewUri(uri);
-      }).catch(() => {
-        if (active) setProcessingError("The saved image could not be loaded from this device.");
-      });
+      void resolveAttachmentUri(attachmentValue)
+        .then((uri) => {
+          resolvedUri = uri;
+          if (active) setPreviewUri(uri);
+        })
+        .catch(() => {
+          if (active) setProcessingError(messages.savedImageLoadFailed);
+        });
       return () => {
         active = false;
         if (resolvedUri) releaseAttachmentUri?.(resolvedUri);
       };
-    }, [attachment.uri, releaseAttachmentUri, resolveAttachmentUri, value]);
+    }, [attachment.uri, messages.savedImageLoadFailed, releaseAttachmentUri, resolveAttachmentUri, value]);
 
     const choose = async (source: "camera" | "library") => {
       const picker = source === "camera" ? services?.captureImage : services?.selectImage;
@@ -475,7 +630,8 @@ export function createWhoVaQuestionControls(primitives: WhoVaQuestionControlPrim
           selected = await services.processImage(candidate, WHO_VA_ATTACHMENT_POLICY.image, question, data);
         }
         if (selected !== undefined) {
-          if (!isProcessedImageAttachment(selected)) throw new AttachmentProcessingError("image-output-invalid");
+          if (!isProcessedImageAttachment(selected))
+            throw new AttachmentProcessingError("image-output-invalid");
           if (value !== undefined) await services.removeAttachment?.(value);
           onAnswer(selected);
           setRotation(0);
@@ -483,7 +639,7 @@ export function createWhoVaQuestionControls(primitives: WhoVaQuestionControlPrim
           setVisible(true);
         }
       } catch (error) {
-        setProcessingError(attachmentErrorMessage(error));
+        setProcessingError(attachmentErrorMessage(error, messages));
       } finally {
         setBusy(undefined);
       }
@@ -494,51 +650,105 @@ export function createWhoVaQuestionControls(primitives: WhoVaQuestionControlPrim
         {previewUri && visible && Image ? (
           <View style={questionControlStyles.imageFrame}>
             <Image
-              accessibilityLabel={attachment.name ?? "Selected image"}
+              accessibilityLabel={attachment.name ?? messages.selectedImage}
               testID={`question-${question.name}-preview`}
               source={{ uri: previewUri }}
-              style={[questionControlStyles.image, { transform: [{ rotate: `${rotation}deg` }, { scale: zoom }] }]}
+              style={[
+                questionControlStyles.image,
+                { transform: [{ rotate: `${rotation}deg` }, { scale: zoom }] }
+              ]}
             />
           </View>
         ) : null}
-        {attachment.name ? <PrimitiveText style={questionControlStyles.attachmentName}>{attachment.name}</PrimitiveText> : null}
-        {processingError ? <PrimitiveText accessibilityRole="alert" style={questionControlStyles.attachmentError}>{processingError}</PrimitiveText> : null}
+        {attachment.name ? (
+          <PrimitiveText style={questionControlStyles.attachmentName}>{attachment.name}</PrimitiveText>
+        ) : null}
+        {processingError ? (
+          <PrimitiveText accessibilityRole="alert" style={questionControlStyles.attachmentError}>
+            {processingError}
+          </PrimitiveText>
+        ) : null}
         <View style={questionControlStyles.actions}>
           <Pressable
             accessibilityRole="button"
             disabled={!services?.captureImage || busy != null}
-            style={[questionControlStyles.button, (!services?.captureImage || busy != null) && questionControlStyles.buttonDisabled]}
+            style={[
+              questionControlStyles.button,
+              (!services?.captureImage || busy != null) && questionControlStyles.buttonDisabled
+            ]}
             onPress={() => void choose("camera")}
           >
-            <PrimitiveText style={questionControlStyles.buttonText}>{busy === "camera" ? "Opening camera…" : "Camera"}</PrimitiveText>
+            <PrimitiveText style={questionControlStyles.buttonText}>
+              {busy === "camera" ? messages.openingCamera : messages.camera}
+            </PrimitiveText>
           </Pressable>
           <Pressable
             accessibilityRole="button"
             disabled={!services?.selectImage || busy != null}
-            style={[questionControlStyles.button, questionControlStyles.buttonSecondary, (!services?.selectImage || busy != null) && questionControlStyles.buttonDisabled]}
+            style={[
+              questionControlStyles.button,
+              questionControlStyles.buttonSecondary,
+              (!services?.selectImage || busy != null) && questionControlStyles.buttonDisabled
+            ]}
             onPress={() => void choose("library")}
           >
-            <PrimitiveText style={questionControlStyles.buttonTextSecondary}>{busy === "library" ? "Opening images…" : attachment.uri ? "Replace image" : "Choose image"}</PrimitiveText>
+            <PrimitiveText style={questionControlStyles.buttonTextSecondary}>
+              {busy === "library"
+                ? messages.openingImages
+                : attachment.uri
+                  ? messages.replaceImage
+                  : messages.chooseImage}
+            </PrimitiveText>
           </Pressable>
           {attachment.uri ? (
             <>
-              <Pressable accessibilityRole="button" style={[questionControlStyles.button, questionControlStyles.buttonSecondary]} onPress={() => setVisible((current) => !current)}>
-                <PrimitiveText style={questionControlStyles.buttonTextSecondary}>{visible ? "Hide image" : "View image"}</PrimitiveText>
+              <Pressable
+                accessibilityRole="button"
+                style={[questionControlStyles.button, questionControlStyles.buttonSecondary]}
+                onPress={() => setVisible((current) => !current)}
+              >
+                <PrimitiveText style={questionControlStyles.buttonTextSecondary}>
+                  {visible ? messages.hideImage : messages.viewImage}
+                </PrimitiveText>
               </Pressable>
-              <Pressable accessibilityRole="button" style={[questionControlStyles.button, questionControlStyles.buttonSecondary]} onPress={() => setRotation((current) => (current + 90) % 360)}>
-                <PrimitiveText style={questionControlStyles.buttonTextSecondary}>Rotate</PrimitiveText>
+              <Pressable
+                accessibilityRole="button"
+                style={[questionControlStyles.button, questionControlStyles.buttonSecondary]}
+                onPress={() => setRotation((current) => (current + 90) % 360)}
+              >
+                <PrimitiveText style={questionControlStyles.buttonTextSecondary}>
+                  {messages.rotate}
+                </PrimitiveText>
               </Pressable>
-              <Pressable accessibilityRole="button" style={[questionControlStyles.button, questionControlStyles.buttonSecondary]} onPress={() => setZoom((current) => Math.min(3, current + 0.25))}>
-                <PrimitiveText style={questionControlStyles.buttonTextSecondary}>Zoom in</PrimitiveText>
+              <Pressable
+                accessibilityRole="button"
+                style={[questionControlStyles.button, questionControlStyles.buttonSecondary]}
+                onPress={() => setZoom((current) => Math.min(3, current + 0.25))}
+              >
+                <PrimitiveText style={questionControlStyles.buttonTextSecondary}>
+                  {messages.zoomIn}
+                </PrimitiveText>
               </Pressable>
-              <Pressable accessibilityRole="button" style={[questionControlStyles.button, questionControlStyles.buttonSecondary]} onPress={() => setZoom((current) => Math.max(0.5, current - 0.25))}>
-                <PrimitiveText style={questionControlStyles.buttonTextSecondary}>Zoom out</PrimitiveText>
+              <Pressable
+                accessibilityRole="button"
+                style={[questionControlStyles.button, questionControlStyles.buttonSecondary]}
+                onPress={() => setZoom((current) => Math.max(0.5, current - 0.25))}
+              >
+                <PrimitiveText style={questionControlStyles.buttonTextSecondary}>
+                  {messages.zoomOut}
+                </PrimitiveText>
               </Pressable>
-              <Pressable accessibilityRole="button" style={[questionControlStyles.button, questionControlStyles.buttonDanger]} onPress={() => {
-                if (value !== undefined) void services.removeAttachment?.(value);
-                onAnswer(undefined);
-              }}>
-                <PrimitiveText style={questionControlStyles.buttonTextDanger}>Remove image</PrimitiveText>
+              <Pressable
+                accessibilityRole="button"
+                style={[questionControlStyles.button, questionControlStyles.buttonDanger]}
+                onPress={() => {
+                  if (value !== undefined) void services.removeAttachment?.(value);
+                  onAnswer(undefined);
+                }}
+              >
+                <PrimitiveText style={questionControlStyles.buttonTextDanger}>
+                  {messages.removeImage}
+                </PrimitiveText>
               </Pressable>
             </>
           ) : null}
@@ -547,25 +757,40 @@ export function createWhoVaQuestionControls(primitives: WhoVaQuestionControlPrim
     );
   }
 
-  function FilePicker({ question, value, data, platform, onAnswer }: WhoVaQuestionControlProps) {
+  function FilePicker({
+    question,
+    value,
+    data,
+    platform,
+    messages = ENGLISH_UI_MESSAGES,
+    onAnswer
+  }: WhoVaQuestionControlProps) {
     const [busy, setBusy] = useState(false);
     const [processingError, setProcessingError] = useState<string>();
     const attachment = attachmentDetails(value);
     const services = { ...primitives.platform, ...platform };
     const acceptsImages = question.appearance === "image-or-pdf";
     const acceptedMimeTypes = acceptsImages
-      ? [...WHO_VA_ATTACHMENT_POLICY.image.acceptedMimeTypes, ...WHO_VA_ATTACHMENT_POLICY.pdf.acceptedMimeTypes]
+      ? [
+          ...WHO_VA_ATTACHMENT_POLICY.image.acceptedMimeTypes,
+          ...WHO_VA_ATTACHMENT_POLICY.pdf.acceptedMimeTypes
+        ]
       : [...WHO_VA_ATTACHMENT_POLICY.pdf.acceptedMimeTypes];
-    const attachmentLabel = acceptsImages ? "attachment" : "PDF";
+    const attachmentLabel = acceptsImages ? messages.attachment : messages.pdf;
     return (
       <>
-        {attachment.name ? <PrimitiveText style={questionControlStyles.attachmentName}>{attachment.name}</PrimitiveText> : null}
+        {attachment.name ? (
+          <PrimitiveText style={questionControlStyles.attachmentName}>{attachment.name}</PrimitiveText>
+        ) : null}
         <View style={questionControlStyles.actions}>
           <Pressable
             accessibilityRole="button"
             testID={`question-${question.name}`}
             disabled={!services?.selectFile || busy}
-            style={[questionControlStyles.button, (!services?.selectFile || busy) && questionControlStyles.buttonDisabled]}
+            style={[
+              questionControlStyles.button,
+              (!services?.selectFile || busy) && questionControlStyles.buttonDisabled
+            ]}
             onPress={async () => {
               if (!services?.selectFile) return;
               setBusy(true);
@@ -573,40 +798,75 @@ export function createWhoVaQuestionControls(primitives: WhoVaQuestionControlPrim
               try {
                 const candidate = await services.selectFile(question, data, acceptedMimeTypes);
                 let selected = candidate;
-                if (candidate !== undefined && !isProcessedPdfAttachment(candidate) && !(acceptsImages && isProcessedImageAttachment(candidate))) {
-                  if (acceptsImages && WHO_VA_ATTACHMENT_POLICY.image.acceptedMimeTypes.includes(
-                    attachmentMimeType(candidate) as "image/jpeg" | "image/png"
-                  )) {
-                    if (!services.processImage) throw new AttachmentProcessingError("image-processing-unavailable");
-                    selected = await services.processImage(candidate, WHO_VA_ATTACHMENT_POLICY.image, question, data);
+                if (
+                  candidate !== undefined &&
+                  !isProcessedPdfAttachment(candidate) &&
+                  !(acceptsImages && isProcessedImageAttachment(candidate))
+                ) {
+                  if (
+                    acceptsImages &&
+                    WHO_VA_ATTACHMENT_POLICY.image.acceptedMimeTypes.includes(
+                      attachmentMimeType(candidate) as "image/jpeg" | "image/png"
+                    )
+                  ) {
+                    if (!services.processImage)
+                      throw new AttachmentProcessingError("image-processing-unavailable");
+                    selected = await services.processImage(
+                      candidate,
+                      WHO_VA_ATTACHMENT_POLICY.image,
+                      question,
+                      data
+                    );
                   } else {
-                    if (!services.processPdf) throw new AttachmentProcessingError("pdf-processing-unavailable");
+                    if (!services.processPdf)
+                      throw new AttachmentProcessingError("pdf-processing-unavailable");
                     selected = await services.processPdf(candidate, question, data);
                   }
                 }
                 if (selected !== undefined) {
-                  if (!isProcessedPdfAttachment(selected) && !(acceptsImages && isProcessedImageAttachment(selected))) {
-                    throw new AttachmentProcessingError(acceptsImages ? "image-output-invalid" : "pdf-render-failed");
+                  if (
+                    !isProcessedPdfAttachment(selected) &&
+                    !(acceptsImages && isProcessedImageAttachment(selected))
+                  ) {
+                    throw new AttachmentProcessingError(
+                      acceptsImages ? "image-output-invalid" : "pdf-render-failed"
+                    );
                   }
                   if (value !== undefined) await services.removeAttachment?.(value);
                   onAnswer(selected);
                 }
               } catch (error) {
-                setProcessingError(attachmentErrorMessage(error));
+                setProcessingError(attachmentErrorMessage(error, messages));
               } finally {
                 setBusy(false);
               }
             }}
           >
-            <PrimitiveText style={questionControlStyles.buttonText}>{busy ? "Opening files…" : attachment.uri ? `Replace ${attachmentLabel}` : `Choose ${attachmentLabel}`}</PrimitiveText>
+            <PrimitiveText style={questionControlStyles.buttonText}>
+              {busy
+                ? messages.openingFiles
+                : attachment.uri
+                  ? messages.replaceAttachment(attachmentLabel)
+                  : messages.chooseAttachment(attachmentLabel)}
+            </PrimitiveText>
           </Pressable>
-          {processingError ? <PrimitiveText accessibilityRole="alert" style={questionControlStyles.attachmentError}>{processingError}</PrimitiveText> : null}
+          {processingError ? (
+            <PrimitiveText accessibilityRole="alert" style={questionControlStyles.attachmentError}>
+              {processingError}
+            </PrimitiveText>
+          ) : null}
           {attachment.uri ? (
-            <Pressable accessibilityRole="button" style={[questionControlStyles.button, questionControlStyles.buttonDanger]} onPress={() => {
-              if (value !== undefined) void services.removeAttachment?.(value);
-              onAnswer(undefined);
-            }}>
-              <PrimitiveText style={questionControlStyles.buttonTextDanger}>Remove {attachmentLabel}</PrimitiveText>
+            <Pressable
+              accessibilityRole="button"
+              style={[questionControlStyles.button, questionControlStyles.buttonDanger]}
+              onPress={() => {
+                if (value !== undefined) void services.removeAttachment?.(value);
+                onAnswer(undefined);
+              }}
+            >
+              <PrimitiveText style={questionControlStyles.buttonTextDanger}>
+                {messages.removeAttachment(attachmentLabel)}
+              </PrimitiveText>
             </Pressable>
           ) : null}
         </View>
@@ -614,23 +874,38 @@ export function createWhoVaQuestionControls(primitives: WhoVaQuestionControlPrim
     );
   }
 
-  function Note(_props: WhoVaQuestionControlProps) { return null; }
-  function Empty(_props: WhoVaQuestionControlProps) { return null; }
+  function Note(_props: WhoVaQuestionControlProps) {
+    return null;
+  }
+  function Empty(_props: WhoVaQuestionControlProps) {
+    return null;
+  }
 
   function Control(props: WhoVaQuestionControlProps) {
     switch (props.question.control) {
-      case "text": return <Text {...props} />;
-      case "integer": return <Integer {...props} />;
-      case "date": return <Date {...props} />;
-      case "singleChoice": return <SingleChoice {...props} />;
-      case "multipleChoice": return <MultipleChoice {...props} />;
-      case "confirm": return <Confirm {...props} />;
-      case "audio": return <Audio {...props} />;
-      case "image": return <ImagePicker {...props} />;
-      case "file": return <FilePicker {...props} />;
-      case "note": return <Note {...props} />;
+      case "text":
+        return <Text {...props} />;
+      case "integer":
+        return <Integer {...props} />;
+      case "date":
+        return <Date {...props} />;
+      case "singleChoice":
+        return <SingleChoice {...props} />;
+      case "multipleChoice":
+        return <MultipleChoice {...props} />;
+      case "confirm":
+        return <Confirm {...props} />;
+      case "audio":
+        return <Audio {...props} />;
+      case "image":
+        return <ImagePicker {...props} />;
+      case "file":
+        return <FilePicker {...props} />;
+      case "note":
+        return <Note {...props} />;
       case "calculated":
-      case "system": return <Empty {...props} />;
+      case "system":
+        return <Empty {...props} />;
     }
   }
 

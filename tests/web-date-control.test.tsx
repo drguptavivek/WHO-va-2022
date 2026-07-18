@@ -13,12 +13,14 @@ const dateInstrument: InstrumentDefinition = {
   version: "1",
   defaultLanguage: "English (en)",
   sourceFile: "generated-test-artifact.json",
-  sections: [{
-    name: "dates",
-    sourceRow: 1,
-    order: 1,
-    label: { en: "Dates" }
-  }],
+  sections: [
+    {
+      name: "dates",
+      sourceRow: 1,
+      order: 1,
+      label: { en: "Dates" }
+    }
+  ],
   questions: [
     {
       name: "Id10021",

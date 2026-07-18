@@ -14,21 +14,23 @@ const requiredInstrument: InstrumentDefinition = {
   defaultLanguage: "English (en)",
   sourceFile: "generated-test-artifact.json",
   sections: [{ name: "details", sourceRow: 1, order: 1, label: { en: "Details" } }],
-  questions: [{
-    name: "required_name",
-    order: 1,
-    sourceRow: 2,
-    sourceType: "text",
-    dataType: "string",
-    control: "text",
-    label: { en: "Required name" },
-    hint: {},
-    guidance: {},
-    required: true,
-    readOnly: false,
-    constraintMessage: {},
-    sectionPath: ["details"]
-  }]
+  questions: [
+    {
+      name: "required_name",
+      order: 1,
+      sourceRow: 2,
+      sourceType: "text",
+      dataType: "string",
+      control: "text",
+      label: { en: "Required name" },
+      hint: {},
+      guidance: {},
+      required: true,
+      readOnly: false,
+      constraintMessage: {},
+      sectionPath: ["details"]
+    }
+  ]
 };
 
 afterEach(() => {
@@ -79,8 +81,9 @@ describe("validation navigation", () => {
     root.render(<WhoVaForm instrument={requiredInstrument} />);
     await new Promise((resolve) => setTimeout(resolve, 0));
 
-    const next = Array.from(container.querySelectorAll<HTMLElement>('[role="button"]'))
-      .find((button) => button.textContent === "Complete");
+    const next = Array.from(container.querySelectorAll<HTMLElement>('[role="button"]')).find(
+      (button) => button.textContent === "Complete"
+    );
     next?.click();
     await vi.waitFor(() => expect(scrollIntoView).toHaveBeenCalledOnce());
     expect(scrollIntoView).toHaveBeenCalledWith({ behavior: "smooth", block: "start" });

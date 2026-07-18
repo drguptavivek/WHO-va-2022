@@ -30,62 +30,19 @@ import {
   resolveWebAttachmentUri
 } from "./web-attachments.js";
 import { startWebAudioRecording } from "./web-audio.js";
-
-const webThemeValues: Record<string, string> = {
-  "#f6f8f7": "var(--who-2022-web-color-canvas, #f5f7fa)",
-  "#ffffff": "var(--who-2022-web-color-surface, #ffffff)",
-  "#142a24": "var(--who-2022-web-color-ink, #1f2937)",
-  "#213b34": "var(--who-2022-web-color-ink-subtle, #374151)",
-  "#47625b": "var(--who-2022-web-color-muted, #667085)",
-  "#536b64": "var(--who-2022-web-color-muted, #667085)",
-  "#12372d": "var(--who-2022-web-color-brand-deep, #1e3a5f)",
-  "#183d33": "var(--who-2022-web-color-brand-deep, #1e3a5f)",
-  "#147d64": "var(--who-2022-web-color-brand, #2563eb)",
-  "#edf5f2": "var(--who-2022-web-color-brand-soft, #eff6ff)",
-  "#e3f4ee": "var(--who-2022-web-color-brand-soft, #eff6ff)",
-  "#dce6e1": "var(--who-2022-web-color-border, #e2e8f0)",
-  "#9fb4ad": "var(--who-2022-web-color-control-border, #b8c2d1)",
-  "#315e73": "var(--who-2022-web-color-guidance, #475569)",
-  "#a23a2a": "var(--who-2022-web-color-danger, #b42318)",
-  "#b34231": "var(--who-2022-web-color-danger, #b42318)",
-  "#d66552": "var(--who-2022-web-color-danger-border, #d92d20)",
-  "#8c3022": "var(--who-2022-web-color-danger-strong, #912018)",
-  "#fff8f6": "var(--who-2022-web-color-danger-soft, #fff1f0)",
-  "#f3ded9": "var(--who-2022-web-color-danger-soft, #fff1f0)",
-  "#10231e": "var(--who-2022-web-color-image-background, #111827)"
-};
-
-function webThemeStyle(style: unknown): unknown {
-  if (Array.isArray(style)) return style.map(webThemeStyle);
-  if (style == null || typeof style !== "object") return style;
-  const themedStyle = Object.fromEntries(Object.entries(style).map(([property, value]) => [
-    property,
-    property === "maxWidth" && value === 760
-      ? "var(--who-2022-web-form-max-width, 48rem)"
-      : property === "borderRadius" && value === 8
-        ? "var(--who-2022-web-radius-control, 8px)"
-        : property === "borderRadius" && value === 12
-          ? "var(--who-2022-web-radius-card, 12px)"
-          : typeof value === "string" ? webThemeValues[value.toLowerCase()] ?? value : value
-  ]));
-  if ((style as Record<string, unknown>).padding === 20) {
-    delete themedStyle.padding;
-    const sharedFallback = "var(--who-2022-web-form-padding, clamp(1rem, 2.5vw, 1.5rem))";
-    themedStyle.paddingBlock = `var(--who-2022-web-form-padding-block, ${sharedFallback})`;
-    themedStyle.paddingInline = `var(--who-2022-web-form-padding-inline, ${sharedFallback})`;
-  }
-  return themedStyle;
-}
+import { applyWebTheme } from "./ui/web-theme.js";
 
 function themedPrimitive(Component: React.ElementType, displayName: string): React.ElementType {
-  const ThemedPrimitive = React.forwardRef<unknown, Record<string, unknown>>(({ style, contentContainerStyle, ...props }, ref) => (
-    <Component
-      {...props}
-      ref={ref}
-      style={webThemeStyle(style)}
-      contentContainerStyle={webThemeStyle(contentContainerStyle)}
-    />
-  ));
+  const ThemedPrimitive = React.forwardRef<unknown, Record<string, unknown>>(
+    ({ style, contentContainerStyle, ...props }, ref) => (
+      <Component
+        {...props}
+        ref={ref}
+        style={applyWebTheme(style)}
+        contentContainerStyle={applyWebTheme(contentContainerStyle)}
+      />
+    )
+  );
   ThemedPrimitive.displayName = displayName;
   return ThemedPrimitive;
 }
@@ -98,30 +55,27 @@ const ScrollView = themedPrimitive(WebScrollView, "WhoVaWebScrollView");
 const Image = themedPrimitive(WebImage, "WhoVaWebImage");
 
 const navigationStateKey = "__whoVaFormNavigation";
+const browserNavigationStates = new Map<string, WhoVaNavigationState>();
+
+function createBrowserNavigationId(): string {
+  return (
+    globalThis.crypto?.randomUUID?.() ?? `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`
+  );
+}
 
 function readBrowserNavigationState(): WhoVaNavigationState | undefined {
   if (typeof window === "undefined") return undefined;
   const historyState = window.history.state;
   if (historyState == null || typeof historyState !== "object") return undefined;
-  const state = (historyState as Record<string, unknown>)[navigationStateKey];
-  if (state == null || typeof state !== "object") return undefined;
-  const candidate = state as Partial<WhoVaNavigationState>;
-  if (
-    typeof candidate.instrumentId !== "string"
-    || typeof candidate.draftId !== "string"
-    || typeof candidate.currentSection !== "string"
-    || (candidate.view !== "form" && candidate.view !== "preview")
-    || candidate.data == null
-    || typeof candidate.data !== "object"
-  ) return undefined;
-  return candidate as WhoVaNavigationState;
+  const navigationId = (historyState as Record<string, unknown>)[navigationStateKey];
+  return typeof navigationId === "string" ? browserNavigationStates.get(navigationId) : undefined;
 }
 
-function browserHistoryEnvelope(state: WhoVaNavigationState): Record<string, unknown> {
+function browserHistoryEnvelope(navigationId: string): Record<string, unknown> {
   const current = window.history.state;
   return {
-    ...(current != null && typeof current === "object" ? current as Record<string, unknown> : {}),
-    [navigationStateKey]: state
+    ...(current != null && typeof current === "object" ? (current as Record<string, unknown>) : {}),
+    [navigationStateKey]: navigationId
   };
 }
 
@@ -129,11 +83,21 @@ const browserNavigation: WhoVaNavigationAdapter = {
   read: readBrowserNavigationState,
   replace(state) {
     if (typeof window === "undefined") return;
-    window.history.replaceState(browserHistoryEnvelope(state), "");
+    const current = window.history.state;
+    const storedNavigationId =
+      current != null && typeof current === "object"
+        ? (current as Record<string, unknown>)[navigationStateKey]
+        : undefined;
+    const navigationId =
+      typeof storedNavigationId === "string" ? storedNavigationId : createBrowserNavigationId();
+    browserNavigationStates.set(navigationId, state);
+    window.history.replaceState(browserHistoryEnvelope(navigationId), "");
   },
   push(state) {
     if (typeof window === "undefined") return;
-    window.history.pushState(browserHistoryEnvelope(state), "");
+    const navigationId = createBrowserNavigationId();
+    browserNavigationStates.set(navigationId, state);
+    window.history.pushState(browserHistoryEnvelope(navigationId), "");
   },
   back() {
     if (typeof window !== "undefined") window.history.back();
@@ -147,7 +111,11 @@ const browserNavigation: WhoVaNavigationAdapter = {
 };
 
 export * from "./core.js";
-export { WHO_VA_2022_LANGUAGES, loadWhoVa2022Instrument, loadWhoVa2022Language } from "./instrument-loader.js";
+export {
+  WHO_VA_2022_LANGUAGES,
+  loadWhoVa2022Instrument,
+  loadWhoVa2022Language
+} from "./instrument-loader.js";
 export type { WhoVaFormProps, WhoVaPlatformServices } from "./ui/create-who-va-form.js";
 
 interface WebDateInputProps extends Omit<React.InputHTMLAttributes<HTMLInputElement>, "onChange" | "style"> {
@@ -176,9 +144,11 @@ function WebDateInput({ accessibilityLabel, onChangeText, style, testID, ...prop
 function scrollToWebQuestion(questionNode: unknown) {
   if (typeof HTMLElement === "undefined" || !(questionNode instanceof HTMLElement)) return;
   questionNode.scrollIntoView?.({ behavior: "smooth", block: "start" });
-  questionNode.querySelector<HTMLElement>(
-    'input, textarea, select, button, [role="radio"], [role="checkbox"], [role="button"]'
-  )?.focus({ preventScroll: true });
+  questionNode
+    .querySelector<HTMLElement>(
+      'input, textarea, select, button, [role="radio"], [role="checkbox"], [role="button"]'
+    )
+    ?.focus({ preventScroll: true });
 }
 
 function selectWebFile(accept: string, capture = false): Promise<File | undefined> {
@@ -187,14 +157,18 @@ function selectWebFile(accept: string, capture = false): Promise<File | undefine
     input.type = "file";
     input.accept = accept;
     if (capture) input.setAttribute("capture", "environment");
-    input.addEventListener("change", () => {
-      const file = input.files?.[0];
-      if (!file) {
-        resolve(undefined);
-        return;
-      }
-      resolve(file);
-    }, { once: true });
+    input.addEventListener(
+      "change",
+      () => {
+        const file = input.files?.[0];
+        if (!file) {
+          resolve(undefined);
+          return;
+        }
+        resolve(file);
+      },
+      { once: true }
+    );
     input.addEventListener("cancel", () => resolve(undefined), { once: true });
     input.click();
   });
@@ -224,28 +198,45 @@ const webAttachmentPlatform: WhoVaPlatformServices = {
   selectFile: async (_question, _data, acceptedMimeTypes) => {
     const file = await selectWebFile(acceptedMimeTypes.join(","));
     if (!file) return undefined;
-    const imageSelected = acceptedMimeTypes.includes("image/jpeg")
-      && (file.type === "image/jpeg" || file.type === "image/png" || /\.(?:jpe?g|png)$/i.test(file.name));
+    const imageSelected =
+      acceptedMimeTypes.includes("image/jpeg") &&
+      (file.type === "image/jpeg" || file.type === "image/png" || /\.(?:jpe?g|png)$/i.test(file.name));
     if (imageSelected) return processWebImageAttachment(file, { store: webAttachmentStore });
-    if (acceptedMimeTypes.includes("application/pdf")) return processWebPdfAttachment(file, { store: webAttachmentStore });
+    if (acceptedMimeTypes.includes("application/pdf"))
+      return processWebPdfAttachment(file, { store: webAttachmentStore });
     return undefined;
   },
   resolveAttachmentUri: async (attachment) => {
-    if (attachment == null || Array.isArray(attachment) || typeof attachment !== "object" || typeof attachment.id !== "string") return undefined;
+    if (
+      attachment == null ||
+      Array.isArray(attachment) ||
+      typeof attachment !== "object" ||
+      typeof attachment.id !== "string"
+    )
+      return undefined;
     return resolveWebAttachmentUri({ id: attachment.id }, webAttachmentStore);
   },
   releaseAttachmentUri: (uri) => {
     if (uri.startsWith("blob:")) URL.revokeObjectURL(uri);
   },
   removeAttachment: async (attachment) => {
-    if (attachment != null && !Array.isArray(attachment) && typeof attachment === "object" && typeof attachment.id === "string") {
+    if (
+      attachment != null &&
+      !Array.isArray(attachment) &&
+      typeof attachment === "object" &&
+      typeof attachment.id === "string"
+    ) {
       const pages = Array.isArray(attachment.pages) ? attachment.pages : [];
-      const pageIds = pages.flatMap((page) => (
-        page != null && typeof page === "object" && "id" in page && typeof page.id === "string" ? [page.id] : []
-      ));
-      await Promise.all(pageIds.length > 0
-        ? pageIds.map((id) => webAttachmentStore.remove(id))
-        : [webAttachmentStore.remove(attachment.id)]);
+      const pageIds = pages.flatMap((page) =>
+        page != null && typeof page === "object" && "id" in page && typeof page.id === "string"
+          ? [page.id]
+          : []
+      );
+      await Promise.all(
+        pageIds.length > 0
+          ? pageIds.map((id) => webAttachmentStore.remove(id))
+          : [webAttachmentStore.remove(attachment.id)]
+      );
     }
   }
 };
@@ -263,19 +254,22 @@ export {
 export { startWebAudioRecording } from "./web-audio.js";
 export type * from "./web-audio.js";
 
-export const WhoVaForm = createWhoVaForm({
-  View,
-  Text,
-  TextInput,
-  DateInput: WebDateInput,
-  Pressable,
-  ScrollView,
-  Image,
-  platform: webAttachmentPlatform,
-  draftStore: createLocalStorageDraftStore(),
-  navigation: browserNavigation,
-  scrollToQuestion: scrollToWebQuestion
-}, loadWhoVa2022Instrument);
+export const WhoVaForm = createWhoVaForm(
+  {
+    View,
+    Text,
+    TextInput,
+    DateInput: WebDateInput,
+    Pressable,
+    ScrollView,
+    Image,
+    platform: webAttachmentPlatform,
+    draftStore: createLocalStorageDraftStore(),
+    navigation: browserNavigation,
+    scrollToQuestion: scrollToWebQuestion
+  },
+  loadWhoVa2022Instrument
+);
 
 export const WhoVaQuestionControls = createWhoVaQuestionControls({
   View,

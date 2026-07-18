@@ -6,10 +6,10 @@ Attachment selection is fail-closed. A file chooser's extension and reported MIM
 
 `WHO_VA_ATTACHMENT_POLICY` is the single runtime policy used by web and native adapters.
 
-| Attachment | Input | Processing | Stored output |
-| --- | --- | --- | --- |
-| Image | JPEG or PNG, at most 20 MB, at most 40 megapixels and 20,000 px on either edge | Verify signature and dimensions, decode, correct browser orientation, resize to a 2,048 px longest edge, add a white background, and retry JPEG encoding at decreasing quality | One UUID-named JPEG of at most 2 MB |
-| PDF | Valid PDF signature, at most 10 MB and 20 pages | Parse every page, render it with active forms/XFA disabled, and JPEG-encode each page at a 2,048 px longest edge | An atomic page-image manifest of at most 20 MB; the PDF itself is discarded |
+| Attachment | Input                                                                         | Processing                                                                                                                                                                     | Stored output                                                               |
+| ---------- | ----------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------- |
+| Image      | JPEG or PNG, at most 10 MB, at most 16 megapixels and 8,192 px on either edge | Verify signature and dimensions, decode, correct browser orientation, resize to a 2,048 px longest edge, add a white background, and retry JPEG encoding at decreasing quality | One UUID-named JPEG of at most 2 MB                                         |
+| PDF        | Valid PDF signature, at most 5 MB and 10 pages                                | Parse every page, render it with active forms/XFA disabled, and JPEG-encode each page at a 1,600 px longest edge                                                               | An atomic page-image manifest of at most 10 MB; the PDF itself is discarded |
 
 SVG, GIF, HEIC, WebP, renamed executables, renamed PDFs, malformed images, zero-sized images, and files outside the policy are rejected. They can be added later only with an explicit decoder, canonical output format, and tests.
 
@@ -39,16 +39,17 @@ const platform = {
     const asset = await pickFromImageLibrary();
     return { uri: asset.uri, name: asset.fileName ?? "selected-image" };
   },
-  processImage: async (selection) => processNativeImageAttachment(selection, {
-    getSize: appFiles.getSize,
-    read: appFiles.readBytes,
-    encodeJpeg: async (uri, options) => {
-      // Use expo-image-manipulator here. Return its temporary JPEG URI.
-      return manipulateToJpeg(uri, options);
-    },
-    persist: appFiles.copyIntoEncryptedAttachmentStore,
-    remove: appFiles.removeTemporaryFile
-  })
+  processImage: async (selection) =>
+    processNativeImageAttachment(selection, {
+      getSize: appFiles.getSize,
+      read: appFiles.readBytes,
+      encodeJpeg: async (uri, options) => {
+        // Use expo-image-manipulator here. Return its temporary JPEG URI.
+        return manipulateToJpeg(uri, options);
+      },
+      persist: appFiles.copyIntoEncryptedAttachmentStore,
+      remove: appFiles.removeTemporaryFile
+    })
 };
 ```
 

@@ -22,13 +22,29 @@ function png(width: number, height: number, size = 32): Uint8Array {
 function jpeg(width: number, height: number, size = 64): Uint8Array {
   const bytes = new Uint8Array(Math.max(size, 23));
   bytes.set([
-    0xff, 0xd8,
-    0xff, 0xe0, 0x00, 0x04, 0x00, 0x00,
-    0xff, 0xc0, 0x00, 0x0b, 0x08,
-    (height >> 8) & 0xff, height & 0xff,
-    (width >> 8) & 0xff, width & 0xff,
-    0x01, 0x01, 0x11, 0x00,
-    0xff, 0xd9
+    0xff,
+    0xd8,
+    0xff,
+    0xe0,
+    0x00,
+    0x04,
+    0x00,
+    0x00,
+    0xff,
+    0xc0,
+    0x00,
+    0x0b,
+    0x08,
+    (height >> 8) & 0xff,
+    height & 0xff,
+    (width >> 8) & 0xff,
+    width & 0xff,
+    0x01,
+    0x01,
+    0x11,
+    0x00,
+    0xff,
+    0xd9
   ]);
   return bytes;
 }
@@ -47,37 +63,53 @@ describe("attachment processing", () => {
       height: 800
     });
 
-    expect(() => inspectRasterImage(new TextEncoder().encode("<?php echo 'bad'; ?>"), "photo.jpg"))
-      .toThrowError(AttachmentProcessingError);
+    expect(() =>
+      inspectRasterImage(new TextEncoder().encode("<?php echo 'bad'; ?>"), "photo.jpg")
+    ).toThrowError(AttachmentProcessingError);
   });
 
   it("rejects excessive input bytes and pixel dimensions before invoking the transcoder", async () => {
     const transcoder: ImageTranscoder = { encodeJpeg: vi.fn() };
 
-    await expect(processImageAttachment({
-      name: "huge.jpg",
-      bytes: jpeg(100, 100, WHO_VA_ATTACHMENT_POLICY.image.maxInputBytes + 1)
-    }, transcoder)).rejects.toMatchObject({ code: "image-input-too-large" });
+    await expect(
+      processImageAttachment(
+        {
+          name: "huge.jpg",
+          bytes: jpeg(100, 100, WHO_VA_ATTACHMENT_POLICY.image.maxInputBytes + 1)
+        },
+        transcoder
+      )
+    ).rejects.toMatchObject({ code: "image-input-too-large" });
 
-    await expect(processImageAttachment({
-      name: "pixel-bomb.png",
-      bytes: png(20_000, 20_000)
-    }, transcoder)).rejects.toMatchObject({ code: "image-dimensions-too-large" });
+    await expect(
+      processImageAttachment(
+        {
+          name: "pixel-bomb.png",
+          bytes: png(20_000, 20_000)
+        },
+        transcoder
+      )
+    ).rejects.toMatchObject({ code: "image-dimensions-too-large" });
 
     expect(transcoder.encodeJpeg).not.toHaveBeenCalled();
   });
 
   it("creates a bounded UUID-named JPEG and retries compression when necessary", async () => {
-    const encodeJpeg = vi.fn()
+    const encodeJpeg = vi
+      .fn()
       .mockResolvedValueOnce(jpeg(2048, 1365, WHO_VA_ATTACHMENT_POLICY.image.maxOutputBytes + 1))
       .mockResolvedValueOnce(jpeg(2048, 1365, 800_000));
 
-    const processed = await processImageAttachment({
-      name: "death-certificate.PNG",
-      bytes: png(3000, 2000)
-    }, { encodeJpeg }, {
-      createId: () => "53e80b9f-ff9b-4b52-9842-e36f38931a6c"
-    });
+    const processed = await processImageAttachment(
+      {
+        name: "death-certificate.PNG",
+        bytes: png(3000, 2000)
+      },
+      { encodeJpeg },
+      {
+        createId: () => "53e80b9f-ff9b-4b52-9842-e36f38931a6c"
+      }
+    );
 
     expect(encodeJpeg).toHaveBeenNthCalledWith(1, expect.anything(), {
       width: 2048,
@@ -85,7 +117,11 @@ describe("attachment processing", () => {
       quality: 0.82,
       background: "#ffffff"
     });
-    expect(encodeJpeg).toHaveBeenNthCalledWith(2, expect.anything(), expect.objectContaining({ quality: 0.72 }));
+    expect(encodeJpeg).toHaveBeenNthCalledWith(
+      2,
+      expect.anything(),
+      expect.objectContaining({ quality: 0.72 })
+    );
     expect(processed).toMatchObject({
       id: "53e80b9f-ff9b-4b52-9842-e36f38931a6c",
       name: "53e80b9f-ff9b-4b52-9842-e36f38931a6c.jpg",
@@ -100,9 +136,14 @@ describe("attachment processing", () => {
 
   it("discards an image that cannot be reduced below the final byte limit", async () => {
     const oversized = jpeg(2048, 1365, WHO_VA_ATTACHMENT_POLICY.image.maxOutputBytes + 1);
-    await expect(processImageAttachment({ name: "photo.jpg", bytes: jpeg(3000, 2000) }, {
-      encodeJpeg: vi.fn().mockResolvedValue(oversized)
-    })).rejects.toMatchObject({ code: "image-output-too-large" });
+    await expect(
+      processImageAttachment(
+        { name: "photo.jpg", bytes: jpeg(3000, 2000) },
+        {
+          encodeJpeg: vi.fn().mockResolvedValue(oversized)
+        }
+      )
+    ).rejects.toMatchObject({ code: "image-output-too-large" });
   });
 
   it("converts every PDF page to a bounded JPEG manifest without retaining the PDF", async () => {
@@ -126,8 +167,14 @@ describe("attachment processing", () => {
       size: 850_000,
       originalRetained: false,
       pages: [
-        expect.objectContaining({ name: "00cbb4a9-b379-4f8c-8a30-80410a9eab4e-page-001.jpg", mimeType: "image/jpeg" }),
-        expect.objectContaining({ name: "00cbb4a9-b379-4f8c-8a30-80410a9eab4e-page-002.jpg", mimeType: "image/jpeg" })
+        expect.objectContaining({
+          name: "00cbb4a9-b379-4f8c-8a30-80410a9eab4e-page-001.jpg",
+          mimeType: "image/jpeg"
+        }),
+        expect.objectContaining({
+          name: "00cbb4a9-b379-4f8c-8a30-80410a9eab4e-page-002.jpg",
+          mimeType: "image/jpeg"
+        })
       ]
     });
     expect(processed).not.toHaveProperty("bytes");
@@ -135,22 +182,38 @@ describe("attachment processing", () => {
 
   it("rejects renamed PDFs and fails the entire conversion when rendering fails", async () => {
     const rasterizePdf = vi.fn();
-    await expect(processPdfAttachment({
-      name: "renamed.pdf",
-      bytes: new TextEncoder().encode("<script>alert(1)</script>")
-    }, { rasterizePdf })).rejects.toMatchObject({ code: "pdf-type-not-allowed" });
+    await expect(
+      processPdfAttachment(
+        {
+          name: "renamed.pdf",
+          bytes: new TextEncoder().encode("<script>alert(1)</script>")
+        },
+        { rasterizePdf }
+      )
+    ).rejects.toMatchObject({ code: "pdf-type-not-allowed" });
     expect(rasterizePdf).not.toHaveBeenCalled();
 
-    await expect(processPdfAttachment({ name: "corrupt.pdf", bytes: pdf() }, {
-      rasterizePdf: vi.fn().mockRejectedValue(new Error("xref parse failed"))
-    })).rejects.toMatchObject({ code: "pdf-render-failed" });
+    await expect(
+      processPdfAttachment(
+        { name: "corrupt.pdf", bytes: pdf() },
+        {
+          rasterizePdf: vi.fn().mockRejectedValue(new Error("xref parse failed"))
+        }
+      )
+    ).rejects.toMatchObject({ code: "pdf-render-failed" });
   });
 
   it("rejects PDF page output that exceeds the configured atomic limit", async () => {
-    await expect(processPdfAttachment({ name: "large-output.pdf", bytes: pdf() }, {
-      rasterizePdf: vi.fn().mockResolvedValue([{ bytes: jpeg(100, 100), width: 100, height: 100 }])
-    }, {
-      policy: { ...WHO_VA_ATTACHMENT_POLICY.pdf, maxOutputBytes: 10 }
-    })).rejects.toMatchObject({ code: "pdf-output-too-large" });
+    await expect(
+      processPdfAttachment(
+        { name: "large-output.pdf", bytes: pdf() },
+        {
+          rasterizePdf: vi.fn().mockResolvedValue([{ bytes: jpeg(100, 100), width: 100, height: 100 }])
+        },
+        {
+          policy: { ...WHO_VA_ATTACHMENT_POLICY.pdf, maxOutputBytes: 10 }
+        }
+      )
+    ).rejects.toMatchObject({ code: "pdf-output-too-large" });
   });
 });

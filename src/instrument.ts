@@ -7,7 +7,9 @@ import generatedInstrument from "./generated/who-va-2022.instrument.json";
 import type { InstrumentDefinition, InstrumentQuestion } from "./types.js";
 
 const generated = generatedInstrument as InstrumentDefinition;
-const medicalCertificateAnchorIndex = generated.questions.findIndex((question) => question.name === "Id10473");
+const medicalCertificateAnchorIndex = generated.questions.findIndex(
+  (question) => question.name === "Id10473"
+);
 
 if (medicalCertificateAnchorIndex < 0) {
   throw new Error("Cannot add the medical-certificate upload because Id10473 is missing");

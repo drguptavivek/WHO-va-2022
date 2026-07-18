@@ -16,23 +16,25 @@ const instrument: InstrumentDefinition = {
   defaultLanguage: "English (en)",
   sourceFile: "test.xlsx",
   sections: [{ name: "main", sourceRow: 1, order: 1, label: { en: "Main" } }],
-  questions: [{
-    name: "symptom",
-    order: 1,
-    sourceRow: 2,
-    sourceType: "select_one symptoms",
-    dataType: "string",
-    control: "singleChoice",
-    label: { en: "Symptom" },
-    hint: { en: "Choose one" },
-    guidance: {},
-    required: true,
-    readOnly: false,
-    choices: [{ value: "fever", sourceRow: 2, label: { en: "Fever" } }],
-    constraint: { source: ". = 'fever'" },
-    constraintMessage: { en: "Choose fever" },
-    sectionPath: ["main"]
-  }]
+  questions: [
+    {
+      name: "symptom",
+      order: 1,
+      sourceRow: 2,
+      sourceType: "select_one symptoms",
+      dataType: "string",
+      control: "singleChoice",
+      label: { en: "Symptom" },
+      hint: { en: "Choose one" },
+      guidance: {},
+      required: true,
+      readOnly: false,
+      choices: [{ value: "fever", sourceRow: 2, label: { en: "Fever" } }],
+      constraint: { source: ". = 'fever'" },
+      constraintMessage: { en: "Choose fever" },
+      sectionPath: ["main"]
+    }
+  ]
 };
 
 describe("instrument internationalization", () => {
@@ -141,16 +143,20 @@ describe("instrument internationalization", () => {
   it("evicts the least-recently-used translated instrument when the cache is full", async () => {
     let frenchImports = 0;
     let swahiliImports = 0;
-    const loadLanguage = createWhoVaLanguageLoader(instrument, {
-      fr: async () => {
-        frenchImports += 1;
-        return { locale: "fr", instrument: { questions: { symptom: { label: "Symptôme" } } } };
+    const loadLanguage = createWhoVaLanguageLoader(
+      instrument,
+      {
+        fr: async () => {
+          frenchImports += 1;
+          return { locale: "fr", instrument: { questions: { symptom: { label: "Symptôme" } } } };
+        },
+        sw: async () => {
+          swahiliImports += 1;
+          return { locale: "sw", instrument: { questions: { symptom: { label: "Dalili" } } } };
+        }
       },
-      sw: async () => {
-        swahiliImports += 1;
-        return { locale: "sw", instrument: { questions: { symptom: { label: "Dalili" } } } };
-      }
-    }, { maxCachedLanguages: 1 });
+      { maxCachedLanguages: 1 }
+    );
 
     await loadLanguage("fr");
     await loadLanguage("sw");

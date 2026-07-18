@@ -120,24 +120,33 @@ function representativeAnswer(item: InstrumentQuestion): AnswerValue | undefined
   const firstChoice = item.choices?.[0];
   if (firstChoice) return item.dataType === "string[]" ? [firstChoice.value] : firstChoice.value;
   switch (item.dataType) {
-    case "string": return "E2E answer";
-    case "number": return 30;
-    case "boolean": return true;
-    case "date": return INTERVIEW_DATE;
-    case "dateTime": return NOW.toISOString();
-    case "attachment": return { uri: "attachment://age-path-e2e" };
-    case "audit": return { startedAt: NOW.toISOString() };
-    case "string[]": return ["E2E answer"];
+    case "string":
+      return "E2E answer";
+    case "number":
+      return 30;
+    case "boolean":
+      return true;
+    case "date":
+      return INTERVIEW_DATE;
+    case "dateTime":
+      return NOW.toISOString();
+    case "attachment":
+      return { uri: "attachment://age-path-e2e" };
+    case "audit":
+      return { startedAt: NOW.toISOString() };
+    case "string[]":
+      return ["E2E answer"];
     case "calculated":
-    case "none": return undefined;
+    case "none":
+      return undefined;
   }
 }
 
 function answerVisibleQuestions(session: WhoVaSession, overrides: Record<string, AnswerValue> = {}): void {
   for (let pass = 0; pass < whoVa2022Instrument.questions.length; pass += 1) {
     const snapshot = session.getSnapshot();
-    const unanswered = snapshot.questions.filter((item) =>
-      !["note", "calculated", "system"].includes(item.control) && snapshot.data[item.name] == null
+    const unanswered = snapshot.questions.filter(
+      (item) => !["note", "calculated", "system"].includes(item.control) && snapshot.data[item.name] == null
     );
     if (!unanswered.length) return;
     for (const item of unanswered) {
@@ -179,33 +188,36 @@ function finishDeceasedScreen(session: WhoVaSession, born: string): void {
 }
 
 describe("age-wise WHO VA screen paths from Id10021", () => {
-  it.each(agePaths)(
-    "$label derives the age path and exposes the expected fields and screens",
-    (path) => {
-      const session = createWhoVaSession(whoVa2022Instrument, { now: () => NOW });
-      reachDeceasedScreen(session);
-      finishDeceasedScreen(session, path.born);
+  it.each(agePaths)("$label derives the age path and exposes the expected fields and screens", (path) => {
+    const session = createWhoVaSession(whoVa2022Instrument, { now: () => NOW });
+    reachDeceasedScreen(session);
+    finishDeceasedScreen(session, path.born);
 
-      const deceased = session.getSnapshot();
-      expect(deceased.data.Id10021).toBe(path.born);
-      expect(deceased.data.ageInDays).toBe(path.ageInDays);
-      expect(deceased.data[path.classification]).toBe("1");
-      expect(deceased.questions.map((item) => item.name)).toContain(path.ageDisplay);
+    const deceased = session.getSnapshot();
+    expect(deceased.data.Id10021).toBe(path.born);
+    expect(deceased.data.ageInDays).toBe(path.ageInDays);
+    expect(deceased.data[path.classification]).toBe("1");
+    expect(deceased.questions.map((item) => item.name)).toContain(path.ageDisplay);
 
-      const relevanceData = { ...deceased.data, ...path.branchAnswers };
+    const relevanceData = { ...deceased.data, ...path.branchAnswers };
 
-      for (const name of path.visibleFields) {
-        expect(isQuestionRelevant(whoVa2022Instrument, question(name), relevanceData), `${name} should be visible`).toBe(true);
-      }
-      for (const name of path.hiddenFields) {
-        expect(isQuestionRelevant(whoVa2022Instrument, question(name), relevanceData), `${name} should be hidden`).toBe(false);
-      }
-
-      advance(session);
-      expect(session.getSnapshot().currentSection.name).toBe("narrat");
-      answerVisibleQuestions(session);
-      advance(session);
-      expect(session.getSnapshot().currentSection.name).toBe(path.firstAgeSpecificScreen);
+    for (const name of path.visibleFields) {
+      expect(
+        isQuestionRelevant(whoVa2022Instrument, question(name), relevanceData),
+        `${name} should be visible`
+      ).toBe(true);
     }
-  );
+    for (const name of path.hiddenFields) {
+      expect(
+        isQuestionRelevant(whoVa2022Instrument, question(name), relevanceData),
+        `${name} should be hidden`
+      ).toBe(false);
+    }
+
+    advance(session);
+    expect(session.getSnapshot().currentSection.name).toBe("narrat");
+    answerVisibleQuestions(session);
+    advance(session);
+    expect(session.getSnapshot().currentSection.name).toBe(path.firstAgeSpecificScreen);
+  });
 });

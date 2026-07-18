@@ -49,6 +49,48 @@ export interface WhoVaUiMessageTemplates {
   yes: string;
   no: string;
   recorded: string;
+  startingMicrophone: string;
+  stopAndSaveRecording: string;
+  savingRecording: string;
+  replaceAudio: string;
+  recordAudio: string;
+  microphonePermissionDenied: string;
+  audioRecordingFailed: string;
+  selectedImage: string;
+  savedImageLoadFailed: string;
+  openingCamera: string;
+  camera: string;
+  openingImages: string;
+  replaceImage: string;
+  chooseImage: string;
+  hideImage: string;
+  viewImage: string;
+  rotate: string;
+  zoomIn: string;
+  zoomOut: string;
+  removeImage: string;
+  attachment: string;
+  pdf: string;
+  openingFiles: string;
+  replaceAttachment: string;
+  chooseAttachment: string;
+  removeAttachment: string;
+  attachmentProcessingFailed: string;
+  imageInputTooLarge: string;
+  imageTypeNotAllowed: string;
+  imageDimensionsInvalid: string;
+  imageDimensionsTooLarge: string;
+  imageDecodeFailed: string;
+  imageOutputInvalid: string;
+  imageOutputTooLarge: string;
+  imageProcessingUnavailable: string;
+  attachmentStorageFailed: string;
+  pdfInputTooLarge: string;
+  pdfTypeNotAllowed: string;
+  pdfRenderFailed: string;
+  pdfTooManyPages: string;
+  pdfOutputTooLarge: string;
+  pdfProcessingUnavailable: string;
 }
 
 /** One independently importable language file. */
@@ -101,6 +143,48 @@ export interface WhoVaUiMessages {
   yes: string;
   no: string;
   recorded: string;
+  startingMicrophone: string;
+  stopAndSaveRecording: string;
+  savingRecording: string;
+  replaceAudio: string;
+  recordAudio: string;
+  microphonePermissionDenied: string;
+  audioRecordingFailed: string;
+  selectedImage: string;
+  savedImageLoadFailed: string;
+  openingCamera: string;
+  camera: string;
+  openingImages: string;
+  replaceImage: string;
+  chooseImage: string;
+  hideImage: string;
+  viewImage: string;
+  rotate: string;
+  zoomIn: string;
+  zoomOut: string;
+  removeImage: string;
+  attachment: string;
+  pdf: string;
+  openingFiles: string;
+  replaceAttachment: (kind: string) => string;
+  chooseAttachment: (kind: string) => string;
+  removeAttachment: (kind: string) => string;
+  attachmentProcessingFailed: string;
+  imageInputTooLarge: string;
+  imageTypeNotAllowed: string;
+  imageDimensionsInvalid: string;
+  imageDimensionsTooLarge: string;
+  imageDecodeFailed: string;
+  imageOutputInvalid: string;
+  imageOutputTooLarge: string;
+  imageProcessingUnavailable: string;
+  attachmentStorageFailed: string;
+  pdfInputTooLarge: string;
+  pdfTypeNotAllowed: string;
+  pdfRenderFailed: string;
+  pdfTooManyPages: string;
+  pdfOutputTooLarge: string;
+  pdfProcessingUnavailable: string;
 }
 
 export type WhoVaUiTranslations = Record<string, Partial<WhoVaUiMessageTemplates>>;
@@ -133,13 +217,56 @@ export const ENGLISH_UI_MESSAGE_TEMPLATES: WhoVaUiMessageTemplates = {
   previewAnswers: "Preview answers",
   yes: "Yes",
   no: "No",
-  recorded: "Recorded"
+  recorded: "Recorded",
+  startingMicrophone: "Starting microphone…",
+  stopAndSaveRecording: "Stop and save recording",
+  savingRecording: "Saving recording…",
+  replaceAudio: "Replace audio",
+  recordAudio: "Record audio",
+  microphonePermissionDenied:
+    "Microphone permission was denied. Allow microphone access in the browser and try again.",
+  audioRecordingFailed: "Audio recording failed. Please try again.",
+  selectedImage: "Selected image",
+  savedImageLoadFailed: "The saved image could not be loaded from this device.",
+  openingCamera: "Opening camera…",
+  camera: "Camera",
+  openingImages: "Opening images…",
+  replaceImage: "Replace image",
+  chooseImage: "Choose image",
+  hideImage: "Hide image",
+  viewImage: "View image",
+  rotate: "Rotate",
+  zoomIn: "Zoom in",
+  zoomOut: "Zoom out",
+  removeImage: "Remove image",
+  attachment: "attachment",
+  pdf: "PDF",
+  openingFiles: "Opening files…",
+  replaceAttachment: "Replace {kind}",
+  chooseAttachment: "Choose {kind}",
+  removeAttachment: "Remove {kind}",
+  attachmentProcessingFailed: "The selected attachment could not be processed and was discarded.",
+  imageInputTooLarge: "Choose an image smaller than 10 MB.",
+  imageTypeNotAllowed: "Choose a valid JPEG or PNG image. Renamed and unsupported files are not accepted.",
+  imageDimensionsInvalid: "This image has invalid dimensions and cannot be used.",
+  imageDimensionsTooLarge: "This image has too many pixels. Choose a smaller image or retake the photograph.",
+  imageDecodeFailed: "This file could not be decoded as a safe image.",
+  imageOutputInvalid: "The processed image could not be verified as a JPEG.",
+  imageOutputTooLarge: "This image could not be reduced below 2 MB. Retake it at a lower resolution.",
+  imageProcessingUnavailable: "Image processing is unavailable. The original image was not saved.",
+  attachmentStorageFailed: "The processed attachment could not be saved on this device.",
+  pdfInputTooLarge: "Choose a PDF smaller than 5 MB.",
+  pdfTypeNotAllowed: "Choose a valid PDF. Renamed and unsupported files are not accepted.",
+  pdfRenderFailed: "This PDF could not be safely converted to page images and was discarded.",
+  pdfTooManyPages: "This PDF has too many pages. Select a document with no more than 10 pages.",
+  pdfOutputTooLarge: "The converted PDF pages are too large and were discarded.",
+  pdfProcessingUnavailable: "PDF conversion is unavailable. The original PDF was not saved."
 };
 
 function format(template: string, values: Record<string, string | number>): string {
-  return template.replace(/\{([^}]+)\}/g, (match, name: string) => (
+  return template.replace(/\{([^}]+)\}/g, (match, name: string) =>
     Object.hasOwn(values, name) ? String(values[name]) : match
-  ));
+  );
 }
 
 function messagesFromTemplates(templates: WhoVaUiMessageTemplates): WhoVaUiMessages {
@@ -153,7 +280,10 @@ function messagesFromTemplates(templates: WhoVaUiMessageTemplates): WhoVaUiMessa
     invalidChoice: (name) => format(templates.invalidChoice, { name }),
     invalidConstraint: (name) => format(templates.invalidConstraint, { name }),
     invalidDate: (dateFormat, example) => format(templates.invalidDate, { format: dateFormat, example }),
-    answeredQuestions: (count) => format(templates.answeredQuestions, { count })
+    answeredQuestions: (count) => format(templates.answeredQuestions, { count }),
+    replaceAttachment: (kind) => format(templates.replaceAttachment, { kind }),
+    chooseAttachment: (kind) => format(templates.chooseAttachment, { kind }),
+    removeAttachment: (kind) => format(templates.removeAttachment, { kind })
   };
 }
 
@@ -166,7 +296,10 @@ export function localeCandidates(locale: string): string[] {
 }
 
 export function localeFromLanguageName(value: string): string | undefined {
-  return value.match(/\(([A-Za-z0-9_-]+)\)\s*$/)?.[1]?.replaceAll("_", "-").toLowerCase();
+  return value
+    .match(/\(([A-Za-z0-9_-]+)\)\s*$/)?.[1]
+    ?.replaceAll("_", "-")
+    .toLowerCase();
 }
 
 export function localizeText(text: LocalizedText, locale: string, fallback = ""): string {
@@ -180,7 +313,9 @@ export function localizeText(text: LocalizedText, locale: string, fallback = "")
 export function resolveUiMessages(locale: string, translations: WhoVaUiTranslations = {}): WhoVaUiMessages {
   let templates = { ...ENGLISH_UI_MESSAGE_TEMPLATES };
   for (const candidate of localeCandidates(locale).reverse()) {
-    const key = Object.keys(translations).find((item) => item.toLowerCase().replaceAll("_", "-") === candidate);
+    const key = Object.keys(translations).find(
+      (item) => item.toLowerCase().replaceAll("_", "-") === candidate
+    );
     if (key && translations[key]) templates = { ...templates, ...translations[key] };
   }
   return messagesFromTemplates(templates);
@@ -226,7 +361,8 @@ export function withInstrumentTranslations(
         guidance[key] = value.guidance;
       }
       if (value.constraintMessage) {
-        if (constraintMessage === question.constraintMessage) constraintMessage = { ...question.constraintMessage };
+        if (constraintMessage === question.constraintMessage)
+          constraintMessage = { ...question.constraintMessage };
         constraintMessage[key] = value.constraintMessage;
       }
       if (value.choices && choices) {
@@ -236,11 +372,12 @@ export function withInstrumentTranslations(
         });
       }
     }
-    const changed = label !== question.label
-      || hint !== question.hint
-      || guidance !== question.guidance
-      || constraintMessage !== question.constraintMessage
-      || choices !== question.choices;
+    const changed =
+      label !== question.label ||
+      hint !== question.hint ||
+      guidance !== question.guidance ||
+      constraintMessage !== question.constraintMessage ||
+      choices !== question.choices;
     return changed
       ? { ...question, label, hint, guidance, constraintMessage, ...(choices ? { choices } : {}) }
       : question;
@@ -257,7 +394,9 @@ export function withInstrumentTranslation(
   return withInstrumentTranslations(instrument, { [locale]: translation });
 }
 
-function languageFileFromModule(module: WhoVaLanguageFile | { default: WhoVaLanguageFile }): WhoVaLanguageFile {
+function languageFileFromModule(
+  module: WhoVaLanguageFile | { default: WhoVaLanguageFile }
+): WhoVaLanguageFile {
   return "default" in module ? module.default : module;
 }
 
@@ -282,7 +421,9 @@ export function createWhoVaLanguageLoader(
     }
     const loading = (async () => {
       for (const candidate of localeCandidates(requestedLocale)) {
-        const key = Object.keys(imports).find((item) => item.toLowerCase().replaceAll("_", "-") === candidate);
+        const key = Object.keys(imports).find(
+          (item) => item.toLowerCase().replaceAll("_", "-") === candidate
+        );
         if (!key || !imports[key]) continue;
         const file = languageFileFromModule(await imports[key]());
         const locale = file.locale.toLowerCase().replaceAll("_", "-");

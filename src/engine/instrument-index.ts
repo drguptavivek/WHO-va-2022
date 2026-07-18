@@ -1,8 +1,4 @@
-import type {
-  InstrumentDefinition,
-  InstrumentQuestion,
-  InstrumentSection
-} from "../types.js";
+import type { InstrumentDefinition, InstrumentQuestion, InstrumentSection } from "../types.js";
 
 export interface InstrumentRuntimeIndex {
   questionsByName: ReadonlyMap<string, InstrumentQuestion>;

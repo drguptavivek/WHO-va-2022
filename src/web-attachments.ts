@@ -90,19 +90,33 @@ function openAttachmentDatabase(factory: IDBFactory): Promise<IDBDatabase> {
       }
     });
     request.addEventListener("success", () => resolve(request.result), { once: true });
-    request.addEventListener("error", () => reject(request.error ?? new Error("Unable to open attachment storage")), { once: true });
+    request.addEventListener(
+      "error",
+      () => reject(request.error ?? new Error("Unable to open attachment storage")),
+      { once: true }
+    );
   });
 }
 
 function transactionComplete(transaction: IDBTransaction): Promise<void> {
   return new Promise((resolve, reject) => {
     transaction.addEventListener("complete", () => resolve(), { once: true });
-    transaction.addEventListener("abort", () => reject(transaction.error ?? new Error("Attachment storage transaction was aborted")), { once: true });
-    transaction.addEventListener("error", () => reject(transaction.error ?? new Error("Attachment storage transaction failed")), { once: true });
+    transaction.addEventListener(
+      "abort",
+      () => reject(transaction.error ?? new Error("Attachment storage transaction was aborted")),
+      { once: true }
+    );
+    transaction.addEventListener(
+      "error",
+      () => reject(transaction.error ?? new Error("Attachment storage transaction failed")),
+      { once: true }
+    );
   });
 }
 
-export function createIndexedDbWebAttachmentStore(factory: IDBFactory | undefined = globalThis.indexedDB): WebAttachmentBinaryStore {
+export function createIndexedDbWebAttachmentStore(
+  factory: IDBFactory | undefined = globalThis.indexedDB
+): WebAttachmentBinaryStore {
   let database: Promise<IDBDatabase> | undefined;
   const getDatabase = () => {
     if (!factory) return Promise.reject(new Error("IndexedDB is unavailable"));
@@ -119,8 +133,16 @@ export function createIndexedDbWebAttachmentStore(factory: IDBFactory | undefine
       const transaction = (await getDatabase()).transaction(WEB_ATTACHMENT_OBJECT_STORE, "readonly");
       const request = transaction.objectStore(WEB_ATTACHMENT_OBJECT_STORE).get(id);
       return await new Promise<Blob | undefined>((resolve, reject) => {
-        request.addEventListener("success", () => resolve(request.result instanceof Blob ? request.result : undefined), { once: true });
-        request.addEventListener("error", () => reject(request.error ?? new Error("Unable to load attachment")), { once: true });
+        request.addEventListener(
+          "success",
+          () => resolve(request.result instanceof Blob ? request.result : undefined),
+          { once: true }
+        );
+        request.addEventListener(
+          "error",
+          () => reject(request.error ?? new Error("Unable to load attachment")),
+          { once: true }
+        );
       });
     },
     async remove(id) {
@@ -132,8 +154,16 @@ export function createIndexedDbWebAttachmentStore(factory: IDBFactory | undefine
       const transaction = (await getDatabase()).transaction(WEB_ATTACHMENT_OBJECT_STORE, "readonly");
       const request = transaction.objectStore(WEB_ATTACHMENT_OBJECT_STORE).getAllKeys();
       return await new Promise<string[]>((resolve, reject) => {
-        request.addEventListener("success", () => resolve(request.result.filter((key): key is string => typeof key === "string")), { once: true });
-        request.addEventListener("error", () => reject(request.error ?? new Error("Unable to list attachments")), { once: true });
+        request.addEventListener(
+          "success",
+          () => resolve(request.result.filter((key): key is string => typeof key === "string")),
+          { once: true }
+        );
+        request.addEventListener(
+          "error",
+          () => reject(request.error ?? new Error("Unable to list attachments")),
+          { once: true }
+        );
       });
     }
   };
@@ -142,7 +172,7 @@ export function createIndexedDbWebAttachmentStore(factory: IDBFactory | undefine
 function canvasToJpeg(canvas: HTMLCanvasElement, quality: number): Promise<Blob> {
   return new Promise((resolve, reject) => {
     canvas.toBlob(
-      (blob) => blob ? resolve(blob) : reject(new Error("The browser could not encode the image")),
+      (blob) => (blob ? resolve(blob) : reject(new Error("The browser could not encode the image"))),
       "image/jpeg",
       quality
     );
@@ -200,26 +230,31 @@ async function processBrowserBlobImage(
     throw new AttachmentProcessingError("image-decode-failed", error);
   }
   try {
-    return await processInspectedImageAttachment(file.name, {
-      mimeType,
-      width: bitmap.width,
-      height: bitmap.height
-    }, {
-      async encodeJpeg(_image, encodingOptions) {
-        const canvas = document.createElement("canvas");
-        canvas.width = encodingOptions.width;
-        canvas.height = encodingOptions.height;
-        const context = canvas.getContext("2d");
-        if (!context) throw new Error("Canvas rendering is unavailable");
-        context.fillStyle = encodingOptions.background;
-        context.fillRect(0, 0, canvas.width, canvas.height);
-        context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
-        return new Uint8Array(await (await canvasToJpeg(canvas, encodingOptions.quality)).arrayBuffer());
+    return await processInspectedImageAttachment(
+      file.name,
+      {
+        mimeType,
+        width: bitmap.width,
+        height: bitmap.height
+      },
+      {
+        async encodeJpeg(_image, encodingOptions) {
+          const canvas = document.createElement("canvas");
+          canvas.width = encodingOptions.width;
+          canvas.height = encodingOptions.height;
+          const context = canvas.getContext("2d");
+          if (!context) throw new Error("Canvas rendering is unavailable");
+          context.fillStyle = encodingOptions.background;
+          context.fillRect(0, 0, canvas.width, canvas.height);
+          context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+          return new Uint8Array(await (await canvasToJpeg(canvas, encodingOptions.quality)).arrayBuffer());
+        }
+      },
+      {
+        policy: options.policy ?? WHO_VA_ATTACHMENT_POLICY.image,
+        ...(options.createId ? { createId: options.createId } : {})
       }
-    }, {
-      policy: options.policy ?? WHO_VA_ATTACHMENT_POLICY.image,
-      ...(options.createId ? { createId: options.createId } : {})
-    });
+    );
   } finally {
     bitmap.close();
   }
@@ -230,7 +265,10 @@ async function storeProcessedWebImage(
   store: WebAttachmentBinaryStore
 ): Promise<WebStoredAttachmentReference> {
   try {
-    await store.save(processed.id, new Blob([copiedArrayBuffer(processed.bytes)], { type: processed.mimeType }));
+    await store.save(
+      processed.id,
+      new Blob([copiedArrayBuffer(processed.bytes)], { type: processed.mimeType })
+    );
   } catch (error) {
     throw new AttachmentProcessingError("attachment-storage-failed", error);
   }
@@ -314,19 +352,24 @@ export async function processWebImageAttachment(
 ): Promise<WebStoredAttachmentReference> {
   const policy = options.policy ?? WHO_VA_ATTACHMENT_POLICY.image;
   if (file.size > policy.maxInputBytes) throw new AttachmentProcessingError("image-input-too-large");
-  const canProcessBlobDirectly = !options.transcoder
-    && file instanceof Blob
-    && typeof globalThis.createImageBitmap === "function"
-    && typeof document !== "undefined";
+  const canProcessBlobDirectly =
+    !options.transcoder &&
+    file instanceof Blob &&
+    typeof globalThis.createImageBitmap === "function" &&
+    typeof document !== "undefined";
   const processed = canProcessBlobDirectly
     ? await processBrowserBlobImage(file, options)
-    : await processImageAttachment({
-      name: file.name,
-      bytes: new Uint8Array(await file.arrayBuffer())
-    }, options.transcoder ?? createBrowserImageTranscoder(), {
-      policy,
-      ...(options.createId ? { createId: options.createId } : {})
-    });
+    : await processImageAttachment(
+        {
+          name: file.name,
+          bytes: new Uint8Array(await file.arrayBuffer())
+        },
+        options.transcoder ?? createBrowserImageTranscoder(),
+        {
+          policy,
+          ...(options.createId ? { createId: options.createId } : {})
+        }
+      );
   return storeProcessedWebImage(processed, options.store);
 }
 
@@ -336,13 +379,17 @@ export async function processWebPdfAttachment(
 ): Promise<WebStoredPdfReference> {
   const policy = WHO_VA_ATTACHMENT_POLICY.pdf;
   if (file.size > policy.maxInputBytes) throw new AttachmentProcessingError("pdf-input-too-large");
-  const processed = await processPdfAttachment({
-    name: file.name,
-    bytes: new Uint8Array(await file.arrayBuffer())
-  }, options.rasterizer ?? createPdfJsRasterizer(), {
-    policy,
-    ...(options.createId ? { createId: options.createId } : {})
-  });
+  const processed = await processPdfAttachment(
+    {
+      name: file.name,
+      bytes: new Uint8Array(await file.arrayBuffer())
+    },
+    options.rasterizer ?? createPdfJsRasterizer(),
+    {
+      policy,
+      ...(options.createId ? { createId: options.createId } : {})
+    }
+  );
 
   const savedIds: string[] = [];
   try {
@@ -404,10 +451,11 @@ function collectReferenceIds(value: unknown, output: Set<string>, seen: WeakSet<
   }
   const candidate = value as Record<string, unknown>;
   if (
-    typeof candidate.id === "string"
-    && typeof candidate.uri === "string"
-    && (candidate.uri.startsWith("who-va-attachment:") || candidate.uri.startsWith("who-va-pdf-pages:"))
-  ) output.add(candidate.id);
+    typeof candidate.id === "string" &&
+    typeof candidate.uri === "string" &&
+    (candidate.uri.startsWith("who-va-attachment:") || candidate.uri.startsWith("who-va-pdf-pages:"))
+  )
+    output.add(candidate.id);
   for (const nested of Object.values(candidate)) collectReferenceIds(nested, output, seen);
 }
 

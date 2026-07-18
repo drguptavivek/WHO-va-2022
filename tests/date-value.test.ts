@@ -5,14 +5,14 @@ import { dateFormatPlaceholder, formatDisplayDate, parseDisplayDate } from "../s
 
 describe("shared WHO date control", () => {
   it("routes every generated WHO date question through the shared date control", () => {
-    expect(whoVa2022Instrument.questions.filter((question) => question.control === "date").map((question) => question.name)).toEqual([
-      "Id10021",
-      "Id10023_a",
-      "Id10023_b",
-      "Id10024",
-      "Id10071"
-    ]);
-    expect(whoVa2022Instrument.questions.find((question) => question.name === "Id10024")?.appearance).toBe("year");
+    expect(
+      whoVa2022Instrument.questions
+        .filter((question) => question.control === "date")
+        .map((question) => question.name)
+    ).toEqual(["Id10021", "Id10023_a", "Id10023_b", "Id10024", "Id10071"]);
+    expect(whoVa2022Instrument.questions.find((question) => question.name === "Id10024")?.appearance).toBe(
+      "year"
+    );
   });
 
   it.each([

@@ -14,13 +14,29 @@ function png(width: number, height: number): Uint8Array {
 
 function jpeg(width: number, height: number): Uint8Array {
   return new Uint8Array([
-    0xff, 0xd8,
-    0xff, 0xe0, 0x00, 0x04, 0x00, 0x00,
-    0xff, 0xc0, 0x00, 0x0b, 0x08,
-    (height >> 8) & 0xff, height & 0xff,
-    (width >> 8) & 0xff, width & 0xff,
-    0x01, 0x01, 0x11, 0x00,
-    0xff, 0xd9
+    0xff,
+    0xd8,
+    0xff,
+    0xe0,
+    0x00,
+    0x04,
+    0x00,
+    0x00,
+    0xff,
+    0xc0,
+    0x00,
+    0x0b,
+    0x08,
+    (height >> 8) & 0xff,
+    height & 0xff,
+    (width >> 8) & 0xff,
+    width & 0xff,
+    0x01,
+    0x01,
+    0x11,
+    0x00,
+    0xff,
+    0xd9
   ]);
 }
 
@@ -40,10 +56,14 @@ describe("native attachment processing", () => {
       remove: vi.fn(async () => undefined)
     };
 
-    const reference = await processNativeImageAttachment({
-      uri: "file:///picker/raw.png",
-      name: "raw.png"
-    }, adapter, { createId: () => "3d602dd8-22aa-40ef-89dc-6214ff4337d7" });
+    const reference = await processNativeImageAttachment(
+      {
+        uri: "file:///picker/raw.png",
+        name: "raw.png"
+      },
+      adapter,
+      { createId: () => "3d602dd8-22aa-40ef-89dc-6214ff4337d7" }
+    );
 
     expect(reference).toMatchObject({
       id: "3d602dd8-22aa-40ef-89dc-6214ff4337d7",
@@ -69,8 +89,9 @@ describe("native attachment processing", () => {
       remove: vi.fn()
     };
 
-    await expect(processNativeImageAttachment({ uri: "file:///cache/huge.jpg", name: "huge.jpg" }, adapter))
-      .rejects.toMatchObject({ code: "image-input-too-large" });
+    await expect(
+      processNativeImageAttachment({ uri: "file:///cache/huge.jpg", name: "huge.jpg" }, adapter)
+    ).rejects.toMatchObject({ code: "image-input-too-large" });
     expect(adapter.read).not.toHaveBeenCalled();
     expect(adapter.encodeJpeg).not.toHaveBeenCalled();
   });
@@ -80,17 +101,15 @@ describe("native attachment processing", () => {
     const adapter: NativeAttachmentFileAdapter = {
       getSize: vi.fn().mockResolvedValue(4_000_000),
       inspect: vi.fn().mockResolvedValue({ mimeType: "image/png", width: 3000, height: 2000 }),
-      read: vi.fn(async (uri) => uri.includes("processed") ? encoded : new Uint8Array()),
+      read: vi.fn(async (uri) => (uri.includes("processed") ? encoded : new Uint8Array())),
       encodeJpeg: vi.fn().mockResolvedValue("file:///cache/processed.jpg"),
       persist: vi.fn(async (_uri, name) => `file:///documents/attachments/${name}`),
       remove: vi.fn().mockResolvedValue(undefined)
     };
 
-    await processNativeImageAttachment(
-      { uri: "file:///picker/raw.png", name: "raw.png" },
-      adapter,
-      { createId: () => "native-inspected" }
-    );
+    await processNativeImageAttachment({ uri: "file:///picker/raw.png", name: "raw.png" }, adapter, {
+      createId: () => "native-inspected"
+    });
 
     expect(adapter.inspect).toHaveBeenCalledWith("file:///picker/raw.png");
     expect(adapter.read).not.toHaveBeenCalledWith("file:///picker/raw.png");

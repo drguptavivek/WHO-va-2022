@@ -102,10 +102,7 @@ describe("XLSForm label references", () => {
     const root = createRoot(container);
 
     root.render(
-      <WhoVaForm
-        instrument={instrument}
-        initialData={{ birthDate: "2026-06-20", deathDate: "2026-07-17" }}
-      />
+      <WhoVaForm instrument={instrument} initialData={{ birthDate: "2026-06-20", deathDate: "2026-07-17" }} />
     );
     await new Promise((resolve) => setTimeout(resolve, 0));
 

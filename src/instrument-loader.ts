@@ -3,9 +3,7 @@ import type { InstrumentDefinition } from "./types.js";
 
 let instrumentPromise: Promise<InstrumentDefinition> | undefined;
 
-export const WHO_VA_2022_LANGUAGES = [
-  { locale: "en", label: "English" }
-] as const;
+export const WHO_VA_2022_LANGUAGES = [{ locale: "en", label: "English" }] as const;
 
 /** Loads the built-in offline instrument once, when an interview first needs it. */
 export function loadWhoVa2022Instrument(): Promise<InstrumentDefinition> {

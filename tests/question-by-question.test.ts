@@ -18,41 +18,64 @@ const knownNames = new Set(whoVa2022Instrument.questions.map((question) => quest
 function references(node: ExpressionNode | undefined): string[] {
   if (!node) return [];
   switch (node.type) {
-    case "reference": return [node.name];
-    case "unary": return references(node.operand);
-    case "binary": return [...references(node.left), ...references(node.right)];
-    case "call": return node.arguments.flatMap(references);
-    default: return [];
+    case "reference":
+      return [node.name];
+    case "unary":
+      return references(node.operand);
+    case "binary":
+      return [...references(node.left), ...references(node.right)];
+    case "call":
+      return node.arguments.flatMap(references);
+    default:
+      return [];
   }
 }
 
 function invalidTypeValue(question: InstrumentQuestion): AnswerValue | undefined {
   switch (question.dataType) {
-    case "string": return 42;
-    case "number": return "not-a-number";
-    case "boolean": return "not-a-boolean";
-    case "date": return "17/07/2026";
-    case "dateTime": return "not-a-date-time";
-    case "string[]": return "not-an-array";
-    case "attachment": return 42;
-    case "audit": return "not-an-audit-object";
+    case "string":
+      return 42;
+    case "number":
+      return "not-a-number";
+    case "boolean":
+      return "not-a-boolean";
+    case "date":
+      return "17/07/2026";
+    case "dateTime":
+      return "not-a-date-time";
+    case "string[]":
+      return "not-an-array";
+    case "attachment":
+      return 42;
+    case "audit":
+      return "not-an-audit-object";
     case "calculated":
-    case "none": return undefined;
+    case "none":
+      return undefined;
   }
 }
 
 function representativeValue(question: InstrumentQuestion): AnswerValue | undefined {
   switch (question.dataType) {
-    case "string": return question.choices?.[0]?.value ?? "test";
-    case "number": return 1;
-    case "boolean": return true;
-    case "date": return "2020-01-01";
-    case "dateTime": return "2020-01-01T00:00:00.000Z";
-    case "string[]": return question.choices?.[0] ? [question.choices[0].value] : ["test"];
-    case "attachment": return { uri: "attachment://test" };
-    case "audit": return { startedAt: "2020-01-01T00:00:00.000Z" };
+    case "string":
+      return question.choices?.[0]?.value ?? "test";
+    case "number":
+      return 1;
+    case "boolean":
+      return true;
+    case "date":
+      return "2020-01-01";
+    case "dateTime":
+      return "2020-01-01T00:00:00.000Z";
+    case "string[]":
+      return question.choices?.[0] ? [question.choices[0].value] : ["test"];
+    case "attachment":
+      return { uri: "attachment://test" };
+    case "audit":
+      return { startedAt: "2020-01-01T00:00:00.000Z" };
     case "calculated":
-    case "none": return undefined;
+    case "none":
+      return undefined;
   }
 }
 
@@ -107,8 +130,11 @@ describe("question-by-question WHO source conformance", () => {
         expect(submission.issues.map((issue) => issue.code)).toEqual(fieldIssues.map((issue) => issue.code));
       }
       if (generated.choices?.length) {
-        const invalidChoice: AnswerValue = generated.dataType === "string[]" ? ["__not_a_who_value__"] : "__not_a_who_value__";
-        expect(validateAnswer(generated, invalidChoice, {}).some((issue) => issue.code === "choice")).toBe(true);
+        const invalidChoice: AnswerValue =
+          generated.dataType === "string[]" ? ["__not_a_who_value__"] : "__not_a_who_value__";
+        expect(validateAnswer(generated, invalidChoice, {}).some((issue) => issue.code === "choice")).toBe(
+          true
+        );
       }
       const sample = representativeValue(generated);
       if (sample !== undefined && !["note", "calculated", "system"].includes(generated.control)) {

@@ -12,7 +12,9 @@ import {
 } from "../src/index.js";
 
 const calculatedQuestions = whoVa2022Instrument.questions.filter((question) => question.calculation);
-const questionOrder = new Map(whoVa2022Instrument.questions.map((question) => [question.name, question.order]));
+const questionOrder = new Map(
+  whoVa2022Instrument.questions.map((question) => [question.name, question.order])
+);
 
 function references(source: string): string[] {
   return [...source.matchAll(/\$\{([^}]+)\}/g)].map((match) => match[1] as string);
@@ -24,7 +26,10 @@ describe("WHO VA sequential calculation graph", () => {
 
     for (const question of calculatedQuestions) {
       for (const dependency of references(question.calculation?.source ?? "")) {
-        expect(questionOrder.get(dependency), `${question.name} references unknown ${dependency}`).toBeDefined();
+        expect(
+          questionOrder.get(dependency),
+          `${question.name} references unknown ${dependency}`
+        ).toBeDefined();
         expect(
           questionOrder.get(dependency),
           `${question.name} must be calculated after ${dependency}`
@@ -78,10 +83,16 @@ describe("WHO VA sequential calculation graph", () => {
 
     const data = session.getSnapshot().data;
     const childNote = whoVa2022Instrument.questions.find((question) => question.name === "displayAgeChild");
-    const neonateNote = whoVa2022Instrument.questions.find((question) => question.name === "displayAgeNeonate");
+    const neonateNote = whoVa2022Instrument.questions.find(
+      (question) => question.name === "displayAgeNeonate"
+    );
     expect(data).toMatchObject({ ageInDays: 28, isNeonatal: "0", isChild: "1" });
-    expect(evaluateExpression(childNote!.relevant!.ast ?? parseExpression(childNote!.relevant!.source), data)).toBe(true);
-    expect(evaluateExpression(neonateNote!.relevant!.ast ?? parseExpression(neonateNote!.relevant!.source), data)).toBe(false);
+    expect(
+      evaluateExpression(childNote!.relevant!.ast ?? parseExpression(childNote!.relevant!.source), data)
+    ).toBe(true);
+    expect(
+      evaluateExpression(neonateNote!.relevant!.ast ?? parseExpression(neonateNote!.relevant!.source), data)
+    ).toBe(false);
   });
 
   it.each([
@@ -181,19 +192,51 @@ describe("WHO VA sequential calculation graph", () => {
       sections: [{ name: "main", sourceRow: 1, order: 1, label: { en: "Main" } }],
       questions: [
         {
-          name: "enabled", order: 1, sourceRow: 2, sourceType: "text", dataType: "string", control: "text",
-          label: { en: "Enabled" }, hint: {}, guidance: {}, required: false, readOnly: false,
-          constraintMessage: {}, sectionPath: ["main"]
+          name: "enabled",
+          order: 1,
+          sourceRow: 2,
+          sourceType: "text",
+          dataType: "string",
+          control: "text",
+          label: { en: "Enabled" },
+          hint: {},
+          guidance: {},
+          required: false,
+          readOnly: false,
+          constraintMessage: {},
+          sectionPath: ["main"]
         },
         {
-          name: "input", order: 2, sourceRow: 3, sourceType: "integer", dataType: "number", control: "integer",
-          label: { en: "Input" }, hint: {}, guidance: {}, required: false, readOnly: false,
-          constraintMessage: {}, sectionPath: ["main"]
+          name: "input",
+          order: 2,
+          sourceRow: 3,
+          sourceType: "integer",
+          dataType: "number",
+          control: "integer",
+          label: { en: "Input" },
+          hint: {},
+          guidance: {},
+          required: false,
+          readOnly: false,
+          constraintMessage: {},
+          sectionPath: ["main"]
         },
         {
-          name: "output", order: 3, sourceRow: 4, sourceType: "calculate", dataType: "calculated", control: "calculated",
-          label: {}, hint: {}, guidance: {}, required: false, readOnly: true, constraintMessage: {},
-          relevant: { source: "${enabled} = 'yes'" }, calculation: { source: "${input} * 2" }, sectionPath: ["main"]
+          name: "output",
+          order: 3,
+          sourceRow: 4,
+          sourceType: "calculate",
+          dataType: "calculated",
+          control: "calculated",
+          label: {},
+          hint: {},
+          guidance: {},
+          required: false,
+          readOnly: true,
+          constraintMessage: {},
+          relevant: { source: "${enabled} = 'yes'" },
+          calculation: { source: "${input} * 2" },
+          sectionPath: ["main"]
         }
       ]
     };

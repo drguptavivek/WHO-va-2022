@@ -56,7 +56,8 @@ function cellText(value: ExcelJS.CellValue): string {
   if (typeof value === "object") {
     if ("result" in value && value.result != null) return String(value.result);
     if ("text" in value && value.text != null) return String(value.text);
-    if ("richText" in value && Array.isArray(value.richText)) return value.richText.map((part) => part.text).join("");
+    if ("richText" in value && Array.isArray(value.richText))
+      return value.richText.map((part) => part.text).join("");
   }
   return String(value);
 }
@@ -113,25 +114,48 @@ function compileExpression(source: string, row: number, column: string) {
   }
 }
 
-function questionShape(sourceType: string): { control: QuestionControl; dataType: AnswerDataType; listName?: string } {
+function questionShape(sourceType: string): {
+  control: QuestionControl;
+  dataType: AnswerDataType;
+  listName?: string;
+} {
   const type = normalizeType(sourceType);
-  if (type.startsWith("select_one ")) return { control: "singleChoice", dataType: "string", listName: type.slice("select_one ".length) };
-  if (type.startsWith("select_multiple ")) return { control: "multipleChoice", dataType: "string[]", listName: type.slice("select_multiple ".length) };
+  if (type.startsWith("select_one "))
+    return { control: "singleChoice", dataType: "string", listName: type.slice("select_one ".length) };
+  if (type.startsWith("select_multiple "))
+    return {
+      control: "multipleChoice",
+      dataType: "string[]",
+      listName: type.slice("select_multiple ".length)
+    };
   switch (type) {
-    case "text": return { control: "text", dataType: "string" };
-    case "integer": return { control: "integer", dataType: "number" };
-    case "date": return { control: "date", dataType: "date" };
-    case "audio": return { control: "audio", dataType: "attachment" };
-    case "image": return { control: "image", dataType: "attachment" };
-    case "file": return { control: "file", dataType: "attachment" };
-    case "trigger": return { control: "confirm", dataType: "boolean" };
-    case "note": return { control: "note", dataType: "none" };
-    case "calculate": return { control: "calculated", dataType: "calculated" };
-    case "today": return { control: "system", dataType: "date" };
+    case "text":
+      return { control: "text", dataType: "string" };
+    case "integer":
+      return { control: "integer", dataType: "number" };
+    case "date":
+      return { control: "date", dataType: "date" };
+    case "audio":
+      return { control: "audio", dataType: "attachment" };
+    case "image":
+      return { control: "image", dataType: "attachment" };
+    case "file":
+      return { control: "file", dataType: "attachment" };
+    case "trigger":
+      return { control: "confirm", dataType: "boolean" };
+    case "note":
+      return { control: "note", dataType: "none" };
+    case "calculate":
+      return { control: "calculated", dataType: "calculated" };
+    case "today":
+      return { control: "system", dataType: "date" };
     case "start":
-    case "end": return { control: "system", dataType: "dateTime" };
-    case "audit": return { control: "system", dataType: "audit" };
-    default: return { control: "system", dataType: "none" };
+    case "end":
+      return { control: "system", dataType: "dateTime" };
+    case "audit":
+      return { control: "system", dataType: "audit" };
+    default:
+      return { control: "system", dataType: "none" };
   }
 }
 
@@ -141,7 +165,8 @@ export async function compileWhoVaWorkbook(sourceFile: string): Promise<Instrume
   const surveySheet = workbook.getWorksheet("survey");
   const choicesSheet = workbook.getWorksheet("choices");
   const settingsSheet = workbook.getWorksheet("settings");
-  if (!surveySheet || !choicesSheet || !settingsSheet) throw new Error("XLSForm must contain survey, choices, and settings sheets");
+  if (!surveySheet || !choicesSheet || !settingsSheet)
+    throw new Error("XLSForm must contain survey, choices, and settings sheets");
 
   const surveyRows = worksheetRows(surveySheet);
   const choiceRows = worksheetRows(choicesSheet).filter((row) => row.list_name && row.name);
@@ -204,7 +229,9 @@ export async function compileWhoVaWorkbook(sourceFile: string): Promise<Instrume
       constraintMessage: omitSourceConstraint ? {} : constraintMessage(row),
       sectionPath: [...(RUNTIME_QUESTION_SECTION_PATHS[row.name] ?? sectionStack)],
       ...(row.agegroup ? { ageGroup: row.agegroup } : {}),
-      ...(shape.listName ? { listName: shape.listName, choices: choicesByList.get(shape.listName) ?? [] } : {}),
+      ...(shape.listName
+        ? { listName: shape.listName, choices: choicesByList.get(shape.listName) ?? [] }
+        : {}),
       ...(row.appearance ? { appearance: row.appearance } : {}),
       ...(row.parameters ? { parameters: row.parameters } : {}),
       ...(row.default ? { defaultValue: row.default } : {}),
@@ -212,7 +239,9 @@ export async function compileWhoVaWorkbook(sourceFile: string): Promise<Instrume
       ...(constraintSource && !omitSourceConstraint
         ? { constraint: compileExpression(constraintSource, Number(row._row), "constraint") }
         : {}),
-      ...(row.calculation ? { calculation: compileExpression(row.calculation, Number(row._row), "calculation") } : {})
+      ...(row.calculation
+        ? { calculation: compileExpression(row.calculation, Number(row._row), "calculation") }
+        : {})
     };
     questions.push(question);
   }
