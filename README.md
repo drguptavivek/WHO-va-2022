@@ -12,6 +12,7 @@ The runtime and package build do **not** use SurveyJS, Excel, or XLSForm generat
 - [API reference](https://github.com/drguptavivek/WHO-va-2022/blob/main/docs/api.md) — entry points and the main headless, form, draft, localization, and attachment APIs
 - [Architecture](https://github.com/drguptavivek/WHO-va-2022/blob/main/docs/architecture.md) — executable contract, runtime boundaries, shared behavior, and platform services
 - [Attachment processing](https://github.com/drguptavivek/WHO-va-2022/blob/main/docs/attachments.md) — validation policy, browser/native lifecycles, and the server boundary
+- [Examples and host app integration](https://github.com/drguptavivek/WHO-va-2022/blob/main/docs/examples.md) — React web, web component, Expo/React Native, draft storage, and demo build notes
 
 ## Installation
 

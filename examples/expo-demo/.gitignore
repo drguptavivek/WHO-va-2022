@@ -1,0 +1,7 @@
+android/
+ios/
+dist-web/
+artifacts/
+.expo/
+node_modules/
+*.log

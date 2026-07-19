@@ -55,6 +55,18 @@ vi.mock("react-native", () => {
   };
 });
 
+vi.mock("react-native-svg", () => {
+  const svgPrimitive = (tag: "circle" | "path" | "svg") =>
+    React.forwardRef<SVGElement, Record<string, unknown>>(({ children, ...props }, ref) =>
+      React.createElement(tag, { ...props, ref }, children as React.ReactNode)
+    );
+  return {
+    Circle: svgPrimitive("circle"),
+    default: svgPrimitive("svg"),
+    Path: svgPrimitive("path")
+  };
+});
+
 import { WhoVaForm } from "../src/native.js";
 
 const nativeInstrument: InstrumentDefinition = {

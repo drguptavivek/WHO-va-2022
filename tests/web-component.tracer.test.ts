@@ -61,7 +61,7 @@ describe("framework-independent web embedding", () => {
     await new Promise((resolve) => setTimeout(resolve, 0));
 
     const saveDraft = [...element.querySelectorAll('[role="button"]')].find(
-      (button) => button.textContent === "Save draft"
+      (button) => button.getAttribute("aria-label") === "Save draft"
     );
     saveDraft?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
 
@@ -82,7 +82,7 @@ describe("framework-independent web embedding", () => {
     await new Promise((resolve) => setTimeout(resolve, 0));
 
     const saveDraft = [...element.querySelectorAll('[role="button"]')].find(
-      (button) => button.textContent === "Save draft"
+      (button) => button.getAttribute("aria-label") === "Save draft"
     );
     saveDraft?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
 

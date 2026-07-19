@@ -3,6 +3,7 @@
  * factories to native primitives while re-exporting the headless API.
  */
 import { Image, Pressable, ScrollView, Text, TextInput, View } from "react-native";
+import Svg, { Circle as SvgCircle, Path as SvgPath } from "react-native-svg";
 
 import { createWhoVaForm } from "./ui/create-who-va-form.js";
 import { createWhoVaQuestionControls } from "./ui/question-controls.js";
@@ -19,7 +20,7 @@ export type * from "./native-attachments.js";
 export type { WhoVaFormProps, WhoVaPlatformServices } from "./ui/create-who-va-form.js";
 
 export const WhoVaForm = createWhoVaForm(
-  { View, Text, TextInput, Pressable, ScrollView, Image },
+  { View, Text, TextInput, Pressable, ScrollView, Image, Svg, SvgCircle, SvgPath },
   loadWhoVa2022Instrument
 );
 export const WhoVaQuestionControls = createWhoVaQuestionControls({ View, Text, TextInput, Pressable, Image });

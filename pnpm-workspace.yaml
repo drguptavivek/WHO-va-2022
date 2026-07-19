@@ -1,5 +1,6 @@
 packages:
   - "."
+  - "examples/expo-demo"
 
 allowBuilds:
   esbuild: true

@@ -62,7 +62,7 @@ afterEach(() => {
 
 function button(container: HTMLElement, label: string): HTMLElement | undefined {
   return Array.from(container.querySelectorAll<HTMLElement>('[role="button"]')).find(
-    (candidate) => candidate.textContent === label
+    (candidate) => candidate.textContent === label || candidate.getAttribute("aria-label") === label
   );
 }
 

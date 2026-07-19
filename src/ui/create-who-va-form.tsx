@@ -61,6 +61,9 @@ export interface WhoVaPrimitiveSet {
   Pressable: React.ElementType;
   ScrollView: React.ElementType;
   Image?: React.ElementType;
+  Svg?: React.ElementType;
+  SvgCircle?: React.ElementType;
+  SvgPath?: React.ElementType;
   platform?: WhoVaPlatformServices;
   draftStore?: WhoVaDraftStore;
   navigation?: WhoVaNavigationAdapter;
@@ -83,6 +86,44 @@ export interface WhoVaNavigationAdapter {
   push(state: WhoVaNavigationState): void;
   back(): void;
   subscribe(listener: (state: WhoVaNavigationState | undefined) => void): () => void;
+}
+
+type FooterIconName = "preview" | "save";
+
+function FooterIcon({
+  name,
+  primitives
+}: {
+  name: FooterIconName;
+  primitives: Required<Pick<WhoVaPrimitiveSet, "Svg" | "SvgCircle" | "SvgPath">>;
+}): React.ReactElement {
+  const { Svg, SvgCircle, SvgPath } = primitives;
+  const iconProps = {
+    fill: "none",
+    height: 22,
+    stroke: "#183d33",
+    strokeLinecap: "round",
+    strokeLinejoin: "round",
+    strokeWidth: 2,
+    viewBox: "0 0 24 24",
+    width: 22
+  };
+  return (
+    <Svg {...iconProps} style={styles.icon} aria-hidden="true" focusable="false">
+      {name === "save" ? (
+        <>
+          <SvgPath d="M15.2 3a2 2 0 0 1 1.4.6l3.8 3.8a2 2 0 0 1 .6 1.4V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z" />
+          <SvgPath d="M17 21v-7a1 1 0 0 0-1-1H8a1 1 0 0 0-1 1v7" />
+          <SvgPath d="M7 3v4a1 1 0 0 0 1 1h7" />
+        </>
+      ) : (
+        <>
+          <SvgPath d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0" />
+          <SvgCircle cx="12" cy="12" r="3" />
+        </>
+      )}
+    </Svg>
+  );
 }
 
 function plainText(value: string | undefined): string {
@@ -174,12 +215,34 @@ const styles = {
   error: withWebTheme({ color: "#a23a2a", marginTop: 8, fontSize: 13 }, { color: "danger" }),
   navigation: {
     flexDirection: "row" as const,
-    flexWrap: "wrap" as const,
-    justifyContent: "space-between" as const,
-    gap: 12,
+    flexWrap: "nowrap" as const,
+    alignItems: "center" as const,
+    gap: 8,
+    justifyContent: "center" as const,
     marginTop: 12,
     marginBottom: 12
   },
+  navButton: {
+    minHeight: 40,
+    minWidth: 68,
+    paddingHorizontal: 12,
+    paddingVertical: 10
+  },
+  navIconButton: {
+    alignItems: "center" as const,
+    justifyContent: "center" as const,
+    minHeight: 40,
+    minWidth: 44,
+    paddingHorizontal: 0,
+    paddingVertical: 0
+  },
+  navPrimaryButton: {
+    minHeight: 42,
+    minWidth: 76,
+    paddingHorizontal: 14,
+    paddingVertical: 10
+  },
+  icon: { height: 22, width: 22 },
   draftStatus: withWebTheme(
     { color: "#536b64", fontSize: 12, marginTop: 4, marginBottom: 24 },
     { color: "muted" }
@@ -194,6 +257,10 @@ export function createWhoVaForm(
   loadDefaultInstrument?: () => Promise<InstrumentDefinition>
 ): React.ComponentType<WhoVaFormProps> {
   const { View, Text, Pressable, ScrollView } = primitives;
+  const svgPrimitives =
+    primitives.Svg && primitives.SvgCircle && primitives.SvgPath
+      ? { Svg: primitives.Svg, SvgCircle: primitives.SvgCircle, SvgPath: primitives.SvgPath }
+      : undefined;
   const questionControls = createWhoVaQuestionControls({
     View,
     Text,
@@ -209,6 +276,16 @@ export function createWhoVaForm(
     const instrument = props.resolvedInstrument;
     const locale = props.locale ?? localeFromLanguageName(instrument.defaultLanguage) ?? "en";
     const messages = resolveUiMessages(locale, props.uiTranslations);
+    const saveDraftIcon = svgPrimitives ? (
+      <FooterIcon name="save" primitives={svgPrimitives} />
+    ) : (
+      <Text style={questionControlStyles.buttonTextSecondary}>Save</Text>
+    );
+    const previewIcon = svgPrimitives ? (
+      <FooterIcon name="preview" primitives={svgPrimitives} />
+    ) : (
+      <Text style={questionControlStyles.buttonTextSecondary}>View</Text>
+    );
     const [restoredNavigation] = useState(() => {
       const restored = primitives.navigation?.read();
       return restored?.instrumentId === instrument.id ? restored : undefined;
@@ -549,6 +626,7 @@ export function createWhoVaForm(
             style={[
               questionControlStyles.button,
               questionControlStyles.buttonSecondary,
+              styles.navButton,
               !snapshot.canGoBack && questionControlStyles.buttonDisabled
             ]}
             onPress={() => session.previous()}
@@ -561,18 +639,23 @@ export function createWhoVaForm(
             style={[
               questionControlStyles.button,
               questionControlStyles.buttonSecondary,
+              styles.navIconButton,
               (!(props.draftStore ?? primitives.draftStore) || draftStatus === "saving") &&
                 questionControlStyles.buttonDisabled
             ]}
             onPress={() => void saveDraft()}
+            accessibilityLabel={draftStatus === "saving" ? messages.saving : messages.saveDraft}
           >
-            <Text style={questionControlStyles.buttonTextSecondary}>
-              {draftStatus === "saving" ? messages.saving : messages.saveDraft}
-            </Text>
+            {saveDraftIcon}
           </Pressable>
           <Pressable
             accessibilityRole="button"
-            style={[questionControlStyles.button, questionControlStyles.buttonSecondary]}
+            accessibilityLabel={messages.previewAnswers}
+            style={[
+              questionControlStyles.button,
+              questionControlStyles.buttonSecondary,
+              styles.navIconButton
+            ]}
             onPress={() => {
               void saveDraft().then(() => {
                 primitives.navigation?.push({
@@ -585,9 +668,13 @@ export function createWhoVaForm(
               });
             }}
           >
-            <Text style={questionControlStyles.buttonTextSecondary}>{messages.previewAnswers}</Text>
+            {previewIcon}
           </Pressable>
-          <Pressable accessibilityRole="button" style={questionControlStyles.button} onPress={advance}>
+          <Pressable
+            accessibilityRole="button"
+            style={[questionControlStyles.button, styles.navPrimaryButton]}
+            onPress={advance}
+          >
             <Text style={questionControlStyles.buttonText}>
               {snapshot.canGoForward ? messages.next : messages.complete}
             </Text>

@@ -53,6 +53,18 @@ const TextInput = themedPrimitive(WebTextInput, "WhoVaWebTextInput");
 const Pressable = themedPrimitive(WebPressable, "WhoVaWebPressable");
 const ScrollView = themedPrimitive(WebScrollView, "WhoVaWebScrollView");
 const Image = themedPrimitive(WebImage, "WhoVaWebImage");
+const Svg = React.forwardRef<SVGSVGElement, React.SVGProps<SVGSVGElement>>((props, ref) => (
+  <svg {...props} ref={ref} />
+));
+Svg.displayName = "WhoVaWebSvg";
+const SvgCircle = React.forwardRef<SVGCircleElement, React.SVGProps<SVGCircleElement>>((props, ref) => (
+  <circle {...props} ref={ref} />
+));
+SvgCircle.displayName = "WhoVaWebSvgCircle";
+const SvgPath = React.forwardRef<SVGPathElement, React.SVGProps<SVGPathElement>>((props, ref) => (
+  <path {...props} ref={ref} />
+));
+SvgPath.displayName = "WhoVaWebSvgPath";
 
 const navigationStateKey = "__whoVaFormNavigation";
 
@@ -265,6 +277,9 @@ export const WhoVaForm = createWhoVaForm(
     Pressable,
     ScrollView,
     Image,
+    Svg,
+    SvgCircle,
+    SvgPath,
     platform: webAttachmentPlatform,
     draftStore: createLocalStorageDraftStore(),
     navigation: browserNavigation,
