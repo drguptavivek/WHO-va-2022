@@ -218,73 +218,40 @@ export function processInspectedImageAttachment(
   return encodeInspectedImage(name, inspected, transcoder, new Uint8Array(), options);
 }
 
-export interface PdfRasterizationOptions {
-  maxPages: number;
-  maxPageWidthOrHeight: number;
-  jpegQualities: readonly number[];
-}
-
-export interface RasterizedPdfPage {
-  bytes: Uint8Array;
-  width: number;
-  height: number;
-}
-
-export interface PdfRasterizer {
-  rasterizePdf(pdf: BinaryImageSelection, options: PdfRasterizationOptions): Promise<RasterizedPdfPage[]>;
-}
-
-export interface ProcessedPdfPage extends RasterizedPdfPage {
+export interface RetainedPdfAttachment {
+  [key: string]: unknown;
   id: string;
-  name: string;
-  mimeType: "image/jpeg";
-  size: number;
-}
-
-export interface ProcessedPdfAttachment {
-  id: string;
+  uri: string;
   name: string;
   originalName: string;
-  mimeType: "application/vnd.who-va.pdf-pages+json";
-  pageCount: number;
+  mimeType: "application/pdf";
   size: number;
-  originalRetained: false;
-  pages: ProcessedPdfPage[];
+  originalRetained: true;
+  processed: false;
+  serverSideValidationRequired: true;
 }
 
-export function isProcessedPdfAttachment(
+export function isRetainedPdfAttachment(
   value: unknown,
   policy: PdfAttachmentPolicy = WHO_VA_ATTACHMENT_POLICY.pdf
-): value is Record<string, unknown> & {
-  uri: string;
-  mimeType: "application/vnd.who-va.pdf-pages+json";
-  pageCount: number;
-  size: number;
-  processed: true;
-  originalRetained: false;
-  pages: unknown[];
-} {
+): value is RetainedPdfAttachment {
   if (value == null || Array.isArray(value) || typeof value !== "object") return false;
   const candidate = value as Record<string, unknown>;
   return (
-    candidate.processed === true &&
-    candidate.originalRetained === false &&
-    candidate.mimeType === "application/vnd.who-va.pdf-pages+json" &&
+    candidate.processed === false &&
+    candidate.originalRetained === true &&
+    candidate.serverSideValidationRequired === true &&
+    candidate.mimeType === "application/pdf" &&
+    typeof candidate.id === "string" &&
+    candidate.id.length > 0 &&
     typeof candidate.uri === "string" &&
-    typeof candidate.pageCount === "number" &&
-    candidate.pageCount > 0 &&
-    candidate.pageCount <= policy.maxPages &&
-    Array.isArray(candidate.pages) &&
-    candidate.pages.length === candidate.pageCount &&
+    typeof candidate.name === "string" &&
+    candidate.name.toLowerCase().endsWith(".pdf") &&
+    typeof candidate.originalName === "string" &&
     typeof candidate.size === "number" &&
     candidate.size > 0 &&
-    candidate.size <= policy.maxOutputBytes
+    candidate.size <= policy.maxInputBytes
   );
-}
-
-export interface ProcessPdfAttachmentOptions {
-  policy?: PdfAttachmentPolicy;
-  createId?: () => string;
 }
 
 function uint16(bytes: Uint8Array, offset: number): number {
@@ -364,85 +331,4 @@ export async function processImageAttachment(
 
   const inspected = inspectRasterImage(selection.bytes, selection.name);
   return encodeInspectedImage(selection.name, inspected, transcoder, selection.bytes, options);
-}
-
-function hasPdfSignature(bytes: Uint8Array): boolean {
-  const limit = Math.min(bytes.byteLength - 4, 1024);
-  for (let offset = 0; offset <= limit; offset += 1) {
-    if (
-      bytes[offset] === 0x25 &&
-      bytes[offset + 1] === 0x50 &&
-      bytes[offset + 2] === 0x44 &&
-      bytes[offset + 3] === 0x46 &&
-      bytes[offset + 4] === 0x2d
-    )
-      return true;
-  }
-  return false;
-}
-
-export async function processPdfAttachment(
-  selection: BinaryImageSelection,
-  rasterizer: PdfRasterizer,
-  options: ProcessPdfAttachmentOptions = {}
-): Promise<ProcessedPdfAttachment> {
-  const policy = options.policy ?? WHO_VA_ATTACHMENT_POLICY.pdf;
-  if (selection.bytes.byteLength > policy.maxInputBytes)
-    throw new AttachmentProcessingError("pdf-input-too-large");
-  if (!hasPdfSignature(selection.bytes)) throw new AttachmentProcessingError("pdf-type-not-allowed");
-
-  let renderedPages: RasterizedPdfPage[];
-  try {
-    renderedPages = await rasterizer.rasterizePdf(selection, {
-      maxPages: policy.maxPages,
-      maxPageWidthOrHeight: policy.maxPageWidthOrHeight,
-      jpegQualities: WHO_VA_ATTACHMENT_POLICY.image.jpegQualities
-    });
-  } catch (error) {
-    throw error instanceof AttachmentProcessingError
-      ? error
-      : new AttachmentProcessingError("pdf-render-failed", error);
-  }
-  if (renderedPages.length === 0) throw new AttachmentProcessingError("pdf-render-failed");
-  if (renderedPages.length > policy.maxPages) throw new AttachmentProcessingError("pdf-too-many-pages");
-
-  const id = (options.createId ?? createDraftId)();
-  let totalSize = 0;
-  const pages = renderedPages.map((page, index): ProcessedPdfPage => {
-    let inspected: InspectedRasterImage;
-    try {
-      inspected = inspectRasterImage(page.bytes);
-    } catch (error) {
-      throw new AttachmentProcessingError("pdf-render-failed", error);
-    }
-    if (
-      inspected.mimeType !== "image/jpeg" ||
-      inspected.width !== page.width ||
-      inspected.height !== page.height ||
-      Math.max(inspected.width, inspected.height) > policy.maxPageWidthOrHeight
-    )
-      throw new AttachmentProcessingError("pdf-render-failed");
-    totalSize += page.bytes.byteLength;
-    return {
-      id: `${id}-page-${String(index + 1).padStart(3, "0")}`,
-      name: `${id}-page-${String(index + 1).padStart(3, "0")}.jpg`,
-      mimeType: "image/jpeg",
-      size: page.bytes.byteLength,
-      width: inspected.width,
-      height: inspected.height,
-      bytes: page.bytes
-    };
-  });
-  if (totalSize > policy.maxOutputBytes) throw new AttachmentProcessingError("pdf-output-too-large");
-
-  return {
-    id,
-    name: `${id}-pages`,
-    originalName: selection.name,
-    mimeType: "application/vnd.who-va.pdf-pages+json",
-    pageCount: pages.length,
-    size: totalSize,
-    originalRetained: false,
-    pages
-  };
 }

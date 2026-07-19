@@ -119,8 +119,5 @@
     "vite": "^8.1.5",
     "vitest": "^4.1.10"
   },
-  "packageManager": "pnpm@11.9.0",
-  "dependencies": {
-    "pdfjs-dist": "^6.1.200"
-  }
+  "packageManager": "pnpm@11.9.0"
 }

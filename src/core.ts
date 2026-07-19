@@ -51,10 +51,9 @@ export {
   WHO_VA_ATTACHMENT_POLICY,
   inspectRasterImage,
   isProcessedImageAttachment,
-  isProcessedPdfAttachment,
+  isRetainedPdfAttachment,
   processImageAttachment,
-  processInspectedImageAttachment,
-  processPdfAttachment
+  processInspectedImageAttachment
 } from "./attachments.js";
 export type * from "./types.js";
 export type * from "./attachments.js";

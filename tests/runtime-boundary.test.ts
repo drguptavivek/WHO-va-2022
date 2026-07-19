@@ -57,7 +57,7 @@ describe("runtime artifact boundary", () => {
     expect(packageJson.scripts).not.toHaveProperty("generate");
     expect(packageJson.scripts?.build).not.toContain("generate");
     expect(packageJson.scripts?.check).not.toContain("generate");
-    expect(packageJson.dependencies).not.toHaveProperty("exceljs");
+    expect(packageJson.dependencies ?? {}).not.toHaveProperty("exceljs");
     expect(packageJson.devDependencies).toHaveProperty("exceljs");
   });
 });

@@ -7,12 +7,12 @@ import {
   WHO_VA_ATTACHMENT_POLICY,
   processImageAttachment,
   processInspectedImageAttachment,
-  processPdfAttachment,
   type ImageAttachmentPolicy,
   type ImageTranscoder,
   type ProcessedImageAttachment,
-  type PdfRasterizer
+  type RetainedPdfAttachment
 } from "./attachments.js";
+import { createDraftId } from "./draft.js";
 
 const WEB_ATTACHMENT_DATABASE = "who-va-2022-attachments";
 const WEB_ATTACHMENT_OBJECT_STORE = "binary";
@@ -44,30 +44,6 @@ export interface WebStoredAttachmentReference {
   processed: true;
 }
 
-export interface WebStoredPdfPageReference {
-  id: string;
-  uri: string;
-  name: string;
-  mimeType: "image/jpeg";
-  size: number;
-  width: number;
-  height: number;
-}
-
-export interface WebStoredPdfReference {
-  [key: string]: unknown;
-  id: string;
-  uri: string;
-  name: string;
-  originalName: string;
-  mimeType: "application/vnd.who-va.pdf-pages+json";
-  pageCount: number;
-  size: number;
-  originalRetained: false;
-  processed: true;
-  pages: WebStoredPdfPageReference[];
-}
-
 export interface ProcessWebImageAttachmentOptions {
   store: WebAttachmentBinaryStore;
   transcoder?: ImageTranscoder;
@@ -75,9 +51,8 @@ export interface ProcessWebImageAttachmentOptions {
   createId?: () => string;
 }
 
-export interface ProcessWebPdfAttachmentOptions {
+export interface StoreWebPdfAttachmentOptions {
   store: WebAttachmentBinaryStore;
-  rasterizer?: PdfRasterizer;
   createId?: () => string;
 }
 
@@ -285,67 +260,6 @@ async function storeProcessedWebImage(
   };
 }
 
-export function createPdfJsRasterizer(): PdfRasterizer {
-  return {
-    async rasterizePdf(selection, options) {
-      if (typeof document === "undefined") throw new AttachmentProcessingError("pdf-render-failed");
-      const { getDocument } = await import("pdfjs-dist/webpack.mjs");
-      const loadingTask = getDocument({
-        data: copiedArrayBuffer(selection.bytes),
-        stopAtErrors: true,
-        enableXfa: false,
-        maxImageSize: WHO_VA_ATTACHMENT_POLICY.image.maxPixels
-      });
-      let pdf: Awaited<typeof loadingTask.promise> | undefined;
-      try {
-        pdf = await loadingTask.promise;
-        if (pdf.numPages > options.maxPages) throw new AttachmentProcessingError("pdf-too-many-pages");
-        const pages = [];
-        for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber += 1) {
-          const page = await pdf.getPage(pageNumber);
-          try {
-            const initialViewport = page.getViewport({ scale: 1 });
-            const desiredLongestEdge = Math.min(
-              options.maxPageWidthOrHeight,
-              Math.max(initialViewport.width, initialViewport.height) * 2.5
-            );
-            const scale = desiredLongestEdge / Math.max(initialViewport.width, initialViewport.height);
-            const viewport = page.getViewport({ scale });
-            const canvas = document.createElement("canvas");
-            canvas.width = Math.max(1, Math.floor(viewport.width));
-            canvas.height = Math.max(1, Math.floor(viewport.height));
-            const context = canvas.getContext("2d");
-            if (!context) throw new Error("Canvas rendering is unavailable");
-            context.fillStyle = "#ffffff";
-            context.fillRect(0, 0, canvas.width, canvas.height);
-            await page.render({ canvas, canvasContext: context, viewport, background: "#ffffff" }).promise;
-
-            let blob: Blob | undefined;
-            for (const quality of options.jpegQualities) {
-              blob = await canvasToJpeg(canvas, quality);
-              if (blob.size <= WHO_VA_ATTACHMENT_POLICY.image.maxOutputBytes) break;
-            }
-            if (!blob || blob.size > WHO_VA_ATTACHMENT_POLICY.image.maxOutputBytes) {
-              throw new AttachmentProcessingError("pdf-output-too-large");
-            }
-            pages.push({
-              bytes: new Uint8Array(await blob.arrayBuffer()),
-              width: canvas.width,
-              height: canvas.height
-            });
-          } finally {
-            page.cleanup();
-          }
-        }
-        return pages;
-      } finally {
-        await pdf?.cleanup();
-        await loadingTask.destroy();
-      }
-    }
-  };
-}
-
 export async function processWebImageAttachment(
   file: WebImageFile,
   options: ProcessWebImageAttachmentOptions
@@ -373,54 +287,35 @@ export async function processWebImageAttachment(
   return storeProcessedWebImage(processed, options.store);
 }
 
-export async function processWebPdfAttachment(
+export async function storeWebPdfAttachment(
   file: WebImageFile,
-  options: ProcessWebPdfAttachmentOptions
-): Promise<WebStoredPdfReference> {
+  options: StoreWebPdfAttachmentOptions
+): Promise<RetainedPdfAttachment> {
   const policy = WHO_VA_ATTACHMENT_POLICY.pdf;
   if (file.size > policy.maxInputBytes) throw new AttachmentProcessingError("pdf-input-too-large");
-  const processed = await processPdfAttachment(
-    {
-      name: file.name,
-      bytes: new Uint8Array(await file.arrayBuffer())
-    },
-    options.rasterizer ?? createPdfJsRasterizer(),
-    {
-      policy,
-      ...(options.createId ? { createId: options.createId } : {})
-    }
-  );
-
-  const savedIds: string[] = [];
+  const bytes = new Uint8Array(await file.arrayBuffer());
+  const header = bytes.slice(0, 8);
+  const hasPdfHeader = header[0] === 0x25 && header[1] === 0x50 && header[2] === 0x44 && header[3] === 0x46;
+  if (file.type !== "application/pdf" && !file.name.toLowerCase().endsWith(".pdf")) {
+    throw new AttachmentProcessingError("pdf-type-not-allowed");
+  }
+  if (!hasPdfHeader) throw new AttachmentProcessingError("pdf-type-not-allowed");
+  const id = (options.createId ?? createDraftId)();
   try {
-    for (const page of processed.pages) {
-      await options.store.save(page.id, new Blob([copiedArrayBuffer(page.bytes)], { type: page.mimeType }));
-      savedIds.push(page.id);
-    }
+    await options.store.save(id, new Blob([copiedArrayBuffer(bytes)], { type: "application/pdf" }));
   } catch (error) {
-    await Promise.allSettled(savedIds.map((id) => options.store.remove(id)));
     throw new AttachmentProcessingError("attachment-storage-failed", error);
   }
-
   return {
-    id: processed.id,
-    uri: `who-va-pdf-pages:${processed.id}`,
-    name: processed.name,
-    originalName: processed.originalName,
-    mimeType: processed.mimeType,
-    pageCount: processed.pageCount,
-    size: processed.size,
-    originalRetained: false,
-    processed: true,
-    pages: processed.pages.map((page) => ({
-      id: page.id,
-      uri: `who-va-attachment:${page.id}`,
-      name: page.name,
-      mimeType: page.mimeType,
-      size: page.size,
-      width: page.width,
-      height: page.height
-    }))
+    id,
+    uri: `who-va-attachment:${id}`,
+    name: `${id}.pdf`,
+    originalName: file.name,
+    mimeType: "application/pdf",
+    size: file.size,
+    originalRetained: true,
+    processed: false,
+    serverSideValidationRequired: true
   };
 }
 
@@ -453,7 +348,7 @@ function collectReferenceIds(value: unknown, output: Set<string>, seen: WeakSet<
   if (
     typeof candidate.id === "string" &&
     typeof candidate.uri === "string" &&
-    (candidate.uri.startsWith("who-va-attachment:") || candidate.uri.startsWith("who-va-pdf-pages:"))
+    candidate.uri.startsWith("who-va-attachment:")
   )
     output.add(candidate.id);
   for (const nested of Object.values(candidate)) collectReferenceIds(nested, output, seen);

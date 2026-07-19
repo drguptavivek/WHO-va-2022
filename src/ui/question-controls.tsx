@@ -8,7 +8,7 @@ import {
   AttachmentProcessingError,
   WHO_VA_ATTACHMENT_POLICY,
   isProcessedImageAttachment,
-  isProcessedPdfAttachment,
+  isRetainedPdfAttachment,
   type ImageAttachmentPolicy
 } from "../attachments.js";
 import type { AnswerValue, InstrumentQuestion, SubmissionData, ValidationIssue } from "../types.js";
@@ -40,11 +40,6 @@ export interface WhoVaPlatformServices {
     data: SubmissionData,
     acceptedMimeTypes: string[]
   ) => Promise<AnswerValue | undefined>;
-  processPdf?: (
-    selection: AnswerValue,
-    question: InstrumentQuestion,
-    data: SubmissionData
-  ) => Promise<AnswerValue>;
   resolveAttachmentUri?: (attachment: AnswerValue) => Promise<string | undefined>;
   releaseAttachmentUri?: (uri: string) => void;
   removeAttachment?: (attachment: AnswerValue) => Promise<void>;
@@ -857,7 +852,7 @@ export function createWhoVaQuestionControls(primitives: WhoVaQuestionControlPrim
                 let selected = candidate;
                 if (
                   candidate !== undefined &&
-                  !isProcessedPdfAttachment(candidate) &&
+                  !isRetainedPdfAttachment(candidate) &&
                   !(acceptsImages && isProcessedImageAttachment(candidate))
                 ) {
                   if (
@@ -875,14 +870,12 @@ export function createWhoVaQuestionControls(primitives: WhoVaQuestionControlPrim
                       data
                     );
                   } else {
-                    if (!services.processPdf)
-                      throw new AttachmentProcessingError("pdf-processing-unavailable");
-                    selected = await services.processPdf(candidate, question, data);
+                    throw new AttachmentProcessingError("pdf-processing-unavailable");
                   }
                 }
                 if (selected !== undefined) {
                   if (
-                    !isProcessedPdfAttachment(selected) &&
+                    !isRetainedPdfAttachment(selected) &&
                     !(acceptsImages && isProcessedImageAttachment(selected))
                   ) {
                     throw new AttachmentProcessingError(

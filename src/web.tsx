@@ -26,7 +26,7 @@ import {
   cleanupOrphanedWebAttachments,
   loadWebAttachmentBlob,
   processWebImageAttachment,
-  processWebPdfAttachment,
+  storeWebPdfAttachment,
   resolveWebAttachmentUri
 } from "./web-attachments.js";
 import { startWebAudioRecording } from "./web-audio.js";
@@ -217,7 +217,7 @@ const webAttachmentPlatform: WhoVaPlatformServices = {
       (file.type === "image/jpeg" || file.type === "image/png" || /\.(?:jpe?g|png)$/i.test(file.name));
     if (imageSelected) return processWebImageAttachment(file, { store: webAttachmentStore });
     if (acceptedMimeTypes.includes("application/pdf"))
-      return processWebPdfAttachment(file, { store: webAttachmentStore });
+      return storeWebPdfAttachment(file, { store: webAttachmentStore });
     return undefined;
   },
   resolveAttachmentUri: async (attachment) => {
@@ -240,17 +240,7 @@ const webAttachmentPlatform: WhoVaPlatformServices = {
       typeof attachment === "object" &&
       typeof attachment.id === "string"
     ) {
-      const pages = Array.isArray(attachment.pages) ? attachment.pages : [];
-      const pageIds = pages.flatMap((page) =>
-        page != null && typeof page === "object" && "id" in page && typeof page.id === "string"
-          ? [page.id]
-          : []
-      );
-      await Promise.all(
-        pageIds.length > 0
-          ? pageIds.map((id) => webAttachmentStore.remove(id))
-          : [webAttachmentStore.remove(attachment.id)]
-      );
+      await webAttachmentStore.remove(attachment.id);
     }
   }
 };
@@ -259,9 +249,8 @@ export {
   cleanupOrphanedWebAttachments,
   createBrowserImageTranscoder,
   createIndexedDbWebAttachmentStore,
-  createPdfJsRasterizer,
   processWebImageAttachment,
-  processWebPdfAttachment,
+  storeWebPdfAttachment,
   loadWebAttachmentBlob,
   resolveWebAttachmentUri
 } from "./web-attachments.js";

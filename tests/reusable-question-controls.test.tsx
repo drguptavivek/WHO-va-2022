@@ -401,35 +401,29 @@ describe("reusable question controls", () => {
     root.unmount();
   });
 
-  it("limits file selection to PDFs and processes the selection before returning the answer", async () => {
-    const rawPdf = {
-      uri: "file:///picker/report.pdf",
-      name: "report.pdf",
+  it("accepts a retained PDF reference for server-side validation without local PDF conversion", async () => {
+    const retainedPdf = {
+      id: "retained-pdf",
+      uri: "file:///documents/who-va-attachments/retained-pdf.pdf",
+      name: "retained-pdf.pdf",
+      originalName: "certificate.pdf",
       mimeType: "application/pdf",
-      size: 120_000
+      size: 128,
+      originalRetained: true,
+      processed: false,
+      serverSideValidationRequired: true
     };
-    const processedPdf = {
-      uri: "who-va-pdf-pages:report",
-      name: "report-pages",
-      originalName: "report.pdf",
-      mimeType: "application/vnd.who-va.pdf-pages+json",
-      pageCount: 1,
-      size: 24,
-      originalRetained: false,
-      processed: true,
-      pages: [{ uri: "who-va-attachment:report-page-001", mimeType: "image/jpeg" }]
-    };
-    const selectFile = vi.fn().mockResolvedValue(rawPdf);
-    const processPdf = vi.fn().mockResolvedValue(processedPdf);
+    const selectFile = vi.fn().mockResolvedValue(retainedPdf);
     const onAnswer = vi.fn();
-    const question = {
+    const data = {};
+    const question: InstrumentQuestion = {
       ...textQuestion,
-      name: "document",
-      sourceType: "file" as const,
+      name: "certificate_pdf",
+      sourceType: "file",
       dataType: "attachment" as const,
-      control: "file" as const
+      control: "file",
+      label: { en: "Certificate PDF" }
     };
-    const data = { existing_answer: "kept" };
     const container = document.createElement("div");
     document.body.append(container);
     const root = createRoot(container);
@@ -440,19 +434,19 @@ describe("reusable question controls", () => {
         data={data}
         locale="en"
         issues={[]}
-        platform={{ selectFile, processPdf }}
+        platform={{ selectFile }}
         onAnswer={onAnswer}
       />
     );
     await new Promise((resolve) => setTimeout(resolve, 0));
 
-    const choosePdf = Array.from(container.querySelectorAll<HTMLElement>('[role="button"]')).find(
-      (button) => button.textContent === "Choose PDF"
-    );
-    choosePdf?.click();
-    await vi.waitFor(() => expect(onAnswer).toHaveBeenCalledWith(processedPdf));
+    Array.from(container.querySelectorAll("button"))
+      .find((button) => button.textContent === "Choose PDF")
+      ?.click();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
     expect(selectFile).toHaveBeenCalledWith(question, data, ["application/pdf"]);
-    expect(processPdf).toHaveBeenCalledWith(rawPdf, question, data);
+    expect(onAnswer).toHaveBeenCalledWith(retainedPdf);
     root.unmount();
   });
 
@@ -487,15 +481,15 @@ describe("reusable question controls", () => {
         size: 120_000
       },
       processed: {
-        uri: "who-va-pdf-pages:certificate",
-        name: "certificate-pages",
+        id: "certificate-pdf",
+        uri: "who-va-attachment:certificate-pdf",
+        name: "certificate-pdf.pdf",
         originalName: "certificate.pdf",
-        mimeType: "application/vnd.who-va.pdf-pages+json",
-        pageCount: 1,
-        size: 90_000,
-        originalRetained: false,
-        processed: true,
-        pages: [{ uri: "who-va-attachment:certificate-page-001", mimeType: "image/jpeg" }]
+        mimeType: "application/pdf",
+        size: 120_000,
+        originalRetained: true,
+        processed: false,
+        serverSideValidationRequired: true
       },
       processor: "pdf"
     }
@@ -504,9 +498,8 @@ describe("reusable question controls", () => {
       (candidate) => candidate.name === "custom_medical_certificate_upload"
     );
     expect(question).toBeDefined();
-    const selectFile = vi.fn().mockResolvedValue(raw);
+    const selectFile = vi.fn().mockResolvedValue(processor === "pdf" ? processed : raw);
     const processImage = vi.fn().mockResolvedValue(processed);
-    const processPdf = vi.fn().mockResolvedValue(processed);
     const onAnswer = vi.fn();
     const container = document.createElement("div");
     document.body.append(container);
@@ -518,7 +511,7 @@ describe("reusable question controls", () => {
         data={{}}
         locale="en"
         issues={[]}
-        platform={{ selectFile, processImage, processPdf }}
+        platform={{ selectFile, processImage }}
         onAnswer={onAnswer}
       />
     );
@@ -532,9 +525,7 @@ describe("reusable question controls", () => {
     expect(selectFile).toHaveBeenCalledWith(question, {}, ["image/jpeg", "image/png", "application/pdf"]);
     if (processor === "image") {
       expect(processImage).toHaveBeenCalledWith(raw, expect.anything(), question, {});
-      expect(processPdf).not.toHaveBeenCalled();
     } else {
-      expect(processPdf).toHaveBeenCalledWith(raw, question, {});
       expect(processImage).not.toHaveBeenCalled();
     }
     root.unmount();

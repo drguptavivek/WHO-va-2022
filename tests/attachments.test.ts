@@ -5,9 +5,7 @@ import {
   WHO_VA_ATTACHMENT_POLICY,
   inspectRasterImage,
   processImageAttachment,
-  processPdfAttachment,
-  type ImageTranscoder,
-  type PdfRasterizer
+  type ImageTranscoder
 } from "../src/attachments.js";
 
 function png(width: number, height: number, size = 32): Uint8Array {
@@ -46,12 +44,6 @@ function jpeg(width: number, height: number, size = 64): Uint8Array {
     0xff,
     0xd9
   ]);
-  return bytes;
-}
-
-function pdf(size = 64): Uint8Array {
-  const bytes = new Uint8Array(size);
-  bytes.set(new TextEncoder().encode("%PDF-1.7\n"));
   return bytes;
 }
 
@@ -144,76 +136,5 @@ describe("attachment processing", () => {
         }
       )
     ).rejects.toMatchObject({ code: "image-output-too-large" });
-  });
-
-  it("converts every PDF page to a bounded JPEG manifest without retaining the PDF", async () => {
-    const rasterizer: PdfRasterizer = {
-      rasterizePdf: vi.fn().mockResolvedValue([
-        { bytes: jpeg(1131, 1600, 400_000), width: 1131, height: 1600 },
-        { bytes: jpeg(1131, 1600, 450_000), width: 1131, height: 1600 }
-      ])
-    };
-
-    const processed = await processPdfAttachment({ name: "notes.pdf", bytes: pdf() }, rasterizer, {
-      createId: () => "00cbb4a9-b379-4f8c-8a30-80410a9eab4e"
-    });
-
-    expect(processed).toMatchObject({
-      id: "00cbb4a9-b379-4f8c-8a30-80410a9eab4e",
-      name: "00cbb4a9-b379-4f8c-8a30-80410a9eab4e-pages",
-      originalName: "notes.pdf",
-      mimeType: "application/vnd.who-va.pdf-pages+json",
-      pageCount: 2,
-      size: 850_000,
-      originalRetained: false,
-      pages: [
-        expect.objectContaining({
-          name: "00cbb4a9-b379-4f8c-8a30-80410a9eab4e-page-001.jpg",
-          mimeType: "image/jpeg"
-        }),
-        expect.objectContaining({
-          name: "00cbb4a9-b379-4f8c-8a30-80410a9eab4e-page-002.jpg",
-          mimeType: "image/jpeg"
-        })
-      ]
-    });
-    expect(processed).not.toHaveProperty("bytes");
-  });
-
-  it("rejects renamed PDFs and fails the entire conversion when rendering fails", async () => {
-    const rasterizePdf = vi.fn();
-    await expect(
-      processPdfAttachment(
-        {
-          name: "renamed.pdf",
-          bytes: new TextEncoder().encode("<script>alert(1)</script>")
-        },
-        { rasterizePdf }
-      )
-    ).rejects.toMatchObject({ code: "pdf-type-not-allowed" });
-    expect(rasterizePdf).not.toHaveBeenCalled();
-
-    await expect(
-      processPdfAttachment(
-        { name: "corrupt.pdf", bytes: pdf() },
-        {
-          rasterizePdf: vi.fn().mockRejectedValue(new Error("xref parse failed"))
-        }
-      )
-    ).rejects.toMatchObject({ code: "pdf-render-failed" });
-  });
-
-  it("rejects PDF page output that exceeds the configured atomic limit", async () => {
-    await expect(
-      processPdfAttachment(
-        { name: "large-output.pdf", bytes: pdf() },
-        {
-          rasterizePdf: vi.fn().mockResolvedValue([{ bytes: jpeg(100, 100), width: 100, height: 100 }])
-        },
-        {
-          policy: { ...WHO_VA_ATTACHMENT_POLICY.pdf, maxOutputBytes: 10 }
-        }
-      )
-    ).rejects.toMatchObject({ code: "pdf-output-too-large" });
   });
 });

@@ -1,49 +1,13 @@
-import { DateTimePickerAndroid } from "@react-native-community/datetimepicker";
-import { AppState, Platform, Pressable, Text, View, type AppStateStatus } from "react-native";
+import { AppState, Pressable, Text, View, type AppStateStatus } from "react-native";
 import { useRouter } from "expo-router";
 import { useCallback, useEffect, useRef } from "react";
 
-import type {
-  InstrumentQuestion,
-  SubmissionData,
-  SubmissionValidationResult,
-  WhoVaDraft,
-  WhoVaDraftController
-} from "@drguptavivek/who-2022-va";
+import type { SubmissionValidationResult, WhoVaDraft, WhoVaDraftController } from "@drguptavivek/who-2022-va";
 import { WhoVaForm } from "@drguptavivek/who-2022-va/native";
 
 import { DemoChrome, EmptyState, styles } from "./DemoLayout";
 import { countAnswers, useDemoState } from "./DemoState";
-
-function dateFromIso(value: string | undefined): Date {
-  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value ?? "");
-  if (!match) return new Date();
-  return new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
-}
-
-function isoFromDate(value: Date): string {
-  const year = value.getFullYear();
-  const month = String(value.getMonth() + 1).padStart(2, "0");
-  const day = String(value.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
-}
-
-function pickAndroidDate(
-  question: InstrumentQuestion,
-  _data: SubmissionData,
-  currentValue?: string
-): Promise<string | undefined> {
-  if (Platform.OS !== "android") return Promise.resolve(undefined);
-  return new Promise((resolve) => {
-    DateTimePickerAndroid.open({
-      mode: "date",
-      value: dateFromIso(currentValue),
-      onChange: (event, selectedDate) => {
-        resolve(event.type === "set" && selectedDate ? isoFromDate(selectedDate) : undefined);
-      }
-    });
-  });
-}
+import { useExpoWhoVaPlatformServices } from "./ExpoPlatformServices";
 
 export function FormRouteScreen({
   draft,
@@ -58,6 +22,7 @@ export function FormRouteScreen({
 }) {
   const router = useRouter();
   const { addCompleted, draftStore, setLastUpdate } = useDemoState();
+  const platform = useExpoWhoVaPlatformServices();
   const draftControllerRef = useRef<WhoVaDraftController | undefined>(undefined);
   const appStateRef = useRef<AppStateStatus>(AppState.currentState);
   const saveBeforeRoute = useCallback(
@@ -118,7 +83,7 @@ export function FormRouteScreen({
           draftId={draft?.id}
           draftStore={draftStore}
           initialData={draft?.data}
-          platform={{ pickDate: pickAndroidDate }}
+          platform={platform}
           autoSaveDraftOnChange
           onChange={(data) => {
             setLastUpdate(`${Object.keys(data).length} draft answers captured`);

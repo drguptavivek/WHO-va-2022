@@ -7,12 +7,11 @@ import {
   cleanupOrphanedWebAttachments,
   loadWebAttachmentBlob,
   processWebImageAttachment,
-  processWebPdfAttachment,
   resolveWebAttachmentUri,
+  storeWebPdfAttachment,
   type WebAttachmentBinaryStore,
   type WebImageFile
 } from "../src/web-attachments.js";
-import type { PdfRasterizer } from "../src/attachments.js";
 
 function png(width: number, height: number): Uint8Array {
   const bytes = new Uint8Array(32);
@@ -169,7 +168,7 @@ describe("web attachment processing", () => {
     expect(arrayBuffer).not.toHaveBeenCalled();
   });
 
-  it("atomically stores converted PDF page images and never stores the original PDF", async () => {
+  it("stores retained PDF originals for server-side validation", async () => {
     const original = new Uint8Array(64);
     original.set(new TextEncoder().encode("%PDF-1.7\n"));
     const file: WebImageFile = {
@@ -180,56 +179,43 @@ describe("web attachment processing", () => {
         return arrayBuffer(original);
       }
     };
-    const firstPage = jpeg(1131, 1600);
-    const secondPage = jpeg(1131, 1600);
-    const rasterizer: PdfRasterizer = {
-      rasterizePdf: vi.fn().mockResolvedValue([
-        { bytes: firstPage, width: 1131, height: 1600 },
-        { bytes: secondPage, width: 1131, height: 1600 }
-      ])
-    };
     const store = memoryStore();
 
-    const reference = await processWebPdfAttachment(file, {
+    const reference = await storeWebPdfAttachment(file, {
       store,
-      rasterizer,
       createId: () => "ad13fefc-9d37-47d7-94df-ec6c894e65dd"
     });
 
     expect(reference).toMatchObject({
       id: "ad13fefc-9d37-47d7-94df-ec6c894e65dd",
-      uri: "who-va-pdf-pages:ad13fefc-9d37-47d7-94df-ec6c894e65dd",
+      uri: "who-va-attachment:ad13fefc-9d37-47d7-94df-ec6c894e65dd",
       originalName: "interview-notes.pdf",
-      pageCount: 2,
-      originalRetained: false,
-      processed: true
+      mimeType: "application/pdf",
+      originalRetained: true,
+      processed: false,
+      serverSideValidationRequired: true
     });
-    expect(store.saved.size).toBe(2);
-    expect(Array.from(store.saved.values()).every((blob) => blob.type === "image/jpeg")).toBe(true);
-    expect(Array.from(store.saved.values()).some((blob) => blob.type === "application/pdf")).toBe(false);
+    expect(store.saved.size).toBe(1);
+    expect(Array.from(store.saved.values()).every((blob) => blob.type === "application/pdf")).toBe(true);
   });
 
   it("removes stored binaries that are no longer referenced by drafts", async () => {
     const store = memoryStore();
     await store.save("kept", new Blob(["kept"]));
-    await store.save("kept-page", new Blob(["kept page"]));
+    await store.save("kept-pdf", new Blob(["kept pdf"]));
     await store.save("orphan", new Blob(["orphan"]));
     const references = [
       {
         data: {
           imageAnswer: { id: "kept", uri: "who-va-attachment:kept" },
-          documentAnswer: {
-            id: "pdf",
-            uri: "who-va-pdf-pages:pdf",
-            pages: [{ id: "kept-page", uri: "who-va-attachment:kept-page" }]
-          }
+          documentAnswer: { id: "kept-pdf", uri: "who-va-attachment:kept-pdf" }
         }
       }
     ];
 
     await expect(cleanupOrphanedWebAttachments(references, store)).resolves.toBe(1);
     expect(store.saved.has("kept")).toBe(true);
-    expect(store.saved.has("kept-page")).toBe(true);
+    expect(store.saved.has("kept-pdf")).toBe(true);
     expect(store.saved.has("orphan")).toBe(false);
   });
 });
