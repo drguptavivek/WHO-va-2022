@@ -2,6 +2,8 @@
 
 This is a practical guide to the public package surface. TypeScript declarations emitted by `pnpm build` remain the exact signature reference.
 
+The normative data contract and its differences from the WHO 2022 reference are documented in [Form schema and WHO differences](form-schema.md).
+
 ## Entry points
 
 | Import                                    | Use it for                                                                                                 |
@@ -95,7 +97,7 @@ The session exposes:
 | `validate()` / `complete()`        | Return normalized data and validation issues                                      |
 | `subscribe(listener)`              | Observe snapshots; returns an unsubscribe function                                |
 
-`next()` returns a discriminated `SessionNavigationResult`: `blocked` includes a non-empty issue list, `advanced` moves to another section, and `completed` includes the already-validated submission result. `validate()` and `complete()` likewise return a discriminated validation union, so `valid: true` guarantees an empty issue list.
+`next()` returns a discriminated `SessionNavigationResult`: `blocked` includes a non-empty issue list, `advanced` moves to another section, and `completed` includes the already-validated submission result. `validate()` and `complete()` likewise return a discriminated validation union, so `valid: true` guarantees an empty issue list. Every validation result also carries `formVersion`, `instrumentId`, and `instrumentVersion` outside `data`, allowing a stored submission to identify the exact form model without polluting canonical WHO answers.
 
 ## Stateless engine functions
 
@@ -150,9 +152,10 @@ Each receives the same core contract: `question`, `value`, `data`, `locale`, `is
 - `createLocalStorageDraftStore(storage?)` creates the browser-compatible key/value adapter.
 - `WHO_VA_DRAFT_KEY_PREFIX` is the default `who-va-2022:draft:` prefix.
 - `WHO_VA_DRAFT_SCHEMA_VERSION` is the current envelope version.
+- `WHO_VA_FORM_VERSION` identifies this implementation's form model independently of the WHO instrument and draft schema.
 - `decodeWhoVaDraft(value)` validates host-loaded data, migrates legacy unversioned envelopes to version 1, and rejects malformed or unknown versions.
 
-A `WhoVaDraft` contains `schemaVersion: 1`, its ID, instrument ID/version, current section, timestamps, and unvalidated answer data. Treat storage as an untrusted serialization boundary and call `decodeWhoVaDraft()` in custom stores before using decoded JSON. Draft metadata is deliberately outside the WHO submission object. Session initialization, `replaceData()`, and normalized validation output retain only question names declared by the supplied instrument; unknown host fields must remain in the host application's separate record.
+A `WhoVaDraft` contains `schemaVersion: 1`, `formVersion`, its ID, instrument ID/version, current section, timestamps, and unvalidated answer data. Legacy drafts without `formVersion` are assigned the current version during decoding. Treat storage as an untrusted serialization boundary and call `decodeWhoVaDraft()` in custom stores before using decoded JSON. Draft metadata is deliberately outside the WHO submission object. Session initialization, `replaceData()`, and normalized validation output retain only question names declared by the supplied instrument; unknown host fields must remain in the host application's separate record.
 
 ## Localization
 

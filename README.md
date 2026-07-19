@@ -10,6 +10,7 @@ The runtime, package build, and test suite do **not** parse Excel or generate fr
 
 - [Developer guide](https://github.com/drguptavivek/WHO-va-2022/blob/main/docs/development.md) — setup, repository map, common workflows, testing, and contribution rules
 - [API reference](https://github.com/drguptavivek/WHO-va-2022/blob/main/docs/api.md) — entry points and the main headless, form, draft, localization, and attachment APIs
+- [Form schema and WHO differences](https://github.com/drguptavivek/WHO-va-2022/blob/main/docs/form-schema.md) — canonical answer types, identifiers, implementation additions, and every intentional change from the WHO 2022 reference
 - [Architecture](https://github.com/drguptavivek/WHO-va-2022/blob/main/docs/architecture.md) — executable contract, runtime boundaries, shared behavior, and platform services
 - [Attachment processing](https://github.com/drguptavivek/WHO-va-2022/blob/main/docs/attachments.md) — validation policy, browser/native lifecycles, and the server boundary
 - [Examples and host app integration](https://github.com/drguptavivek/WHO-va-2022/blob/main/docs/examples.md) — React web, web component, Expo/React Native, draft storage, and demo build notes
@@ -133,6 +134,8 @@ export default function App() {
 `initialData` accepts canonical WHO question IDs directly, and `createWhoVaInitialDataFromPrefill()` maps common host context such as a death-list record, citizenship/nationality, logged-in interviewer profile, HIV/malaria mortality presets, and state/district location. Prefilled answers remain normal editable form answers unless the WHO instrument marks that question read-only. Keep host-only identifiers, such as a local death-list UUID or RBAC assignment ID, outside the WHO answer payload; pass them as `draftId` or attach them in your server submission envelope.
 
 Prefill evidence is mutually exclusive: choose date of birth or reported age, and choose date of death or reported year. Caller-owned form sessions must be paired with their instrument and cannot also receive `initialData`; managed forms accept `initialData` and create their own session.
+
+`WHO_VA_FORM_VERSION` identifies the implemented form model separately from the WHO instrument version and the draft schema version. Drafts and validation/completion results carry the form and instrument identifiers as metadata outside canonical WHO answer data.
 
 | Prefill data                              | WHO code                   | Label                                        | Expected shape                                                                       |
 | ----------------------------------------- | -------------------------- | -------------------------------------------- | ------------------------------------------------------------------------------------ |
@@ -407,7 +410,7 @@ Canonical artifacts:
 - `src/generated/who-va-2022.instrument.json` — authoritative runtime instrument
 - `src/generated/who-va-2022.question-audit.json` — human-reviewable question matrix retained alongside the contract
 
-The package build reads only the checked-in JSON. Tests may compile the retained XLSForm in memory to detect source drift and verify type, coded values, requiredness, relevance AST, constraints, calculations, field validation, and isolated submission validation. The test compiler never regenerates or modifies the JSON.
+The package build and automated tests read only the checked-in JSON. The retained XLSForm is reference documentation for manual provenance review; no repository code parses it or generates the JSON from it.
 
 ### Deviations from WHO form / gotchas
 
@@ -419,7 +422,7 @@ The canonical JSON intentionally keeps a few runtime adaptations separate from t
 - `Id10023_a`, `Id10023_b`, and `Id10382` use clearer app-supplied English constraint messages.
 - Four source constraints are retained and evaluable but inert for valid app inputs: `Id10260`, `Id10414`, `Id10414_a`, and `Id10414_b`. Their constraint formulas mention values that are not in the compiled app choice lists for those questions, so normal runtime validation cannot raise a constraint error from them.
 
-See the [XLSForm to app audit](https://github.com/drguptavivek/WHO-va-2022/blob/main/docs/xlsform-app-audit.md) and `tests/exhaustive-runtime-expressions.test.ts` for the exhaustive constraint/calculation coverage.
+See [Form schema and WHO differences](https://github.com/drguptavivek/WHO-va-2022/blob/main/docs/form-schema.md) for the normative implementation schema, the [XLSForm to app audit](https://github.com/drguptavivek/WHO-va-2022/blob/main/docs/xlsform-app-audit.md) for the manual provenance record, and `tests/exhaustive-runtime-expressions.test.ts` for exhaustive runtime constraint/calculation coverage.
 
 See the [developer guide](https://github.com/drguptavivek/WHO-va-2022/blob/main/docs/development.md) for the full contributor workflow and [Architecture](https://github.com/drguptavivek/WHO-va-2022/blob/main/docs/architecture.md) for the trust boundaries and extension points.
 

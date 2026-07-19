@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   WHO_VA_DRAFT_SCHEMA_VERSION,
+  WHO_VA_FORM_VERSION,
   compileInstrumentDefinition,
   createWhoVaInitialDataFromPrefill,
   createWhoVaSession,
@@ -112,6 +113,7 @@ describe("cohesive runtime models", () => {
     });
 
     expect(decoded.schemaVersion).toBe(WHO_VA_DRAFT_SCHEMA_VERSION);
+    expect(decoded.formVersion).toBe(WHO_VA_FORM_VERSION);
     expect(decoded.data.name).toBe("Amina");
     expect(() => decodeWhoVaDraft({ id: "broken", data: [] })).toThrow(/draft/i);
     expect(() => decodeWhoVaDraft({ ...decoded, schemaVersion: 999 })).toThrow(/draft schema version/i);
@@ -135,7 +137,14 @@ describe("cohesive runtime models", () => {
     const result = session.next();
 
     expect(result).toMatchObject({ status: "completed", advanced: true, completed: true });
-    if (result.status === "completed") expect(result.result.valid).toBe(true);
+    if (result.status === "completed") {
+      expect(result.result).toMatchObject({
+        valid: true,
+        formVersion: WHO_VA_FORM_VERSION,
+        instrumentId: instrument.id,
+        instrumentVersion: instrument.version
+      });
+    }
   });
 });
 

@@ -4,7 +4,7 @@ import React from "react";
 import { createRoot } from "react-dom/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import type { InstrumentDefinition, WhoVaDraft } from "../src/index.js";
+import { WHO_VA_FORM_VERSION, type InstrumentDefinition, type WhoVaDraft } from "../src/index.js";
 import { WhoVaForm } from "../src/web.js";
 
 const instrument: InstrumentDefinition = {
@@ -63,6 +63,7 @@ describe("draft save ordering", () => {
     next?.click();
     next?.click();
     await vi.waitFor(() => expect(save).toHaveBeenCalledTimes(1));
+    expect(saved[0]?.formVersion).toBe(WHO_VA_FORM_VERSION);
     expect(saved[0]?.currentSection).toBe("two");
 
     finishFirstSave?.();

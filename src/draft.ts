@@ -3,6 +3,7 @@
  * adapter. Native hosts provide their own implementation of the same contract.
  */
 import type { AnswerValue, SubmissionData, WhoVaDraft, WhoVaDraftStore } from "./types.js";
+import { WHO_VA_FORM_VERSION } from "./version.js";
 
 export const WHO_VA_DRAFT_KEY_PREFIX = "who-va-2022:draft:";
 export const WHO_VA_DRAFT_SCHEMA_VERSION = 1 as const;
@@ -73,6 +74,7 @@ export function decodeWhoVaDraft(value: unknown): WhoVaDraft {
   if (!data) throw new Error("Stored WHO VA draft has invalid answer data");
   return {
     schemaVersion: WHO_VA_DRAFT_SCHEMA_VERSION,
+    formVersion: value.formVersion === undefined ? WHO_VA_FORM_VERSION : requiredString(value, "formVersion"),
     id,
     instrumentId,
     instrumentVersion,

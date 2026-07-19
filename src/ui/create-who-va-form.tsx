@@ -20,6 +20,7 @@ import { WHO_VA_DRAFT_SCHEMA_VERSION, createDraftId, decodeWhoVaDraft } from "..
 import { createWhoVaSession } from "../engine/session.js";
 import { applyCalculations, isQuestionRelevantWithCalculatedData } from "../engine/validation.js";
 import { localeFromLanguageName, resolveUiMessages, type WhoVaUiTranslations } from "../i18n.js";
+import { WHO_VA_FORM_VERSION } from "../version.js";
 import {
   createWhoVaQuestionControls,
   questionControlStyles,
@@ -281,6 +282,7 @@ export function createWhoVaForm(
       const current = session.getSnapshot();
       const draft: WhoVaDraft = {
         schemaVersion: WHO_VA_DRAFT_SCHEMA_VERSION,
+        formVersion: WHO_VA_FORM_VERSION,
         id: draftId,
         instrumentId: instrument.id,
         instrumentVersion: instrument.version,

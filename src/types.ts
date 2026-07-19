@@ -188,6 +188,7 @@ export type SubmissionData = Record<string, AnswerValue | undefined>;
 
 export interface WhoVaDraft {
   schemaVersion: 1;
+  formVersion: string;
   id: string;
   instrumentId: string;
   instrumentVersion: string;
@@ -211,13 +212,19 @@ export interface ValidationIssue {
 
 export type NonEmptyArray<T> = [T, ...T[]];
 
-export interface ValidSubmissionResult {
+export interface FormVersionIdentity {
+  formVersion: string;
+  instrumentId: string;
+  instrumentVersion: string;
+}
+
+export interface ValidSubmissionResult extends FormVersionIdentity {
   valid: true;
   data: SubmissionData;
   issues: [];
 }
 
-export interface InvalidSubmissionResult {
+export interface InvalidSubmissionResult extends FormVersionIdentity {
   valid: false;
   data: SubmissionData;
   issues: NonEmptyArray<ValidationIssue>;

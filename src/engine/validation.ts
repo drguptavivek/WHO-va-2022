@@ -16,6 +16,7 @@ import type {
 } from "../types.js";
 import { ENGLISH_UI_MESSAGES, localizeText, type WhoVaUiMessages } from "../i18n.js";
 import { isValidIsoDate } from "../date.js";
+import { WHO_VA_FORM_VERSION } from "../version.js";
 
 const expressionAst = getCompiledExpressionAst;
 
@@ -220,6 +221,20 @@ export function validateSubmission(
     );
   }
   return issues.length
-    ? { valid: false, data: normalized, issues: [issues[0]!, ...issues.slice(1)] }
-    : { valid: true, data: normalized, issues: [] };
+    ? {
+        valid: false,
+        formVersion: WHO_VA_FORM_VERSION,
+        instrumentId: instrument.id,
+        instrumentVersion: instrument.version,
+        data: normalized,
+        issues: [issues[0]!, ...issues.slice(1)]
+      }
+    : {
+        valid: true,
+        formVersion: WHO_VA_FORM_VERSION,
+        instrumentId: instrument.id,
+        instrumentVersion: instrument.version,
+        data: normalized,
+        issues: []
+      };
 }

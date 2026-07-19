@@ -74,6 +74,7 @@ describe("answer preview", () => {
     const root = createRoot(container);
     const foreignDraft: WhoVaDraft = {
       schemaVersion: 1,
+      formVersion: "2022",
       id: "draft-a",
       instrumentId: previewInstrument.id,
       instrumentVersion: previewInstrument.version,
