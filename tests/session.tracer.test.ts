@@ -1,6 +1,24 @@
 import { describe, expect, it } from "vitest";
 
-import { createWhoVaSession, whoVa2022Instrument } from "../src/index.js";
+import { createWhoVaSession, validateSubmission, whoVa2022Instrument } from "../src/index.js";
+
+function contextQuestion(name: string, sectionPath: string[], order: number) {
+  return {
+    name,
+    order,
+    sourceRow: order,
+    sourceType: "system",
+    dataType: "string" as const,
+    control: "system" as const,
+    label: { en: name },
+    hint: {},
+    guidance: {},
+    required: false,
+    readOnly: true,
+    constraintMessage: {},
+    sectionPath
+  };
+}
 
 describe("universal instrument session", () => {
   it("applies XLSForm group relevance separately from question relevance", () => {
@@ -15,6 +33,9 @@ describe("universal instrument session", () => {
       ...whoVa2022Instrument,
       sections: [topLevelSection],
       questions: [
+        contextQuestion("isChild", [sourceSection.name], 1),
+        contextQuestion("isNeonatal", [sourceSection.name], 2),
+        contextQuestion("Id10114", [sourceSection.name], 3),
         { ...neonatalQuestion, sectionPath: [sourceSection.name] },
         { ...childQuestion, sectionPath: [sourceSection.name] }
       ]
@@ -29,7 +50,12 @@ describe("universal instrument session", () => {
     const groupGatedInstrument = {
       ...instrument,
       sections: [{ ...topLevelSection, relevant: neonatalQuestion.relevant }],
-      questions: [{ ...childQuestion, sectionPath: [sourceSection.name] }]
+      questions: [
+        contextQuestion("isChild", [sourceSection.name], 1),
+        contextQuestion("isNeonatal", [sourceSection.name], 2),
+        contextQuestion("Id10114", [sourceSection.name], 3),
+        { ...childQuestion, sectionPath: [sourceSection.name] }
+      ]
     };
     expect(() =>
       createWhoVaSession(groupGatedInstrument, {
@@ -71,6 +97,18 @@ describe("universal instrument session", () => {
     expect(session.getSnapshot().data.Id10010b).toBeUndefined();
   });
 
+  it("drops host-only fields from session and normalized submission data", () => {
+    const input = { Id10010: "Interviewer", hostRecordId: "host-only-123" };
+    const session = createWhoVaSession(whoVa2022Instrument, { initialData: input });
+    const result = validateSubmission(whoVa2022Instrument, input);
+
+    expect(session.getSnapshot().data).not.toHaveProperty("hostRecordId");
+    expect(result.data).not.toHaveProperty("hostRecordId");
+
+    expect(() => session.replaceData(input)).not.toThrow();
+    expect(session.getSnapshot().data).not.toHaveProperty("hostRecordId");
+  });
+
   it("does not publish a redundant snapshot for the same instrument object", () => {
     const session = createWhoVaSession(whoVa2022Instrument);
     let notifications = 0;
@@ -105,6 +143,11 @@ describe("universal instrument session", () => {
       sections: whoVa2022Instrument.sections.filter((section) => sectionNames.has(section.name)),
       questions: whoVa2022Instrument.questions.filter((question) => questionNames.has(question.name))
     };
+    instrument.questions.push(
+      contextQuestion("Id10013", ["stillbirth"], 1),
+      contextQuestion("isNeonatal", ["stillbirth"], 2),
+      contextQuestion("Id10114", ["stillbirth"], 3)
+    );
     const session = createWhoVaSession(instrument, {
       initialData: { Id10013: "yes", isNeonatal: "1", Id10114: "no" }
     });

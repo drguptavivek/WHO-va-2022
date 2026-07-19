@@ -100,7 +100,7 @@ The session exposes:
 - `getQuestion(instrument, name)` returns a named question or throws when it is absent.
 - `isQuestionRelevant(instrument, question, data)` evaluates visibility.
 - `validateAnswer(instrument, question, value, data, ...)` validates one field.
-- `validateSubmission(instrument, data, ...)` recalculates, removes irrelevant answers from normalized output, and validates the complete submission.
+- `validateSubmission(instrument, data, ...)` recalculates, removes irrelevant and unknown fields from normalized output, and validates the complete submission.
 
 Prefer `validateSubmission()` at server ingress even if the client already validated the interview.
 
@@ -124,11 +124,11 @@ Prefer `validateSubmission()` at server ingress even if the client already valid
 | `onInstrumentError`             | Handle default-instrument loading failures                                        |
 | `onComplete`                    | Receive the normalized submission result                                          |
 
-Web forms use a browser draft store by default. Native hosts should inject a `WhoVaDraftStore` suitable for their app.
+Web and native forms are in-memory by default. Hosts must inject a `WhoVaDraftStore` to enable durable saves and platform services to enable binary capture. Web exports `createInsecureWhoVaBrowserDefaults()` only for demos and low-risk prototypes that deliberately accept plaintext `localStorage` and unencrypted IndexedDB.
 
 Native hosts should also inject `platform.pickDate` when they want full-date fields to open a calendar. On Android, the Expo demo uses `@react-native-community/datetimepicker` and `DateTimePickerAndroid.open()` for date questions including `Id10021`, `Id10023_a`, and `Id10023_b`. Without `pickDate`, native full-date fields fall back to validated text entry.
 
-The web component exposes `draftStore` and `platform` JavaScript properties. Assign a `WhoVaDraftStore` and host-controlled attachment/recording services before appending the element so production VA data does not pass through the default unencrypted browser stores.
+The web component exposes `draftStore` and `platform` JavaScript properties. Assign a `WhoVaDraftStore` and host-controlled attachment/recording services before appending the element; otherwise persistence and binary controls remain disabled.
 
 ## Reusable question controls
 
@@ -142,7 +142,7 @@ Each receives the same core contract: `question`, `value`, `data`, `locale`, `is
 - `createLocalStorageDraftStore(storage?)` creates the browser-compatible key/value adapter.
 - `WHO_VA_DRAFT_KEY_PREFIX` is the default `who-va-2022:draft:` prefix.
 
-A `WhoVaDraft` contains its ID, instrument ID/version, current section, timestamps, and unvalidated answer data. Draft metadata is deliberately outside the WHO submission object.
+A `WhoVaDraft` contains its ID, instrument ID/version, current section, timestamps, and unvalidated answer data. Draft metadata is deliberately outside the WHO submission object. Session initialization, `replaceData()`, and normalized validation output retain only question names declared by the supplied instrument; unknown host fields must remain in the host application's separate record.
 
 ## Localization
 

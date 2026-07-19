@@ -36,9 +36,10 @@ Useful commands:
 | `pnpm test:e2e:report` | Open the latest Playwright HTML report                             |
 | `pnpm build`           | Build ESM bundles, declarations, and source maps into `dist/`      |
 | `pnpm build:demo`      | Produce a static demo build                                        |
-| `pnpm check`           | Run type checking, Vitest, and the package build                   |
+| `pnpm check`           | Run lint, formatting, type checking, Vitest, and package build     |
+| `pnpm check:all`       | Run `pnpm check` plus the Chromium end-to-end suite                |
 
-`pnpm check` intentionally does not include Playwright. Run `pnpm test:e2e` separately when a change affects controls, navigation, browser persistence, or form behavior.
+`pnpm check` intentionally remains the browser-free package gate. Run `pnpm check:all` when Chromium is available; GitHub Actions runs the package gate and browser suite as separate jobs.
 
 ## Repository map
 
@@ -99,7 +100,7 @@ Add focused tests under `tests/`. Prefer testing public functions or a session o
 
 ### Shared controls
 
-Controls belong in `src/ui/question-controls.tsx` and should use injected primitives and platform services. Keep questionnaire behavior outside platform-specific entry points. Verify shared behavior with Vitest and browser interaction with Playwright when relevant.
+Control behavior belongs in `src/ui/question-controls.tsx`, while shared labels, attachment messages, and presentation styles live in `src/ui/question-control-support.ts`. Form presentation helpers and styles live in `src/ui/form-presentation.tsx`. Keep questionnaire behavior outside platform-specific entry points. Verify shared behavior with Vitest and browser interaction with Playwright when relevant.
 
 ### Platform adapters
 
@@ -124,7 +125,7 @@ The suites are intentionally layered:
 - Source-conformance tests compare the canonical JSON with the workbook without mutating either artifact.
 - Playwright drives the rendered form, including error correction, age calculations, and navigation.
 
-For a normal code change, run the narrowest related Vitest file while iterating, then `pnpm check`. Add `pnpm test:e2e` for user-visible browser or navigation changes.
+For a normal code change, run the narrowest related Vitest file while iterating, then `pnpm check`. Use `pnpm check:all` for user-visible browser or navigation changes.
 
 ## Build and package boundaries
 

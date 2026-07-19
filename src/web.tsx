@@ -20,7 +20,7 @@ import {
 import { createLocalStorageDraftStore } from "./draft.js";
 import { loadWhoVa2022Instrument } from "./instrument-loader.js";
 import { createWhoVaQuestionControls, type WhoVaPlatformServices } from "./ui/question-controls.js";
-import type { AnswerValue } from "./types.js";
+import type { AnswerValue, WhoVaDraftStore } from "./types.js";
 import {
   createIndexedDbWebAttachmentStore,
   cleanupOrphanedWebAttachments,
@@ -245,6 +245,22 @@ const webAttachmentPlatform: WhoVaPlatformServices = {
   }
 };
 
+export interface InsecureWhoVaBrowserDefaults {
+  draftStore: WhoVaDraftStore;
+  platform: WhoVaPlatformServices;
+}
+
+/**
+ * Explicitly opts a demo or low-risk prototype into plaintext localStorage and
+ * unencrypted IndexedDB. Production hosts should inject protected adapters.
+ */
+export function createInsecureWhoVaBrowserDefaults(): InsecureWhoVaBrowserDefaults {
+  return {
+    draftStore: createLocalStorageDraftStore(),
+    platform: webAttachmentPlatform
+  };
+}
+
 export {
   cleanupOrphanedWebAttachments,
   createBrowserImageTranscoder,
@@ -269,8 +285,6 @@ export const WhoVaForm = createWhoVaForm(
     Svg,
     SvgCircle,
     SvgPath,
-    platform: webAttachmentPlatform,
-    draftStore: createLocalStorageDraftStore(),
     navigation: browserNavigation,
     scrollToQuestion: scrollToWebQuestion
   },
@@ -283,7 +297,6 @@ export const WhoVaQuestionControls = createWhoVaQuestionControls({
   TextInput,
   DateInput: WebDateInput,
   Pressable,
-  Image,
-  platform: webAttachmentPlatform
+  Image
 });
 export type { WhoVaQuestionControlProps } from "./ui/question-controls.js";

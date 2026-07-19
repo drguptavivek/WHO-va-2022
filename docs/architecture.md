@@ -30,7 +30,7 @@ The contract is intentionally checked in and maintained directly. Changes can th
 - `validateAnswer()`
 - `validateSubmission()`
 
-Invisible answers are removed from normalized submission output. Calculated values are recomputed from answers. Invalid types and values outside a WHO choice list are rejected before they enter session state.
+Invisible answers and fields not declared by the instrument are removed from normalized submission output. Session initialization and replacement also ignore unknown fields. Calculated values are recomputed from answers. Invalid types and values outside a WHO choice list are rejected before they enter session state.
 
 Question cards report their content position to the shared renderer. Failed Next or Complete validation aligns the first issue at the top of the viewport, highlights its card, and, on web, focuses its first interactive control. This behavior applies equally to ordinary WHO constraints and incomplete date/year drafts.
 
@@ -48,7 +48,7 @@ Image and file controls use `platform.captureImage`, `platform.selectImage`, and
 
 ## Draft persistence
 
-Drafts use a stable UUID and a platform-neutral envelope containing instrument identity/version, current section, timestamps, and the unvalidated submission data. Manual Save draft and every Next/Complete press write the same envelope. Web defaults to `localStorage`; Expo and React Native hosts inject a `WhoVaDraftStore` backed by their chosen durable app storage. Draft metadata remains outside the canonical WHO answer object.
+Drafts use a stable UUID and a platform-neutral envelope containing instrument identity/version, current section, timestamps, and the unvalidated submission data. Manual Save draft and every Next/Complete press write the same envelope when a host store is configured. Web, Expo, and React Native hosts inject a `WhoVaDraftStore` backed by protected app storage; no renderer persists by default. Browser history contains only draft/navigation metadata and cannot restore navigation from a different configured draft. The explicit `createInsecureWhoVaBrowserDefaults()` helper exists for demos and low-risk prototypes. Draft metadata remains outside the canonical WHO answer object.
 
 ## Test boundary
 

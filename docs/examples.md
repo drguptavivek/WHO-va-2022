@@ -39,6 +39,8 @@ import { WhoVaForm } from "@drguptavivek/who-2022-va/web";
 export function VerbalAutopsyPage() {
   return (
     <WhoVaForm
+      draftStore={secureDraftStore}
+      platform={secureAttachmentAndRecordingServices}
       onDraftSaved={(draft) => console.log("saved", draft.id)}
       onComplete={(result) => {
         if (result.valid) submitVa(result.data);
@@ -48,7 +50,7 @@ export function VerbalAutopsyPage() {
 }
 ```
 
-The web form includes a default `localStorage` draft store. For production VA data, pass your own encrypted or access-controlled `draftStore` instead of using browser storage.
+The web form is in-memory by default: Save draft and binary capture remain disabled until the host supplies a `draftStore` and `platform` services. The checked-in web examples explicitly call `createInsecureWhoVaBrowserDefaults()` because they are prototypes; do not copy that opt-in into production VA deployments.
 
 ## Plain Web Component
 
@@ -65,7 +67,7 @@ form.addEventListener("who-va-complete", (event) => submitVa(event.detail.data))
 document.querySelector("#form-root")?.append(form);
 ```
 
-Configure `draftStore`, attachment services, and any existing `draft-id` before appending the element. Otherwise the component creates a new draft ID and uses the default browser stores.
+Configure `draftStore`, attachment services, and any existing `draft-id` before appending the element. Otherwise the component creates a new draft ID but keeps answers in memory and leaves Save draft and binary controls disabled.
 
 ## Expo / React Native
 

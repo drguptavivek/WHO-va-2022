@@ -65,7 +65,23 @@ class UniversalWhoVaSession implements WhoVaSession {
     this.locale = options.locale ?? "en";
     this.messages = resolveUiMessages(this.locale, options.uiTranslations);
     const startedAt = this.now();
-    this.data = { ...(options.initialData ?? {}) };
+    this.data = {};
+    const initialData = options.initialData ?? {};
+    const { choiceValuesByQuestionName, questionsByName } = getInstrumentRuntimeIndex(instrument);
+    for (const [name, value] of Object.entries(initialData)) {
+      const question = questionsByName.get(name);
+      if (!question) continue;
+      const errors = validateAnswer(
+        question,
+        value,
+        initialData,
+        this.locale,
+        this.messages,
+        choiceValuesByQuestionName.get(name)
+      ).filter(blocksDraftMutation);
+      if (errors.length) throw new Error(errors[0]?.message ?? `${name} is invalid`);
+      this.data[name] = value;
+    }
     for (const question of instrument.questions) {
       if (question.sourceType === "today" && this.data[question.name] == null)
         this.data[question.name] = formatLocalDate(startedAt);
@@ -173,12 +189,14 @@ class UniversalWhoVaSession implements WhoVaSession {
 
   replaceData(data: SubmissionData): void {
     const replacement = { ...this.data };
+    const { choiceValuesByQuestionName, questionsByName } = getInstrumentRuntimeIndex(this.instrument);
     for (const question of this.instrument.questions) {
       if (["calculated", "system"].includes(question.control)) continue;
       delete replacement[question.name];
     }
     for (const [name, value] of Object.entries(data)) {
-      const question = getQuestion(this.instrument, name);
+      const question = questionsByName.get(name);
+      if (!question) continue;
       if (["calculated", "system"].includes(question.control)) continue;
       const errors = validateAnswer(
         question,
@@ -186,7 +204,7 @@ class UniversalWhoVaSession implements WhoVaSession {
         { ...replacement, [name]: value },
         this.locale,
         this.messages,
-        getInstrumentRuntimeIndex(this.instrument).choiceValuesByQuestionName.get(question.name)
+        choiceValuesByQuestionName.get(question.name)
       ).filter(blocksDraftMutation);
       if (errors.length) throw new Error(errors[0]?.message ?? `${name} is invalid`);
       replacement[name] = value;

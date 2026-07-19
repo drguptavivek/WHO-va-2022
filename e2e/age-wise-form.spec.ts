@@ -108,7 +108,7 @@ async function fillInterviewer(page: Page): Promise<void> {
   await fill(page, "Id10010a", "35");
   await choose(page, "Id10010b", "female");
   await fill(page, "Id10010c", "E2E-001");
-  await choose(page, "language", "1");
+  await choose(page, "language", "en");
   await next(page);
 }
 
@@ -176,7 +176,7 @@ test("required and constraint errors appear, then clear after correction", async
   await expect(page.getByTestId("question-card-Id10010a").getByRole("alert")).toHaveCount(0);
   await choose(page, "Id10010b", "female");
   await fill(page, "Id10010c", "E2E-001");
-  await choose(page, "language", "1");
+  await choose(page, "language", "en");
   await expect(page.getByRole("alert")).toHaveCount(0);
   await next(page);
   await expect(page.getByText("Preset HIV-Malaria mortality and season.", { exact: true })).toBeVisible();

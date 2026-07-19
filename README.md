@@ -162,7 +162,7 @@ Both `/web` and `/native` export `WhoVaQuestionControls`. Its named components a
 
 WHO text questions with `appearance: "multiline"`, including the detailed open narrative, use a tall multiline input. Image controls support camera/library selection, preview, hide/view, 90-degree rotation, zoom, replace, and remove. File controls request PDF MIME type only and support replace/remove. Web supplies browser selectors; Expo/React Native hosts connect camera, image-library, and document-picker functions through `platform`.
 
-Attachment answers are durable references, not embedded base64 data. Browser images are decoded directly from the selected `Blob`, resized and JPEG-encoded, and stored in IndexedDB; the answer JSON stores only an ID and metadata. Native adapters can provide `inspect(uri)` so the original camera file is decoded by the platform without first copying all of its bytes into the JavaScript heap. The processed native file remains a URI that the host can stream to its upload service.
+Attachment answers are durable references, not embedded base64 data. Browser images have their signature and dimensions checked from a bounded header before browser decoding, are resized and JPEG-encoded, and can be stored through an injected platform adapter; the answer JSON stores only an ID and metadata. Native adapters can provide `inspect(uri)` so the original camera file is decoded by the platform without first copying all of its bytes into the JavaScript heap. The processed native file remains a URI that the host can stream to its upload service.
 
 The default limits protect low-memory devices: images are capped at 10 MB and 16 megapixels before processing, then reduced to at most 2048 pixels on the longest edge and 2 MB. PDFs are capped at 5 MB and 10 pages; the original PDF is replaced by JPEG page images no larger than 1600 pixels on the longest edge. Host applications may choose stricter image limits.
 
@@ -173,12 +173,17 @@ import { WhoVaForm } from "@drguptavivek/who-2022-va/web";
 
 export function VerbalAutopsyPage() {
   return (
-    <WhoVaForm onDraftSaved={(draft) => console.log(draft.id)} onComplete={(result) => submit(result.data)} />
+    <WhoVaForm
+      draftStore={secureDraftStore}
+      platform={secureAttachmentAndRecordingServices}
+      onDraftSaved={(draft) => console.log(draft.id)}
+      onComplete={(result) => submit(result.data)}
+    />
   );
 }
 ```
 
-Web uses `localStorage` by default under `who-va-2022:draft:<uuid>`. Pass `draftId` to continue overwriting a known draft, or pass a custom `draftStore` to use another persistence layer. Browser history stores only draft and navigation metadata; reload restoration reads answers from the configured draft store. Audio questions use the browser microphone: press **Record audio**, then **Stop and save recording**. The browser will request microphone permission, and recording requires a secure context (`https://` or localhost). Browser recordings stop automatically after 30 minutes and are discarded if encoded chunks exceed 25 MB.
+Web forms do not persist answers or enable binary capture by default. Pass a protected `draftStore` and host-controlled `platform` services; pass `draftId` to continue overwriting a known draft. Browser history stores only the active draft ID and navigation metadata, rejects state from another configured draft, and reload restoration reads answers only from the configured draft store. Audio questions use the browser microphone when recording services are supplied. Browser recordings are collected in one-second chunks so the 25 MB byte ceiling is enforced during recording, and they stop automatically after 30 minutes.
 
 Upload a stored browser attachment as a `Blob`; do not convert it to base64:
 
@@ -203,7 +208,14 @@ await cleanupWhoVaWebAttachments(allRetainedDrafts.map((draft) => draft.data));
 
 Only call cleanup with the complete set of retained drafts/answers; omitted references are treated as deleted. Object URLs used for previews are revoked when controls release them.
 
-`localStorage` is unencrypted browser storage. For production VA data, provide a secured storage adapter with the application's encryption, access-control, retention, and device-loss protections.
+`localStorage` and IndexedDB are unencrypted browser storage. For production VA data, provide secured adapters with the application's encryption, access-control, retention, and device-loss protections. Demos and low-risk prototypes can opt in explicitly with the deliberately named `createInsecureWhoVaBrowserDefaults()` helper:
+
+```tsx
+import { createInsecureWhoVaBrowserDefaults, WhoVaForm } from "@drguptavivek/who-2022-va/web";
+
+const insecurePrototypeDefaults = createInsecureWhoVaBrowserDefaults();
+<WhoVaForm {...insecurePrototypeDefaults} />;
+```
 
 ## Any web application
 
@@ -239,7 +251,7 @@ defineWhoVaElement();
 </script>
 ```
 
-The element exposes `draftStore` and `platform` properties plus `getData()`, `setData(data)`, `getDraftId()`, `validate()`, and `complete()`. Set secure draft and attachment services plus any `draft-id` attribute before attaching the element; otherwise drafts and attachment binaries use the default unencrypted browser stores and the element generates a new UUID.
+The element exposes `draftStore` and `platform` properties plus `getData()`, `setData(data)`, `getDraftId()`, `validate()`, and `complete()`. Set secure draft and attachment services plus any `draft-id` attribute before attaching the element. Without those services the form still works in memory, Save draft and binary controls remain disabled, and the element generates a new UUID.
 
 ## Adding languages
 
@@ -383,9 +395,10 @@ pnpm test:e2e:headed # watch each action at 800 ms and each form sequentially
 pnpm test:e2e:report # open the most recent Playwright report
 pnpm build
 pnpm check
+pnpm check:all    # full package gate plus Chromium end-to-end tests
 ```
 
-Install the pinned Playwright browser once with `pnpm exec playwright install chromium`. The browser suite enters answers through the rendered controls, captures validation errors and corrected states, verifies the visible age summary and calculated values derived from `Id10021`, and confirms valid paths can advance without alerts.
+Install the pinned Playwright browser once with `pnpm exec playwright install chromium`. The browser suite enters answers through the rendered controls, captures validation errors and corrected states, verifies the visible age summary and calculated values derived from `Id10021`, and confirms valid paths can advance without alerts. GitHub Actions runs both `pnpm check` and the Chromium suite.
 
 Canonical artifacts:
 

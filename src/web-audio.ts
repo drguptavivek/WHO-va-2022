@@ -40,6 +40,8 @@ export interface StartWebAudioRecordingOptions {
   createId?: (() => string) | undefined;
   now?: (() => number) | undefined;
   policy?: WebAudioRecordingPolicy | undefined;
+  /** Request periodic encoded chunks so the byte ceiling is enforced while recording. */
+  timesliceMs?: number | undefined;
 }
 
 function preferredAudioMimeType(MediaRecorderClass: typeof MediaRecorder): string | undefined {
@@ -71,7 +73,7 @@ export async function startWebAudioRecording(
   let recorder: MediaRecorder;
   try {
     recorder = mimeType ? new MediaRecorderClass(stream, { mimeType }) : new MediaRecorderClass(stream);
-    recorder.start();
+    recorder.start(options.timesliceMs ?? 1_000);
   } catch (error) {
     stopStream(stream);
     throw error;

@@ -138,6 +138,19 @@ describe("web attachment processing", () => {
     vi.restoreAllMocks();
   });
 
+  it("rejects oversized image dimensions before browser decoding", async () => {
+    const original = png(WHO_VA_ATTACHMENT_POLICY.image.maxInputWidthOrHeight + 1, 10);
+    const file = new File([arrayBuffer(original)], "oversized.png", { type: "image/png" });
+    const createImageBitmap = vi.fn();
+    vi.stubGlobal("createImageBitmap", createImageBitmap);
+
+    await expect(processWebImageAttachment(file, { store: memoryStore() })).rejects.toMatchObject({
+      code: "image-dimensions-too-large"
+    });
+    expect(createImageBitmap).not.toHaveBeenCalled();
+    vi.unstubAllGlobals();
+  });
+
   it("resolves a stored attachment to a temporary preview URL", async () => {
     const store = memoryStore();
     await store.save("stored-image", new Blob([arrayBuffer(jpeg(100, 100))], { type: "image/jpeg" }));

@@ -1,10 +1,20 @@
-import { defineWhoVaElement, type WhoVaFormElement } from "../src/web-component.js";
+import {
+  createInsecureWhoVaBrowserDefaults,
+  defineWhoVaElement,
+  type WhoVaFormElement
+} from "../src/web-component.js";
 import { WHO_VA_2022_LANGUAGES } from "../src/instrument-loader.js";
 
 defineWhoVaElement();
 
 const form = document.querySelector<WhoVaFormElement>("#who-va-form");
 const language = document.querySelector<HTMLSelectElement>("#language");
+
+if (form) {
+  const insecureDemoDefaults = createInsecureWhoVaBrowserDefaults();
+  form.draftStore = insecureDemoDefaults.draftStore;
+  form.platform = insecureDemoDefaults.platform;
+}
 
 for (const availableLanguage of WHO_VA_2022_LANGUAGES) {
   const option = document.createElement("option");

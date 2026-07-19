@@ -2,7 +2,11 @@
 
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { defineWhoVaElement, type WhoVaFormElement } from "../src/web-component.js";
+import {
+  createInsecureWhoVaBrowserDefaults,
+  defineWhoVaElement,
+  type WhoVaFormElement
+} from "../src/web-component.js";
 import type { WhoVaPlatformServices } from "../src/web.js";
 
 afterEach(() => {
@@ -11,6 +15,19 @@ afterEach(() => {
 });
 
 describe("framework-independent web embedding", () => {
+  it("does not enable plaintext browser persistence by default", async () => {
+    defineWhoVaElement("who-va-secure-default-test");
+    const element = document.createElement("who-va-secure-default-test") as WhoVaFormElement;
+    document.body.append(element);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    const saveDraft = [...element.querySelectorAll('[role="button"]')].find(
+      (button) => button.getAttribute("aria-label") === "Save draft"
+    );
+    expect(saveDraft?.getAttribute("aria-disabled")).toBe("true");
+    expect(localStorage.length).toBe(0);
+  });
+
   it("registers one custom element with imperative data and validation APIs", async () => {
     defineWhoVaElement("who-va-test-form");
     const element = document.createElement("who-va-test-form") as WhoVaFormElement;
@@ -53,6 +70,7 @@ describe("framework-independent web embedding", () => {
   it("saves the current form as a UUID-addressed local draft", async () => {
     defineWhoVaElement("who-va-draft-test");
     const element = document.createElement("who-va-draft-test") as WhoVaFormElement;
+    element.draftStore = createInsecureWhoVaBrowserDefaults().draftStore;
     let savedDraft: { id: string } | undefined;
     element.addEventListener("who-va-draft-saved", (event) => {
       savedDraft = (event as CustomEvent<{ id: string }>).detail;
@@ -107,6 +125,7 @@ describe("framework-independent web embedding", () => {
   it("autosaves the latest submission data when Next is pressed", async () => {
     defineWhoVaElement("who-va-autosave-test");
     const element = document.createElement("who-va-autosave-test") as WhoVaFormElement;
+    element.draftStore = createInsecureWhoVaBrowserDefaults().draftStore;
     let savedDraft: { data: Record<string, unknown> } | undefined;
     element.addEventListener("who-va-draft-saved", (event) => {
       savedDraft = (event as CustomEvent<{ data: Record<string, unknown> }>).detail;

@@ -201,9 +201,10 @@ export function validateSubmission(
 ): SubmissionValidationResult {
   const calculated = applyCalculations(instrument, data);
   const { choiceValuesByQuestionName } = getInstrumentRuntimeIndex(instrument);
-  const normalized: SubmissionData = { ...calculated };
+  const normalized: SubmissionData = {};
   const issues: ValidationIssue[] = [];
   for (const question of instrument.questions) {
+    if (Object.hasOwn(calculated, question.name)) normalized[question.name] = calculated[question.name];
     if (!isQuestionRelevantWithCalculatedData(instrument, question, calculated)) {
       if (question.control !== "system") delete normalized[question.name];
       continue;

@@ -65,7 +65,7 @@ export class WhoVaFormElement extends HTMLElement {
 
   /**
    * Host-provided durable storage. Assign this property before connecting the
-   * element to avoid ever using the unencrypted localStorage default.
+   * element to enable draft persistence.
    */
   get draftStore(): WhoVaDraftStore | undefined {
     return this.configuredDraftStore;

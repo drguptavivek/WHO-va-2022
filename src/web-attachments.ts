@@ -5,8 +5,10 @@
 import {
   AttachmentProcessingError,
   WHO_VA_ATTACHMENT_POLICY,
+  inspectRasterImage,
   processImageAttachment,
   processInspectedImageAttachment,
+  validateImageDimensions,
   type ImageAttachmentPolicy,
   type ImageTranscoder,
   type ProcessedImageAttachment,
@@ -185,19 +187,14 @@ export function createBrowserImageTranscoder(): ImageTranscoder {
   };
 }
 
-function imageMimeTypeFromHeader(bytes: Uint8Array): "image/jpeg" | "image/png" {
-  if (bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff) return "image/jpeg";
-  const png = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
-  if (png.every((byte, index) => bytes[index] === byte)) return "image/png";
-  throw new AttachmentProcessingError("image-type-not-allowed");
-}
-
 async function processBrowserBlobImage(
   file: WebImageFile & Blob,
   options: ProcessWebImageAttachmentOptions
 ): Promise<ProcessedImageAttachment> {
-  const header = new Uint8Array(await file.slice(0, 16).arrayBuffer());
-  const mimeType = imageMimeTypeFromHeader(header);
+  const policy = options.policy ?? WHO_VA_ATTACHMENT_POLICY.image;
+  const header = new Uint8Array(await file.slice(0, Math.min(file.size, 512 * 1024)).arrayBuffer());
+  const inspected = inspectRasterImage(header, file.name);
+  validateImageDimensions(inspected, policy);
   let bitmap: ImageBitmap;
   try {
     bitmap = await globalThis.createImageBitmap(file, { imageOrientation: "from-image" });
@@ -208,7 +205,7 @@ async function processBrowserBlobImage(
     return await processInspectedImageAttachment(
       file.name,
       {
-        mimeType,
+        mimeType: inspected.mimeType,
         width: bitmap.width,
         height: bitmap.height
       },
@@ -226,7 +223,7 @@ async function processBrowserBlobImage(
         }
       },
       {
-        policy: options.policy ?? WHO_VA_ATTACHMENT_POLICY.image,
+        policy,
         ...(options.createId ? { createId: options.createId } : {})
       }
     );

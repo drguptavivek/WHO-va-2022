@@ -167,7 +167,7 @@ async function encodeInspectedImage(
   options: ProcessImageAttachmentOptions
 ): Promise<ProcessedImageAttachment> {
   const policy = options.policy ?? WHO_VA_ATTACHMENT_POLICY.image;
-  validateInputDimensions(inspected, policy);
+  validateImageDimensions(inspected, policy);
   const dimensions = targetDimensions(inspected.width, inspected.height, policy.maxOutputWidthOrHeight);
   const image: DecodableImage = { name, bytes: sourceBytes, ...inspected };
   let lastOutput: Uint8Array | undefined;
@@ -311,7 +311,7 @@ function targetDimensions(width: number, height: number, maximum: number): { wid
   };
 }
 
-function validateInputDimensions(image: InspectedRasterImage, policy: ImageAttachmentPolicy) {
+export function validateImageDimensions(image: InspectedRasterImage, policy: ImageAttachmentPolicy): void {
   if (
     image.width > policy.maxInputWidthOrHeight ||
     image.height > policy.maxInputWidthOrHeight ||

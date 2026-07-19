@@ -61,6 +61,7 @@
     "typecheck": "tsc --noEmit",
     "build": "tsup",
     "check": "pnpm lint && pnpm format:check && pnpm typecheck && pnpm test && pnpm build",
+    "check:all": "pnpm check && pnpm test:e2e",
     "prepublishOnly": "pnpm check"
   },
   "publishConfig": {

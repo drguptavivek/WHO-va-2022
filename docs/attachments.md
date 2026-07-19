@@ -18,14 +18,14 @@ SVG, GIF, HEIC, WebP, renamed executables, renamed PDFs, malformed images, zero-
 `@drguptavivek/who-2022-va/web` provides the complete browser implementation:
 
 1. The picker accepts only JPEG/PNG for images and PDF for documents.
-2. `processWebImageAttachment()` inspects the real bytes before browser decoding.
+2. `processWebImageAttachment()` reads a bounded header, verifies the real signature and dimensions, and enforces dimension limits before browser decoding.
 3. Canvas creates a new JPEG rather than preserving the selected file structure, metadata, or filename.
 4. `storeWebPdfAttachment()` checks the selected PDF size and signature, stores the original PDF, and marks the answer as `serverSideValidationRequired`.
 5. Generated image binaries and retained PDFs are stored in IndexedDB by `createIndexedDbWebAttachmentStore()`.
 6. The answer and local-storage draft contain only `who-va-attachment:` UUID references and metadata.
 7. Preview URLs are temporary `blob:` URLs and are revoked when no longer used.
 
-Browser audio recording uses the same binary store. `WHO_VA_WEB_AUDIO_POLICY` limits a recording to 30 minutes and 25 MB of encoded chunks; the recorder stops automatically at the duration ceiling and discards recordings that exceed the byte ceiling.
+Browser audio recording uses an injected binary store. `WHO_VA_WEB_AUDIO_POLICY` limits a recording to 30 minutes and 25 MB of encoded chunks; the recorder requests one-second chunks so it can stop and discard the recording as soon as the byte ceiling is exceeded.
 
 If IndexedDB, decoding, or storage fails, the control shows a realtime error and does not set an answer.
 

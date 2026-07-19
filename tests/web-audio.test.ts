@@ -22,19 +22,24 @@ function memoryStore(): WebAttachmentBinaryStore & { saved: Map<string, Blob> } 
 }
 
 class FakeMediaRecorder extends EventTarget {
+  static latest: FakeMediaRecorder | undefined;
+
   static isTypeSupported(mimeType: string): boolean {
     return mimeType === "audio/webm;codecs=opus";
   }
 
   readonly mimeType: string;
   state: RecordingState = "inactive";
+  timeslice: number | undefined;
 
   constructor(_stream: MediaStream, options?: MediaRecorderOptions) {
     super();
     this.mimeType = options?.mimeType ?? "";
+    FakeMediaRecorder.latest = this;
   }
 
-  start(): void {
+  start(timeslice?: number): void {
+    this.timeslice = timeslice;
     this.state = "recording";
   }
 
@@ -65,6 +70,7 @@ describe("web audio recording", () => {
     const answer = await recording.stop();
 
     expect(getUserMedia).toHaveBeenCalledWith({ audio: true });
+    expect(FakeMediaRecorder.latest?.timeslice).toBe(1_000);
     expect(answer).toEqual({
       id: "audio-id",
       uri: "who-va-attachment:audio-id",
