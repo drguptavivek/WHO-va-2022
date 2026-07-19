@@ -2,7 +2,7 @@
  * Factory and registry for reusable questionnaire controls, with host-injected
  * primitives and services for dates, audio, images, and files.
  */
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 
 import {
   AttachmentProcessingError,
@@ -160,6 +160,8 @@ function plainText(value: string | undefined): string {
 function localized(text: Record<string, string | undefined>, locale: string, fallback: string): string {
   return plainText(localizeText(text, locale, fallback));
 }
+
+const EMPTY_SELECTED_VALUES: readonly string[] = [];
 
 function questionLabel(question: InstrumentQuestion, locale: string): string {
   return localized(question.label, locale, question.name).replace(
@@ -482,9 +484,10 @@ export function createWhoVaQuestionControls(primitives: WhoVaQuestionControlPrim
   }
 
   function MultipleChoice({ question, value, locale, onAnswer }: WhoVaQuestionControlProps) {
-    const selectedValues = Array.isArray(value) ? value : [];
+    const selectedValues = Array.isArray(value) ? value : EMPTY_SELECTED_VALUES;
+    const selectedSet = useMemo(() => new Set(selectedValues), [selectedValues]);
     return (question.choices ?? []).map((choice) => {
-      const selected = selectedValues.includes(choice.value);
+      const selected = selectedSet.has(choice.value);
       return (
         <Pressable
           key={choice.value}

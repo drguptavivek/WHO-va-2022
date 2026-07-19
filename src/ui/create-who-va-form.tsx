@@ -18,7 +18,7 @@ import type {
 } from "../types.js";
 import { createDraftId } from "../draft.js";
 import { createWhoVaSession } from "../engine/session.js";
-import { isQuestionRelevant } from "../engine/validation.js";
+import { applyCalculations, isQuestionRelevantWithCalculatedData } from "../engine/validation.js";
 import {
   localeFromLanguageName,
   localizeText,
@@ -584,18 +584,16 @@ export function createWhoVaForm(
       if (result.completed) props.onComplete?.(session.validate());
     };
 
-    const answeredQuestions = useMemo(
-      () =>
-        view === "preview"
-          ? instrument.questions.filter(
-              (question) =>
-                !["note", "calculated", "system"].includes(question.control) &&
-                hasAnswer(snapshot.data[question.name]) &&
-                isQuestionRelevant(instrument, question, snapshot.data)
-            )
-          : [],
-      [instrument, snapshot.data, view]
-    );
+    const answeredQuestions = useMemo(() => {
+      if (view !== "preview") return [];
+      const calculated = applyCalculations(instrument, snapshot.data);
+      return instrument.questions.filter(
+        (question) =>
+          !["note", "calculated", "system"].includes(question.control) &&
+          hasAnswer(snapshot.data[question.name]) &&
+          isQuestionRelevantWithCalculatedData(instrument, question, calculated)
+      );
+    }, [instrument, snapshot.data, view]);
 
     if (view === "preview") {
       return (

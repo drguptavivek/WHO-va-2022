@@ -50,6 +50,8 @@ class UniversalWhoVaSession implements WhoVaSession {
   private data: SubmissionData;
   private currentSectionName: string;
   private issues: ValidationIssue[] = [];
+  private visibleSectionsCache:
+    { instrument: InstrumentDefinition; data: SubmissionData; sections: InstrumentSection[] } | undefined;
   private readonly listeners = new Set<(snapshot: SessionSnapshot) => void>();
   private readonly now: () => Date;
   private locale: string;
@@ -82,17 +84,17 @@ class UniversalWhoVaSession implements WhoVaSession {
   }
 
   private visibleSections(): InstrumentSection[] {
-    return this.instrument.sections
-      .filter(
-        (section) =>
-          directQuestions(this.instrument, section).length > 0 &&
-          sectionIsRelevant(this.instrument, section, this.data)
-      )
-      .sort((left, right) => {
-        const leftOrder = directQuestions(this.instrument, left)[0]?.order ?? left.order;
-        const rightOrder = directQuestions(this.instrument, right)[0]?.order ?? right.order;
-        return leftOrder - rightOrder;
-      });
+    if (
+      this.visibleSectionsCache?.instrument === this.instrument &&
+      this.visibleSectionsCache.data === this.data
+    ) {
+      return this.visibleSectionsCache.sections;
+    }
+    const sections = getInstrumentRuntimeIndex(this.instrument).sectionsWithQuestions.filter((section) =>
+      sectionIsRelevant(this.instrument, section, this.data)
+    );
+    this.visibleSectionsCache = { instrument: this.instrument, data: this.data, sections };
+    return sections;
   }
 
   private currentSection(visible = this.visibleSections()): InstrumentSection {
@@ -154,7 +156,14 @@ class UniversalWhoVaSession implements WhoVaSession {
     if (value == null || value === "" || (Array.isArray(value) && value.length === 0)) delete nextData[name];
     else nextData[name] = value;
     const calculatedNextData = applyCalculations(this.instrument, nextData);
-    const fieldIssues = validateAnswer(question, value, calculatedNextData, this.locale, this.messages);
+    const fieldIssues = validateAnswer(
+      question,
+      value,
+      calculatedNextData,
+      this.locale,
+      this.messages,
+      getInstrumentRuntimeIndex(this.instrument).choiceValuesByQuestionName.get(question.name)
+    );
     const blocking = fieldIssues.filter(blocksDraftMutation);
     if (blocking.length) throw new Error(blocking[0]?.message ?? `${name} is invalid`);
     this.data = calculatedNextData;
@@ -176,7 +185,8 @@ class UniversalWhoVaSession implements WhoVaSession {
         value,
         { ...replacement, [name]: value },
         this.locale,
-        this.messages
+        this.messages,
+        getInstrumentRuntimeIndex(this.instrument).choiceValuesByQuestionName.get(question.name)
       ).filter(blocksDraftMutation);
       if (errors.length) throw new Error(errors[0]?.message ?? `${name} is invalid`);
       replacement[name] = value;
@@ -207,7 +217,14 @@ class UniversalWhoVaSession implements WhoVaSession {
     const sections = this.visibleSections();
     const currentSection = this.currentSection(sections);
     const currentIssues = this.currentQuestions(currentSection).flatMap((question) =>
-      validateAnswer(question, this.data[question.name], this.data, this.locale, this.messages)
+      validateAnswer(
+        question,
+        this.data[question.name],
+        this.data,
+        this.locale,
+        this.messages,
+        getInstrumentRuntimeIndex(this.instrument).choiceValuesByQuestionName.get(question.name)
+      )
     );
     this.issues = currentIssues;
     if (currentIssues.length) {

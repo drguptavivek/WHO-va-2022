@@ -134,7 +134,8 @@ export function validateAnswer(
   value: AnswerValue | undefined,
   data: SubmissionData,
   locale = "en",
-  messages: WhoVaUiMessages = ENGLISH_UI_MESSAGES
+  messages: WhoVaUiMessages = ENGLISH_UI_MESSAGES,
+  allowedChoiceValues?: ReadonlySet<string>
 ): ValidationIssue[] {
   if (["note", "calculated"].includes(question.control)) return [];
   if (isEmpty(value)) {
@@ -158,7 +159,7 @@ export function validateAnswer(
     ];
   }
   if (question.choices) {
-    const allowed = new Set(question.choices.map((choice) => choice.value));
+    const allowed = allowedChoiceValues ?? new Set(question.choices.map((choice) => choice.value));
     const values = Array.isArray(value) ? value : [value];
     if (
       values.some((item) => typeof item !== "string" || !allowed.has(item)) ||
@@ -199,6 +200,7 @@ export function validateSubmission(
   messages: WhoVaUiMessages = ENGLISH_UI_MESSAGES
 ): SubmissionValidationResult {
   const calculated = applyCalculations(instrument, data);
+  const { choiceValuesByQuestionName } = getInstrumentRuntimeIndex(instrument);
   const normalized: SubmissionData = { ...calculated };
   const issues: ValidationIssue[] = [];
   for (const question of instrument.questions) {
@@ -206,7 +208,16 @@ export function validateSubmission(
       if (question.control !== "system") delete normalized[question.name];
       continue;
     }
-    issues.push(...validateAnswer(question, calculated[question.name], calculated, locale, messages));
+    issues.push(
+      ...validateAnswer(
+        question,
+        calculated[question.name],
+        calculated,
+        locale,
+        messages,
+        choiceValuesByQuestionName.get(question.name)
+      )
+    );
   }
   return { valid: issues.length === 0, data: normalized, issues };
 }

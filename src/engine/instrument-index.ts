@@ -4,7 +4,9 @@ export interface InstrumentRuntimeIndex {
   questionsByName: ReadonlyMap<string, InstrumentQuestion>;
   questionsBySection: ReadonlyMap<string, readonly InstrumentQuestion[]>;
   sectionsByName: ReadonlyMap<string, InstrumentSection>;
+  sectionsWithQuestions: readonly InstrumentSection[];
   calculatedQuestions: readonly InstrumentQuestion[];
+  choiceValuesByQuestionName: ReadonlyMap<string, ReadonlySet<string>>;
 }
 
 const runtimeIndexes = new WeakMap<InstrumentDefinition, InstrumentRuntimeIndex>();
@@ -17,6 +19,7 @@ export function getInstrumentRuntimeIndex(instrument: InstrumentDefinition): Ins
   const questionsByName = new Map<string, InstrumentQuestion>();
   const questionsBySection = new Map<string, InstrumentQuestion[]>();
   const calculatedQuestions: InstrumentQuestion[] = [];
+  const choiceValuesByQuestionName = new Map<string, ReadonlySet<string>>();
   for (const question of instrument.questions) {
     if (!questionsByName.has(question.name)) questionsByName.set(question.name, question);
     const sectionName = question.sectionPath.at(-1);
@@ -26,18 +29,30 @@ export function getInstrumentRuntimeIndex(instrument: InstrumentDefinition): Ins
       questionsBySection.set(sectionName, sectionQuestions);
     }
     if (question.calculation) calculatedQuestions.push(question);
+    if (question.choices) {
+      choiceValuesByQuestionName.set(question.name, new Set(question.choices.map((choice) => choice.value)));
+    }
   }
 
   const sectionsByName = new Map<string, InstrumentSection>();
+  const sectionsWithQuestions: InstrumentSection[] = [];
   for (const section of instrument.sections) {
     if (!sectionsByName.has(section.name)) sectionsByName.set(section.name, section);
+    if ((questionsBySection.get(section.name)?.length ?? 0) > 0) sectionsWithQuestions.push(section);
   }
+  sectionsWithQuestions.sort((left, right) => {
+    const leftOrder = questionsBySection.get(left.name)?.[0]?.order ?? left.order;
+    const rightOrder = questionsBySection.get(right.name)?.[0]?.order ?? right.order;
+    return leftOrder - rightOrder;
+  });
 
   const index: InstrumentRuntimeIndex = {
     questionsByName,
     questionsBySection,
     sectionsByName,
-    calculatedQuestions
+    sectionsWithQuestions,
+    calculatedQuestions,
+    choiceValuesByQuestionName
   };
   runtimeIndexes.set(instrument, index);
   return index;

@@ -289,10 +289,17 @@ function messagesFromTemplates(templates: WhoVaUiMessageTemplates): WhoVaUiMessa
 
 export const ENGLISH_UI_MESSAGES: WhoVaUiMessages = messagesFromTemplates(ENGLISH_UI_MESSAGE_TEMPLATES);
 
+const localeCandidateCache = new Map<string, string[]>();
+
 export function localeCandidates(locale: string): string[] {
-  const normalized = locale.trim().replaceAll("_", "-").toLowerCase();
+  const cacheKey = locale.trim().replaceAll("_", "-").toLowerCase();
+  const cached = localeCandidateCache.get(cacheKey);
+  if (cached) return cached;
+  const normalized = cacheKey;
   const language = normalized.split("-")[0] ?? "";
-  return [...new Set([normalized, language, "en"].filter(Boolean))];
+  const candidates = [...new Set([normalized, language, "en"].filter(Boolean))];
+  localeCandidateCache.set(cacheKey, candidates);
+  return candidates;
 }
 
 export function localeFromLanguageName(value: string): string | undefined {
@@ -312,7 +319,7 @@ export function localizeText(text: LocalizedText, locale: string, fallback = "")
 
 export function resolveUiMessages(locale: string, translations: WhoVaUiTranslations = {}): WhoVaUiMessages {
   let templates = { ...ENGLISH_UI_MESSAGE_TEMPLATES };
-  for (const candidate of localeCandidates(locale).reverse()) {
+  for (const candidate of [...localeCandidates(locale)].reverse()) {
     const key = Object.keys(translations).find(
       (item) => item.toLowerCase().replaceAll("_", "-") === candidate
     );
