@@ -113,7 +113,15 @@ The in-memory store above is only suitable for demos. Production apps should sav
 
 ## Demo App Builds
 
-The full demo app lives in `examples/expo-demo`.
+The full demo app lives in `examples/expo-demo`. It uses Expo Router and opens on a Home route with Start New, Continue Last, Drafts, and Completed paths so host applications can copy the basic interview lifecycle shape.
+
+Routes:
+
+- `/` shows the Home screen.
+- `/start` starts a new interview.
+- `/continue` resumes the most recent saved draft, and `/continue?draftId=...` resumes a selected draft.
+- `/drafts` lists saved local drafts.
+- `/completed` lists validated submissions completed during the demo session.
 
 ```bash
 pnpm --dir examples/expo-demo build:web
