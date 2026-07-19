@@ -64,7 +64,11 @@ Host-provided language modules are loaded on demand. Translation application str
 
 ```tsx
 import { SafeAreaView } from "react-native";
-import { WhoVaForm, type WhoVaDraftStore } from "@drguptavivek/who-2022-va/native";
+import {
+  WhoVaForm,
+  createWhoVaInitialDataFromPrefill,
+  type WhoVaDraftStore
+} from "@drguptavivek/who-2022-va/native";
 
 const draftStore: WhoVaDraftStore = {
   async save(draft) {
@@ -74,10 +78,31 @@ const draftStore: WhoVaDraftStore = {
 };
 
 export default function App() {
+  const initialData = createWhoVaInitialDataFromPrefill({
+    presets: {
+      hivAidsMortality: selectedDeath.hivAidsMortality,
+      malariaMortality: selectedDeath.malariaMortality
+    },
+    interviewer: { name: currentUser.name, id: currentUser.staffId, sex: currentUser.sex, language: "en" },
+    deceased: {
+      givenNames: selectedDeath.givenNames,
+      surname: selectedDeath.surname,
+      sex: selectedDeath.sex,
+      citizenship: selectedDeath.citizenship,
+      dateOfBirth: selectedDeath.dateOfBirth,
+      dateOfDeath: selectedDeath.dateOfDeath
+    },
+    location: {
+      state: selectedDeath.state,
+      district: selectedDeath.district
+    }
+  });
+
   return (
     <SafeAreaView style={{ flex: 1 }}>
       <WhoVaForm
-        initialData={{ Id10010c: "INT-001" }}
+        draftId={selectedDeath.id}
+        initialData={initialData}
         draftStore={draftStore}
         platform={{
           pickDate: async (_question, _data, currentValue) => {
@@ -105,7 +130,31 @@ export default function App() {
 }
 ```
 
-Date picking, audio capture, and draft storage are injected by the host so the module does not force a particular Expo SDK, database, upload service, or file lifecycle. The Save draft button and every Next/Complete press write a UUID-addressed envelope through `draftStore`. If `pickDate` is omitted on native, full-date questions remain usable as validated text inputs with alphabetic, localized months; order follows the locale (`DD-MMM-YYYY`, `MMM-DD-YYYY`, or `YYYY-MMM-DD`). Stored answers always use canonical `YYYY-MM-DD`. Web renderers use the browser's locale-aware native calendar control automatically. Date fields with the WHO `year` appearance, such as `Id10024`, use a four-digit year input rather than the full-date control.
+`initialData` accepts canonical WHO question IDs directly, and `createWhoVaInitialDataFromPrefill()` maps common host context such as a death-list record, citizenship/nationality, logged-in interviewer profile, HIV/malaria mortality presets, and state/district location. Prefilled answers remain normal editable form answers unless the WHO instrument marks that question read-only. Keep host-only identifiers, such as a local death-list UUID or RBAC assignment ID, outside the WHO answer payload; pass them as `draftId` or attach them in your server submission envelope.
+
+| Prefill data                              | WHO code                   | Label                                        | Expected shape                                                                       |
+| ----------------------------------------- | -------------------------- | -------------------------------------------- | ------------------------------------------------------------------------------------ |
+| `presets.hivAidsMortality`                | `Id10002`                  | Is this a region of high HIV/AIDS mortality? | `"high" \| "low" \| "veryl"`                                                         |
+| `presets.malariaMortality`                | `Id10003`                  | Is this a region of high malaria mortality?  | `"high" \| "low" \| "veryl"`                                                         |
+| `interviewer.name`                        | `Id10010`                  | Name of VA interviewer                       | Non-empty string                                                                     |
+| `interviewer.age`                         | `Id10010a`                 | Age of VA interviewer                        | Number, 18-89 or 99                                                                  |
+| `interviewer.sex`                         | `Id10010b`                 | Sex of VA interviewer                        | `"female" \| "male" \| "undetermined"`                                               |
+| `interviewer.id`                          | `Id10010c`                 | ID of VA interviewer                         | Non-empty string                                                                     |
+| `interviewer.language`                    | `language`                 | Interview language                           | ISO/BCP-47 language tag string, for example `"en"` or `"hi-IN"`                      |
+| `deceased.givenNames`                     | `Id10017`                  | First or given name(s) of the deceased       | Non-empty string                                                                     |
+| `deceased.surname`                        | `Id10018`                  | Surname(s) or family name(s) of the deceased | Non-empty string                                                                     |
+| `deceased.sex`                            | `Id10019`                  | Sex of the deceased                          | `"female" \| "male" \| "undetermined"`                                               |
+| `deceased.citizenship`                    | `Id10052`                  | Citizenship/nationality                      | `"citizen_at_birth" \| "naturalized_citizen" \| "foreign_national" \| "dk" \| "ref"` |
+| `deceased.dateOfBirth`                    | `Id10021`                  | When was the deceased born?                  | ISO date string, `YYYY-MM-DD`; also sets `Id10020="yes"`                             |
+| `deceased.ageInYears`                     | `age_adult`                | Adult age in years                           | Number, 12-119; also sets `Id10020="no"`, `age_group="adult"`                        |
+| `deceased.dateOfDeath`                    | `Id10023_a` or `Id10023_b` | When did (s)he die?                          | ISO date string, `YYYY-MM-DD`; also sets `Id10022="yes"`                             |
+| `deceased.yearOfDeath`                    | `Id10024`                  | Please indicate the year of death            | Four-digit year string; also sets `Id10022="no"`                                     |
+| `location.country/state/district/village` | `Id10057`                  | Where did the death occur?                   | Strings composed as `country, state, district, village`; also sets `Id10051="yes"`   |
+| `location.deathPlace`                     | `Id10057`                  | Where did the death occur?                   | Non-empty string, appended after `; ` when structured location is present            |
+
+Language dropdown options display the English language name plus the local/native name. For custom language choices, use the ISO/BCP-47 tag as the choice value and provide `label.en` plus a native label keyed by the same tag or its base language, for example `{ value: "hi-IN", label: { en: "Hindi (India)", "hi-IN": "हिन्दी" } }`.
+
+Date picking, audio capture, and draft storage are injected by the host so the module does not force a particular Expo SDK, database, upload service, or file lifecycle. The Save draft button and every Next/Complete press write a UUID-addressed envelope through `draftStore`. If `pickDate` is omitted on native, full-date questions remain usable as validated text inputs with alphabetic, localized months; order follows the locale (`DD-MMM-YYYY`, `MMM-DD-YYYY`, or `YYYY-MMM-DD`). On Android, pass `platform.pickDate` backed by `@react-native-community/datetimepicker` to open the calendar for full-date fields such as `Id10021`, `Id10023_a`, and `Id10023_b`; the Expo demo includes this adapter. Stored answers always use canonical `YYYY-MM-DD`. Web renderers use the browser's locale-aware native calendar control automatically. Date fields with the WHO `year` appearance, such as `Id10024`, use a four-digit year input rather than the full-date control.
 
 ## Reusable question controls
 
@@ -159,7 +208,10 @@ Only call cleanup with the complete set of retained drafts/answers; omitted refe
 ## Any web application
 
 ```ts
-import { defineWhoVaElement } from "@drguptavivek/who-2022-va/web-component";
+import {
+  createWhoVaInitialDataFromPrefill,
+  defineWhoVaElement
+} from "@drguptavivek/who-2022-va/web-component";
 
 defineWhoVaElement();
 ```
@@ -173,7 +225,13 @@ defineWhoVaElement();
   // Configure production storage before the element is connected.
   form.draftStore = secureDraftStore;
   form.platform = secureAttachmentAndRecordingServices;
-  form.setData(savedDraft);
+  form.setAttribute("draft-id", selectedDeath.id);
+  form.setData(
+    createWhoVaInitialDataFromPrefill({
+      interviewer: loggedInInterviewer,
+      deceased: selectedDeath
+    })
+  );
   form.addEventListener("who-va-draft-saved", (event) => console.log(event.detail.id));
   form.addEventListener("who-va-complete", (event) => submit(event.detail.data));
   document.querySelector("#who-va-form-container").append(form);

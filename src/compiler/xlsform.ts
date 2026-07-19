@@ -50,6 +50,10 @@ const RUNTIME_QUESTION_SECTION_PATHS: Record<string, string[]> = {
 // standalone runtime contract.
 const OMITTED_SOURCE_CONSTRAINTS = new Set(["Id10365"]);
 
+const RUNTIME_CHOICE_LISTS: Record<string, InstrumentChoice[]> = {
+  language: [{ value: "en", label: { en: "English" }, sourceRow: 3 }]
+};
+
 function cellText(value: ExcelJS.CellValue): string {
   if (value == null) return "";
   if (value instanceof Date) return value.toISOString();
@@ -230,7 +234,10 @@ export async function compileWhoVaWorkbook(sourceFile: string): Promise<Instrume
       sectionPath: [...(RUNTIME_QUESTION_SECTION_PATHS[row.name] ?? sectionStack)],
       ...(row.agegroup ? { ageGroup: row.agegroup } : {}),
       ...(shape.listName
-        ? { listName: shape.listName, choices: choicesByList.get(shape.listName) ?? [] }
+        ? {
+            listName: shape.listName,
+            choices: RUNTIME_CHOICE_LISTS[shape.listName] ?? choicesByList.get(shape.listName) ?? []
+          }
         : {}),
       ...(row.appearance ? { appearance: row.appearance } : {}),
       ...(row.parameters ? { parameters: row.parameters } : {}),

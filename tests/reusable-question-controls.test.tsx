@@ -95,6 +95,46 @@ describe("reusable question controls", () => {
     root.unmount();
   });
 
+  it("renders the interview language question as a searchable dropdown", async () => {
+    const onAnswer = vi.fn();
+    const languageQuestion: InstrumentQuestion = {
+      ...textQuestion,
+      name: "language",
+      sourceType: "select_one language",
+      control: "singleChoice",
+      listName: "language",
+      label: { en: "Interview language" },
+      choices: [
+        { value: "en", sourceRow: 3, label: { en: "English" } },
+        { value: "hi-IN", sourceRow: 4, label: { en: "Hindi (India)", "hi-IN": "हिन्दी" } }
+      ]
+    };
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+    root.render(
+      <WhoVaQuestionControls.SingleChoice
+        question={languageQuestion}
+        value={undefined}
+        data={{}}
+        locale="en"
+        issues={[]}
+        onAnswer={onAnswer}
+      />
+    );
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(container.querySelector<HTMLInputElement>('[data-testid="question-language"]')).not.toBeNull();
+    expect(container.querySelector('[role="radio"]')).toBeNull();
+    expect(container.querySelectorAll('[role="option"]')).toHaveLength(2);
+    expect(container.textContent).toContain("English (English)");
+    expect(container.textContent).toContain("Hindi (India) (हिन्दी)");
+
+    container.querySelector<HTMLElement>('[data-testid="question-language-choice-hi-IN"]')?.click();
+    await vi.waitFor(() => expect(onAnswer).toHaveBeenCalledWith("hi-IN"));
+    root.unmount();
+  });
+
   it("renders reusable image preview, rotate, zoom, view, camera, and library actions", async () => {
     const container = document.createElement("div");
     document.body.append(container);

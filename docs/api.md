@@ -23,11 +23,27 @@ Use the lazy loader in applications sensitive to startup parsing cost. Use the s
 ## Headless sessions
 
 ```ts
-import { createWhoVaSession, loadWhoVa2022Instrument } from "@drguptavivek/who-2022-va";
+import {
+  createWhoVaInitialDataFromPrefill,
+  createWhoVaSession,
+  loadWhoVa2022Instrument
+} from "@drguptavivek/who-2022-va";
 
 const instrument = await loadWhoVa2022Instrument();
 const session = createWhoVaSession(instrument, {
-  initialData: { Id10010c: "INT-001" },
+  initialData: createWhoVaInitialDataFromPrefill({
+    presets: { hivAidsMortality: "low", malariaMortality: "high" },
+    interviewer: { name: "Interviewer One", id: "INT-001", sex: "female", language: "en" },
+    deceased: {
+      givenNames: "Asha",
+      surname: "Rao",
+      sex: "female",
+      citizenship: "citizen_at_birth",
+      dateOfBirth: "1980-04-10",
+      dateOfDeath: "2026-07-01"
+    },
+    location: { state: "Karnataka", district: "Mysuru" }
+  }),
   locale: "en"
 });
 
@@ -36,6 +52,30 @@ const snapshot = session.getSnapshot();
 const navigation = session.next();
 const result = session.complete();
 ```
+
+`initialData` can also be supplied as raw canonical WHO question IDs. The helper maps common host data to IDs including `Id10002`/`Id10003` for HIV/AIDS and malaria mortality presets, `Id10010`/`Id10010c` for interviewer name/ID, `Id10017`/`Id10018`/`Id10019` for deceased name/sex, `Id10052` for citizenship/nationality, `Id10020`/`Id10021` for known DOB, `Id10022`/`Id10023_a`/`Id10023_b`/`Id10024` for date or year of death, and `Id10057` for a composed country/state/district/village/death-place string. These values are seeds, not locks: the interviewer can edit prefilled answers through the normal form controls unless the WHO instrument marks the question read-only. Host-only death-list identifiers are not WHO answers; keep them in `draftId`, route state, or the server submission envelope.
+
+| Prefill data                              | WHO code                   | Label                                        | Expected shape                                                                       |
+| ----------------------------------------- | -------------------------- | -------------------------------------------- | ------------------------------------------------------------------------------------ |
+| `presets.hivAidsMortality`                | `Id10002`                  | Is this a region of high HIV/AIDS mortality? | `"high" \| "low" \| "veryl"`                                                         |
+| `presets.malariaMortality`                | `Id10003`                  | Is this a region of high malaria mortality?  | `"high" \| "low" \| "veryl"`                                                         |
+| `interviewer.name`                        | `Id10010`                  | Name of VA interviewer                       | Non-empty string                                                                     |
+| `interviewer.age`                         | `Id10010a`                 | Age of VA interviewer                        | Number, 18-89 or 99                                                                  |
+| `interviewer.sex`                         | `Id10010b`                 | Sex of VA interviewer                        | `"female" \| "male" \| "undetermined"`                                               |
+| `interviewer.id`                          | `Id10010c`                 | ID of VA interviewer                         | Non-empty string                                                                     |
+| `interviewer.language`                    | `language`                 | Interview language                           | ISO/BCP-47 language tag string, for example `"en"` or `"hi-IN"`                      |
+| `deceased.givenNames`                     | `Id10017`                  | First or given name(s) of the deceased       | Non-empty string                                                                     |
+| `deceased.surname`                        | `Id10018`                  | Surname(s) or family name(s) of the deceased | Non-empty string                                                                     |
+| `deceased.sex`                            | `Id10019`                  | Sex of the deceased                          | `"female" \| "male" \| "undetermined"`                                               |
+| `deceased.citizenship`                    | `Id10052`                  | Citizenship/nationality                      | `"citizen_at_birth" \| "naturalized_citizen" \| "foreign_national" \| "dk" \| "ref"` |
+| `deceased.dateOfBirth`                    | `Id10021`                  | When was the deceased born?                  | ISO date string, `YYYY-MM-DD`; also sets `Id10020="yes"`                             |
+| `deceased.ageInYears`                     | `age_adult`                | Adult age in years                           | Number, 12-119; also sets `Id10020="no"`, `age_group="adult"`                        |
+| `deceased.dateOfDeath`                    | `Id10023_a` or `Id10023_b` | When did (s)he die?                          | ISO date string, `YYYY-MM-DD`; also sets `Id10022="yes"`                             |
+| `deceased.yearOfDeath`                    | `Id10024`                  | Please indicate the year of death            | Four-digit year string; also sets `Id10022="no"`                                     |
+| `location.country/state/district/village` | `Id10057`                  | Where did the death occur?                   | Strings composed as `country, state, district, village`; also sets `Id10051="yes"`   |
+| `location.deathPlace`                     | `Id10057`                  | Where did the death occur?                   | Non-empty string, appended after `; ` when structured location is present            |
+
+Language dropdown options display the English language name plus the local/native name. For custom language choices, use the ISO/BCP-47 tag as the choice value and provide `label.en` plus a native label keyed by the same tag or its base language, for example `{ value: "hi-IN", label: { en: "Hindi (India)", "hi-IN": "हिन्दी" } }`.
 
 The session exposes:
 
@@ -56,6 +96,7 @@ The session exposes:
 - `parseExpression(source)` converts a supported XLSForm expression to the runtime AST.
 - `evaluateExpression(expression, data, options?)` evaluates an AST or source expression against answers.
 - `applyCalculations(instrument, data)` returns data with calculated questions recomputed.
+- `createWhoVaInitialDataFromPrefill(prefill)` maps common host deceased/interviewer context to canonical initial answers.
 - `getQuestion(instrument, name)` returns a named question or throws when it is absent.
 - `isQuestionRelevant(instrument, question, data)` evaluates visibility.
 - `validateAnswer(instrument, question, value, data, ...)` validates one field.
@@ -84,6 +125,8 @@ Prefer `validateSubmission()` at server ingress even if the client already valid
 | `onComplete`                    | Receive the normalized submission result                                          |
 
 Web forms use a browser draft store by default. Native hosts should inject a `WhoVaDraftStore` suitable for their app.
+
+Native hosts should also inject `platform.pickDate` when they want full-date fields to open a calendar. On Android, the Expo demo uses `@react-native-community/datetimepicker` and `DateTimePickerAndroid.open()` for date questions including `Id10021`, `Id10023_a`, and `Id10023_b`. Without `pickDate`, native full-date fields fall back to validated text entry.
 
 The web component exposes `draftStore` and `platform` JavaScript properties. Assign a `WhoVaDraftStore` and host-controlled attachment/recording services before appending the element so production VA data does not pass through the default unencrypted browser stores.
 

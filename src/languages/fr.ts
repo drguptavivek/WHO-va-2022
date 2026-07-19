@@ -74,9 +74,7 @@ export default {
         guidance:
           "Sélectionnez la langue utilisée pour l'entretien. Les options de réponses pour ce champ sont programmables au niveau du projet. Pour obtenir des instructions sur la façon de modifier les options de réponse aux questions, veuillez vous référer au ODK for VA : Un guide rapide. Pour modifier les réponses, dans la feuille de choix de l'instrument ODK VA, aux lignes 3 à 5, il est possible de remplacer les valeurs de la colonne d'étiquette (actuellement anglais, langue 2, langue 3) par les langues utilisées dans les paramètres VA. Si moins de 3 langues sont utilisées, est-il possible de supprimer une ou plusieurs lignes, ou si plus de 3 sont utilisées, est-il possible d'ajouter une ou plusieurs lignes avec les autres langues (par exemple langue 4 Langue 4).",
         choices: {
-          "1": "Anglais",
-          "2": "Langue 2",
-          "3": "Langue 3"
+          en: "Anglais"
         }
       },
       Id10002: {

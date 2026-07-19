@@ -33,6 +33,18 @@ export type {
   WhoVaUiTranslations
 } from "./i18n.js";
 export { createDraftId, createLocalStorageDraftStore, WHO_VA_DRAFT_KEY_PREFIX } from "./draft.js";
+export { createWhoVaInitialDataFromPrefill } from "./prefill.js";
+export type {
+  WhoVaDeceasedPrefill,
+  WhoVaHostPrefill,
+  WhoVaInterviewerPrefill,
+  WhoVaCitizenship,
+  WhoVaLocationPrefill,
+  WhoVaKnownLanguage,
+  WhoVaKnownSex,
+  WhoVaMortalityLevel,
+  WhoVaPresetPrefill
+} from "./prefill.js";
 export type { WhoVaDraftController, WhoVaFormProps, WhoVaPlatformServices } from "./ui/create-who-va-form.js";
 export {
   AttachmentProcessingError,

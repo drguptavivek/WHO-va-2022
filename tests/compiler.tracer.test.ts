@@ -21,6 +21,13 @@ describe("WHO XLSForm compiler tracer", () => {
     });
   });
 
+  it("uses ISO language codes instead of source placeholder language choices", async () => {
+    const instrument = await compileWhoVaWorkbook("whova2022_xls_form_for_odk.xlsx");
+    const question = instrument.questions.find((item) => item.name === "language");
+
+    expect(question?.choices).toEqual([{ value: "en", label: { en: "English" }, sourceRow: 3 }]);
+  });
+
   it("preserves formula-backed read-only flags", async () => {
     const instrument = await compileWhoVaWorkbook("whova2022_xls_form_for_odk.xlsx");
     expect(instrument.questions.find((item) => item.name === "Id10120")?.readOnly).toBe(true);

@@ -112,6 +112,7 @@ export const questionControlStyles = {
     { borderColor: "brand", backgroundColor: "brandSoft" }
   ),
   choiceText: withWebTheme({ color: "#213b34" }, { color: "inkSubtle" }),
+  dropdownList: { marginTop: 6 },
   hint: withWebTheme({ color: "#536b64", fontSize: 13, marginBottom: 10 }, { color: "muted" }),
   actions: { flexDirection: "row" as const, flexWrap: "wrap" as const, gap: 8, marginTop: 8 },
   button: withWebTheme(
@@ -170,6 +171,13 @@ function questionLabel(question: InstrumentQuestion, locale: string): string {
     /^(\([^)]+\))\s*\[([^\]]+)\](.*)$/s,
     "$1 $2$3"
   );
+}
+
+function languageChoiceLabel(choice: NonNullable<InstrumentQuestion["choices"]>[number]): string {
+  const english = plainText(choice.label.en) || choice.value;
+  const baseLanguage = choice.value.split("-")[0] ?? choice.value;
+  const local = plainText(choice.label[choice.value] ?? choice.label[baseLanguage] ?? choice.label.en);
+  return `${english} (${local || english})`;
 }
 
 export function incompleteDateIssue(
@@ -409,7 +417,56 @@ export function createWhoVaQuestionControls(primitives: WhoVaQuestionControlPrim
     );
   }
 
-  function SingleChoice({ question, value, locale, onAnswer }: WhoVaQuestionControlProps) {
+  function SearchableSingleChoice({ question, value, locale, issues, onAnswer }: WhoVaQuestionControlProps) {
+    const selectedChoice = question.choices?.find((choice) => choice.value === value);
+    const [query, setQuery] = useState("");
+    const searchText = query.trim().toLocaleLowerCase(locale);
+    const choices = (question.choices ?? []).filter((choice) => {
+      if (!searchText) return true;
+      const label = languageChoiceLabel(choice).toLocaleLowerCase(locale);
+      return choice.value.toLocaleLowerCase(locale).includes(searchText) || label.includes(searchText);
+    });
+    return (
+      <>
+        <TextInput
+          accessibilityLabel={questionLabel(question, locale)}
+          accessibilityRole="combobox"
+          testID={`question-${question.name}`}
+          style={[questionControlStyles.input, issues.length > 0 && questionControlStyles.inputError]}
+          aria-invalid={issues.length > 0 || undefined}
+          value={query || (selectedChoice ? languageChoiceLabel(selectedChoice) : "")}
+          placeholder="Search language"
+          onChangeText={(text: string) => setQuery(text)}
+        />
+        <View style={questionControlStyles.dropdownList}>
+          {choices.map((choice) => {
+            const selected = value === choice.value;
+            return (
+              <Pressable
+                key={choice.value}
+                accessibilityRole="option"
+                accessibilityState={{ selected }}
+                testID={`question-${question.name}-choice-${choice.value}`}
+                style={[questionControlStyles.choice, selected && questionControlStyles.choiceSelected]}
+                onPress={() => {
+                  onAnswer(choice.value);
+                  setQuery("");
+                }}
+              >
+                <PrimitiveText style={questionControlStyles.choiceText}>
+                  {languageChoiceLabel(choice)}
+                </PrimitiveText>
+              </Pressable>
+            );
+          })}
+        </View>
+      </>
+    );
+  }
+
+  function SingleChoice(props: WhoVaQuestionControlProps) {
+    const { question, value, locale, onAnswer } = props;
+    if (question.name === "language") return <SearchableSingleChoice {...props} />;
     return (question.choices ?? []).map((choice) => {
       const selected = value === choice.value;
       return (

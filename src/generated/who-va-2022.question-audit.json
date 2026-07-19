@@ -77,9 +77,7 @@
       "control": "singleChoice",
       "required": true,
       "choiceValues": [
-        "1",
-        "2",
-        "3"
+        "en"
       ],
       "relevant": null,
       "constraint": null,

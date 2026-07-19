@@ -87,6 +87,7 @@ const nativeInstrument: InstrumentDefinition = {
       sourceType: "date",
       dataType: "date",
       control: "date",
+      appearance: "no-calendar",
       label: { en: "Interview date" },
       hint: {},
       guidance: {},

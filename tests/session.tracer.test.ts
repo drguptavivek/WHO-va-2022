@@ -59,7 +59,7 @@ describe("universal instrument session", () => {
     session.setAnswer("Id10010a", 35);
     session.setAnswer("Id10010b", "female");
     session.setAnswer("Id10010c", "INT-1");
-    session.setAnswer("language", "1");
+    session.setAnswer("language", "en");
 
     expect(session.next().advanced).toBe(true);
     expect(session.getSnapshot().currentSection.name).toBe("presets");

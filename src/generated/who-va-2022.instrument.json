@@ -1274,25 +1274,11 @@
       "listName": "language",
       "choices": [
         {
-          "value": "1",
+          "value": "en",
           "label": {
             "en": "English"
           },
           "sourceRow": 3
-        },
-        {
-          "value": "2",
-          "label": {
-            "en": "Language 2"
-          },
-          "sourceRow": 4
-        },
-        {
-          "value": "3",
-          "label": {
-            "en": "Language 3"
-          },
-          "sourceRow": 5
         }
       ]
     },
