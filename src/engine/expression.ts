@@ -2,7 +2,7 @@
  * Parser and evaluator for the supported XLSForm expression subset, operating
  * on the canonical submission data without a browser or ODK dependency.
  */
-import type { AnswerValue, ExpressionNode, SubmissionData } from "../types.js";
+import type { AnswerValue, ExpressionCallNode, ExpressionNode, SubmissionData } from "../types.js";
 import { formatLocalDate } from "./date.js";
 
 type TokenType =
@@ -224,9 +224,29 @@ class Parser {
       ] as const;
       if (!supported.includes(token.value as (typeof supported)[number]))
         throw new Error(`Unsupported function '${token.value}'`);
-      return { type: "call", name: token.value as (typeof supported)[number], arguments: arguments_ };
+      return callNode(token.value as (typeof supported)[number], arguments_);
     }
     throw new Error(`Unexpected token '${token.value}'`);
+  }
+}
+
+function callNode(name: ExpressionCallNode["name"], arguments_: ExpressionNode[]): ExpressionCallNode {
+  const expectedArguments = name === "selected" ? 2 : name === "if" ? 3 : name === "today" ? 0 : 1;
+  if (arguments_.length !== expectedArguments) {
+    throw new Error(`${name}() requires ${expectedArguments} arguments`);
+  }
+  switch (name) {
+    case "selected":
+      return { type: "call", name, arguments: [arguments_[0]!, arguments_[1]!] };
+    case "if":
+      return { type: "call", name, arguments: [arguments_[0]!, arguments_[1]!, arguments_[2]!] };
+    case "today":
+      return { type: "call", name, arguments: [] };
+    case "count-selected":
+    case "string-length":
+    case "int":
+    case "date":
+      return { type: "call", name, arguments: [arguments_[0]!] };
   }
 }
 

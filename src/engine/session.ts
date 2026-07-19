@@ -3,6 +3,7 @@
  * section navigation, localization, and submission validation.
  */
 import { getInstrumentRuntimeIndex } from "./instrument-index.js";
+import { compileInstrumentDefinition } from "./instrument-model.js";
 import {
   applyCalculations,
   getQuestion,
@@ -158,6 +159,12 @@ class UniversalWhoVaSession implements WhoVaSession {
     if (instrument.id !== this.instrument.id || instrument.version !== this.instrument.version) {
       throw new Error("A session language change must use the same instrument id and version");
     }
+    if (
+      compileInstrumentDefinition(instrument).semanticSignature !==
+      compileInstrumentDefinition(this.instrument).semanticSignature
+    ) {
+      throw new Error("A session language change cannot alter the instrument semantic contract");
+    }
     this.instrument = instrument;
     this.data = applyCalculations(instrument, this.data);
     this.notify();
@@ -247,18 +254,25 @@ class UniversalWhoVaSession implements WhoVaSession {
     this.issues = currentIssues;
     if (currentIssues.length) {
       this.notify();
-      return { advanced: false, issues: [...currentIssues] };
+      return {
+        status: "blocked",
+        advanced: false,
+        completed: false,
+        issues: [currentIssues[0]!, ...currentIssues.slice(1)]
+      };
     }
     const index = sections.findIndex((section) => section.name === currentSection.name);
     const next = sections[index + 1];
     if (!next) {
       const completed = this.complete();
-      return { advanced: completed.valid, completed: completed.valid, issues: completed.issues };
+      return completed.valid
+        ? { status: "completed", advanced: true, completed: true, issues: [], result: completed }
+        : { status: "blocked", advanced: false, completed: false, issues: completed.issues };
     }
     this.currentSectionName = next.name;
     this.issues = [];
     this.notify();
-    return { advanced: true, issues: [] };
+    return { status: "advanced", advanced: true, completed: false, issues: [] };
   }
 
   previous(): boolean {

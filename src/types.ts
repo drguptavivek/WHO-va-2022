@@ -47,6 +47,12 @@ export interface SourceExpression {
   ast?: ExpressionNode;
 }
 
+export type ExpressionCallNode =
+  | { type: "call"; name: "selected"; arguments: [ExpressionNode, ExpressionNode] }
+  | { type: "call"; name: "count-selected" | "string-length" | "int" | "date"; arguments: [ExpressionNode] }
+  | { type: "call"; name: "if"; arguments: [ExpressionNode, ExpressionNode, ExpressionNode] }
+  | { type: "call"; name: "today"; arguments: [] };
+
 export type ExpressionNode =
   | { type: "literal"; value: string | number | boolean | null }
   | { type: "reference"; name: string }
@@ -58,11 +64,7 @@ export type ExpressionNode =
       left: ExpressionNode;
       right: ExpressionNode;
     }
-  | {
-      type: "call";
-      name: "selected" | "count-selected" | "string-length" | "int" | "if" | "today" | "date";
-      arguments: ExpressionNode[];
-    };
+  | ExpressionCallNode;
 
 export interface InstrumentQuestion {
   name: string;
@@ -109,20 +111,83 @@ export interface InstrumentDefinition {
   questions: InstrumentQuestion[];
 }
 
-export interface AttachmentAnswer {
+export interface AttachmentReferenceBase {
   uri: string;
+  id?: string;
+  name?: string;
+  originalName?: string;
+  mimeType?: string;
+  size?: number;
+}
+
+export interface ExternalAttachmentReference extends AttachmentReferenceBase {
+  processed?: never;
+  originalRetained?: never;
+}
+
+export interface ProcessedImageAttachmentReference extends AttachmentReferenceBase {
+  id: string;
+  name: string;
+  originalName: string;
+  mimeType: "image/jpeg";
+  size: number;
+  width: number;
+  height: number;
+  processed: true;
+  durationMs?: never;
+}
+
+export interface RetainedPdfAttachmentReference extends AttachmentReferenceBase {
+  id: string;
+  name: string;
+  originalName: string;
+  mimeType: "application/pdf";
+  size: number;
+  originalRetained: true;
+  processed: false;
+  serverSideValidationRequired: true;
+}
+
+export interface AudioAttachmentReference extends AttachmentReferenceBase {
+  id: string;
+  name: string;
+  originalName: string;
+  mimeType: string;
+  size: number;
+  durationMs: number;
+  processed: true;
+  width?: never;
+  height?: never;
+}
+
+export type AttachmentReference =
+  | ExternalAttachmentReference
+  | ProcessedImageAttachmentReference
+  | RetainedPdfAttachmentReference
+  | AudioAttachmentReference;
+
+/** A platform picker result that still requires canonical processing. */
+export interface AttachmentSelection {
+  uri: string;
+  name?: string;
+  mimeType?: string;
   [key: string]: unknown;
 }
+
+export type AttachmentCandidate = AttachmentReference | AttachmentSelection;
+/** @deprecated Use AttachmentReference. */
+export type AttachmentAnswer = AttachmentReference;
 
 export interface AuditAnswer {
   startedAt: string;
   [key: string]: unknown;
 }
 
-export type AnswerValue = string | number | boolean | string[] | AttachmentAnswer | AuditAnswer | null;
+export type AnswerValue = string | number | boolean | string[] | AttachmentReference | AuditAnswer | null;
 export type SubmissionData = Record<string, AnswerValue | undefined>;
 
 export interface WhoVaDraft {
+  schemaVersion: 1;
   id: string;
   instrumentId: string;
   instrumentVersion: string;
@@ -144,11 +209,21 @@ export interface ValidationIssue {
   message: string;
 }
 
-export interface SubmissionValidationResult {
-  valid: boolean;
+export type NonEmptyArray<T> = [T, ...T[]];
+
+export interface ValidSubmissionResult {
+  valid: true;
   data: SubmissionData;
-  issues: ValidationIssue[];
+  issues: [];
 }
+
+export interface InvalidSubmissionResult {
+  valid: false;
+  data: SubmissionData;
+  issues: NonEmptyArray<ValidationIssue>;
+}
+
+export type SubmissionValidationResult = ValidSubmissionResult | InvalidSubmissionResult;
 
 export interface SessionSnapshot {
   data: SubmissionData;
@@ -161,11 +236,21 @@ export interface SessionSnapshot {
   canGoForward: boolean;
 }
 
-export interface SessionNavigationResult {
-  advanced: boolean;
-  completed?: boolean;
-  issues: ValidationIssue[];
-}
+export type SessionNavigationResult =
+  | {
+      status: "blocked";
+      advanced: false;
+      completed: false;
+      issues: NonEmptyArray<ValidationIssue>;
+    }
+  | { status: "advanced"; advanced: true; completed: false; issues: [] }
+  | {
+      status: "completed";
+      advanced: true;
+      completed: true;
+      issues: [];
+      result: ValidSubmissionResult;
+    };
 
 export interface WhoVaSessionOptions {
   initialData?: SubmissionData;

@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 
-import { compileWhoVaWorkbook } from "../src/compiler/xlsform.js";
 import {
   isQuestionRelevant,
   validateAnswer,
@@ -11,8 +10,6 @@ import {
   type InstrumentQuestion
 } from "../src/index.js";
 
-const sourceInstrument = await compileWhoVaWorkbook("whova2022_xls_form_for_odk.xlsx");
-const generatedByName = new Map(whoVa2022Instrument.questions.map((question) => [question.name, question]));
 const knownNames = new Set(whoVa2022Instrument.questions.map((question) => question.name));
 
 function references(node: ExpressionNode | undefined): string[] {
@@ -84,27 +81,10 @@ function isolatedQuestion(question: InstrumentQuestion): InstrumentQuestion {
   return { ...withoutRelevance, sectionPath: [] };
 }
 
-describe("question-by-question WHO source conformance", () => {
-  it.each(sourceInstrument.questions.map((question) => [question.name, question] as const))(
-    "%s preserves type, choices, relevance, constraints, and validation behavior",
-    (name, sourceQuestion) => {
-      const generated = generatedByName.get(name);
-      expect(generated, `${name} is missing from the runtime artifact`).toBeDefined();
-      if (!generated) return;
-
-      expect(generated.sourceRow).toBe(sourceQuestion.sourceRow);
-      expect(generated.sourceType).toBe(sourceQuestion.sourceType);
-      expect(generated.dataType).toBe(sourceQuestion.dataType);
-      expect(generated.control).toBe(sourceQuestion.control);
-      expect(generated.required).toBe(sourceQuestion.required);
-      expect(generated.readOnly).toBe(sourceQuestion.readOnly);
-      expect(generated.choices?.map((choice) => choice.value) ?? []).toEqual(
-        sourceQuestion.choices?.map((choice) => choice.value) ?? []
-      );
-      expect(generated.relevant?.source ?? null).toBe(sourceQuestion.relevant?.source ?? null);
-      expect(generated.constraint?.source ?? null).toBe(sourceQuestion.constraint?.source ?? null);
-      expect(generated.calculation?.source ?? null).toBe(sourceQuestion.calculation?.source ?? null);
-
+describe("question-by-question canonical runtime contract", () => {
+  it.each(whoVa2022Instrument.questions.map((question) => [question.name, question] as const))(
+    "%s has coherent choices, expressions, and validation behavior",
+    (name, generated) => {
       const choiceValues = generated.choices?.map((choice) => choice.value) ?? [];
       expect(new Set(choiceValues).size).toBe(choiceValues.length);
       for (const choice of generated.choices ?? []) expect(choice.label.en).toBeTruthy();

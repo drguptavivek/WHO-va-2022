@@ -17,6 +17,7 @@ This is a practical guide to the public package surface. TypeScript declarations
 - `loadWhoVa2022Instrument()` lazily imports and caches the canonical instrument.
 - `loadWhoVa2022Language(locale)` returns the built-in English source instrument. Unsupported locale requests fall back to `en`.
 - `WHO_VA_2022_LANGUAGES` lists the single built-in English choice. Use `createWhoVaLanguageLoader()` for authorized host-provided translations.
+- `compileInstrumentDefinition(instrument)` validates a custom instrument, builds its runtime indexes, verifies expression ASTs against their source, and freezes the accepted definition. Normal engine entry points call it automatically.
 
 Use the lazy loader in applications sensitive to startup parsing cost. Use the synchronous export for headless/server workflows that need immediate access.
 
@@ -50,10 +51,13 @@ const session = createWhoVaSession(instrument, {
 session.setAnswer("Id10021", "1980-04-10");
 const snapshot = session.getSnapshot();
 const navigation = session.next();
+if (navigation.status === "completed") queueForSubmission(navigation.result.data);
 const result = session.complete();
 ```
 
 `initialData` can also be supplied as raw canonical WHO question IDs. The helper maps common host data to IDs including `Id10002`/`Id10003` for HIV/AIDS and malaria mortality presets, `Id10010`/`Id10010c` for interviewer name/ID, `Id10017`/`Id10018`/`Id10019` for deceased name/sex, `Id10052` for citizenship/nationality, `Id10020`/`Id10021` for known DOB, `Id10022`/`Id10023_a`/`Id10023_b`/`Id10024` for date or year of death, and `Id10057` for a composed country/state/district/village/death-place string. These values are seeds, not locks: the interviewer can edit prefilled answers through the normal form controls unless the WHO instrument marks the question read-only. Host-only death-list identifiers are not WHO answers; keep them in `draftId`, route state, or the server submission envelope.
+
+Birth and death evidence are mutually exclusive: provide `dateOfBirth` or `ageInYears`, and provide `dateOfDeath` or `yearOfDeath`, never both. TypeScript rejects contradictory prefill objects and the runtime guard protects untyped callers.
 
 | Prefill data                              | WHO code                   | Label                                        | Expected shape                                                                       |
 | ----------------------------------------- | -------------------------- | -------------------------------------------- | ------------------------------------------------------------------------------------ |
@@ -91,6 +95,8 @@ The session exposes:
 | `validate()` / `complete()`        | Return normalized data and validation issues                                      |
 | `subscribe(listener)`              | Observe snapshots; returns an unsubscribe function                                |
 
+`next()` returns a discriminated `SessionNavigationResult`: `blocked` includes a non-empty issue list, `advanced` moves to another section, and `completed` includes the already-validated submission result. `validate()` and `complete()` likewise return a discriminated validation union, so `valid: true` guarantees an empty issue list.
+
 ## Stateless engine functions
 
 - `parseExpression(source)` converts a supported XLSForm expression to the runtime AST.
@@ -126,6 +132,8 @@ Prefer `validateSubmission()` at server ingress even if the client already valid
 
 Web and native forms are in-memory by default. Hosts must inject a `WhoVaDraftStore` to enable durable saves and platform services to enable binary capture. Web exports `createInsecureWhoVaBrowserDefaults()` only for demos and low-risk prototypes that deliberately accept plaintext `localStorage` and unencrypted IndexedDB.
 
+Form ownership is explicit. A managed form may receive `initialData`; a caller-owned `session` must also receive its matching `instrument` and cannot receive `initialData`. `setInstrument()` accepts presentation-only translations for the same instrument identity/version but rejects changes to questions, choices, rules, or hierarchy.
+
 Native hosts should also inject `platform.pickDate` when they want full-date fields to open a calendar. On Android, the Expo demo uses `@react-native-community/datetimepicker` and `DateTimePickerAndroid.open()` for date questions including `Id10021`, `Id10023_a`, and `Id10023_b`. Without `pickDate`, native full-date fields fall back to validated text entry.
 
 The web component exposes `draftStore` and `platform` JavaScript properties. Assign a `WhoVaDraftStore` and host-controlled attachment/recording services before appending the element; otherwise persistence and binary controls remain disabled.
@@ -141,8 +149,10 @@ Each receives the same core contract: `question`, `value`, `data`, `locale`, `is
 - `createDraftId()` creates a UUID draft identifier.
 - `createLocalStorageDraftStore(storage?)` creates the browser-compatible key/value adapter.
 - `WHO_VA_DRAFT_KEY_PREFIX` is the default `who-va-2022:draft:` prefix.
+- `WHO_VA_DRAFT_SCHEMA_VERSION` is the current envelope version.
+- `decodeWhoVaDraft(value)` validates host-loaded data, migrates legacy unversioned envelopes to version 1, and rejects malformed or unknown versions.
 
-A `WhoVaDraft` contains its ID, instrument ID/version, current section, timestamps, and unvalidated answer data. Draft metadata is deliberately outside the WHO submission object. Session initialization, `replaceData()`, and normalized validation output retain only question names declared by the supplied instrument; unknown host fields must remain in the host application's separate record.
+A `WhoVaDraft` contains `schemaVersion: 1`, its ID, instrument ID/version, current section, timestamps, and unvalidated answer data. Treat storage as an untrusted serialization boundary and call `decodeWhoVaDraft()` in custom stores before using decoded JSON. Draft metadata is deliberately outside the WHO submission object. Session initialization, `replaceData()`, and normalized validation output retain only question names declared by the supplied instrument; unknown host fields must remain in the host application's separate record.
 
 ## Localization
 
@@ -163,7 +173,7 @@ The native entry point adds `processNativeImageAttachment()`. The web entry poin
 - `loadWhoVaWebAttachmentBlob(reference)` loads an IndexedDB-backed attachment for streaming through `fetch` or `FormData`.
 - `cleanupWhoVaWebAttachments(references)` deletes binaries not reachable from the complete supplied set of retained drafts or answers.
 
-Attachment answer values are references, not base64 payloads. See [Attachment processing](attachments.md) before implementing storage, upload, cleanup, or a new file format.
+Attachment answer values are references, not base64 payloads. Picker methods return `AttachmentCandidate`; image processors return `ProcessedImageAttachmentReference`; retained PDFs and recordings return their corresponding reference types; lifecycle methods receive `AttachmentReference`. This prevents temporary picker values from being mistaken for canonical processed binaries. See [Attachment processing](attachments.md) before implementing storage, upload, cleanup, or a new file format.
 
 ## Web component
 
@@ -183,6 +193,7 @@ The most commonly used types are:
 
 - `InstrumentDefinition`, `InstrumentSection`, and `InstrumentQuestion`
 - `SubmissionData` and `AnswerValue`
+- `AttachmentCandidate`, `AttachmentReference`, and its processed image, retained PDF, and audio variants
 - `ValidationIssue` and `SubmissionValidationResult`
 - `WhoVaSession`, `WhoVaSessionOptions`, and `SessionSnapshot`
 - `WhoVaDraft` and `WhoVaDraftStore`

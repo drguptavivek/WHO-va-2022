@@ -15,9 +15,13 @@ import { Platform } from "react-native";
 import {
   AttachmentProcessingError,
   WHO_VA_ATTACHMENT_POLICY,
-  type AnswerValue,
+  type AttachmentCandidate,
+  type AttachmentReference,
+  type AttachmentSelection,
   type ImageAttachmentPolicy,
   type InstrumentQuestion,
+  type ProcessedImageAttachmentReference,
+  type RetainedPdfAttachmentReference,
   type SubmissionData,
   type WhoVaPlatformServices
 } from "@drguptavivek/who-2022-va";
@@ -61,7 +65,7 @@ function nameFromUri(uri: string, fallback: string): string {
   return lastSegment ? decodeURIComponent(lastSegment) : fallback;
 }
 
-function selectedImage(asset: ImagePicker.ImagePickerAsset, fallbackName: string): AnswerValue {
+function selectedImage(asset: ImagePicker.ImagePickerAsset, fallbackName: string): AttachmentSelection {
   return {
     uri: asset.uri,
     name: asset.fileName ?? nameFromUri(asset.uri, fallbackName),
@@ -88,10 +92,8 @@ async function readBytes(uri: string): Promise<Uint8Array> {
   return base64ToBytes(value);
 }
 
-function attachmentUri(value: AnswerValue): string | undefined {
-  return value && typeof value === "object" && !Array.isArray(value) && typeof value.uri === "string"
-    ? value.uri
-    : undefined;
+function attachmentUri(value: AttachmentCandidate): string {
+  return value.uri;
 }
 
 function extensionForAudioUri(uri: string | null): string {
@@ -107,7 +109,7 @@ async function persistFile(temporaryUri: string, name: string): Promise<string> 
   return durableUri;
 }
 
-async function captureImage(): Promise<AnswerValue | undefined> {
+async function captureImage(): Promise<AttachmentCandidate | undefined> {
   const permission = await ImagePicker.requestCameraPermissionsAsync();
   if (!permission.granted) return undefined;
   const result = await ImagePicker.launchCameraAsync({
@@ -120,7 +122,7 @@ async function captureImage(): Promise<AnswerValue | undefined> {
   return asset ? selectedImage(asset, "camera-image.jpg") : undefined;
 }
 
-async function selectImage(): Promise<AnswerValue | undefined> {
+async function selectImage(): Promise<AttachmentCandidate | undefined> {
   const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
   if (!permission.granted) return undefined;
   const result = await ImagePicker.launchImageLibraryAsync({
@@ -137,7 +139,7 @@ async function selectFile(
   _question: InstrumentQuestion,
   _data: SubmissionData,
   acceptedMimeTypes: string[]
-): Promise<AnswerValue | undefined> {
+): Promise<AttachmentCandidate | undefined> {
   const result = await DocumentPicker.getDocumentAsync({
     type: acceptedMimeTypes.length > 0 ? acceptedMimeTypes : "*/*",
     multiple: false,
@@ -161,16 +163,12 @@ async function selectFile(
   return selection;
 }
 
-async function processImage(selection: AnswerValue, policy: ImageAttachmentPolicy): Promise<AnswerValue> {
+async function processImage(
+  selection: AttachmentCandidate,
+  policy: ImageAttachmentPolicy
+): Promise<ProcessedImageAttachmentReference> {
   const uri = attachmentUri(selection);
-  const name =
-    selection &&
-    typeof selection === "object" &&
-    !Array.isArray(selection) &&
-    typeof selection.name === "string"
-      ? selection.name
-      : "image.jpg";
-  if (!uri) throw new Error("Selected image did not provide a URI.");
+  const name = typeof selection.name === "string" ? selection.name : "image.jpg";
   return processNativeImageAttachment(
     { uri, name },
     {
@@ -181,12 +179,12 @@ async function processImage(selection: AnswerValue, policy: ImageAttachmentPolic
       },
       read: readBytes,
       async inspect(sourceUri) {
-        if (selection && typeof selection === "object" && !Array.isArray(selection)) {
-          const width = typeof selection.width === "number" ? selection.width : undefined;
-          const height = typeof selection.height === "number" ? selection.height : undefined;
-          const mimeType = selection.mimeType === "image/png" ? "image/png" : "image/jpeg";
-          if (width && height) return { mimeType, width, height };
-        }
+        const width =
+          "width" in selection && typeof selection.width === "number" ? selection.width : undefined;
+        const height =
+          "height" in selection && typeof selection.height === "number" ? selection.height : undefined;
+        const mimeType = selection.mimeType === "image/png" ? "image/png" : "image/jpeg";
+        if (width && height) return { mimeType, width, height };
         throw new Error("Native image dimensions were unavailable.");
       },
       async encodeJpeg(sourceUri, options: ImageEncodingOptions) {
@@ -206,11 +204,8 @@ async function processImage(selection: AnswerValue, policy: ImageAttachmentPolic
   );
 }
 
-async function retainPdf(selection: AnswerValue): Promise<AnswerValue> {
+async function retainPdf(selection: AttachmentCandidate): Promise<RetainedPdfAttachmentReference> {
   const uri = attachmentUri(selection);
-  if (!uri || selection == null || Array.isArray(selection) || typeof selection !== "object") {
-    throw new AttachmentProcessingError("pdf-type-not-allowed");
-  }
   const mimeType = typeof selection.mimeType === "string" ? selection.mimeType : undefined;
   const originalName = typeof selection.name === "string" ? selection.name : nameFromUri(uri, "document.pdf");
   if (mimeType !== "application/pdf" && !originalName.toLowerCase().endsWith(".pdf")) {
@@ -287,7 +282,7 @@ export function useExpoWhoVaPlatformServices(): WhoVaPlatformServices {
           }
         };
       },
-      async removeAttachment(value: AnswerValue) {
+      async removeAttachment(value: AttachmentReference) {
         const uri = attachmentUri(value);
         if (uri?.startsWith(FileSystem.documentDirectory ?? "file://")) {
           await FileSystem.deleteAsync(uri, { idempotent: true });

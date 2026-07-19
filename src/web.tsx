@@ -20,7 +20,7 @@ import {
 import { createLocalStorageDraftStore } from "./draft.js";
 import { loadWhoVa2022Instrument } from "./instrument-loader.js";
 import { createWhoVaQuestionControls, type WhoVaPlatformServices } from "./ui/question-controls.js";
-import type { AnswerValue, WhoVaDraftStore } from "./types.js";
+import type { AttachmentCandidate, WhoVaDraftStore } from "./types.js";
 import {
   createIndexedDbWebAttachmentStore,
   cleanupOrphanedWebAttachments,
@@ -200,7 +200,7 @@ export function cleanupWhoVaWebAttachments(references: Iterable<unknown>): Promi
   return cleanupOrphanedWebAttachments(references, webAttachmentStore);
 }
 
-async function selectAndProcessWebImage(capture = false): Promise<AnswerValue | undefined> {
+async function selectAndProcessWebImage(capture = false): Promise<AttachmentCandidate | undefined> {
   const file = await selectWebFile("image/jpeg,image/png", capture);
   return file ? processWebImageAttachment(file, { store: webAttachmentStore }) : undefined;
 }

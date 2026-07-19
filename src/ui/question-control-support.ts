@@ -1,6 +1,6 @@
 import { AttachmentProcessingError } from "../attachments.js";
 import { localizeText, type WhoVaUiMessages } from "../i18n.js";
-import type { AnswerValue, InstrumentQuestion } from "../types.js";
+import type { AnswerValue, AttachmentReference, InstrumentQuestion } from "../types.js";
 import { withWebTheme } from "./web-theme.js";
 
 export const questionControlStyles = {
@@ -131,6 +131,11 @@ export function attachmentDetails(value: AnswerValue | undefined): {
 export function attachmentMimeType(value: AnswerValue | undefined): string | undefined {
   if (value == null || Array.isArray(value) || typeof value !== "object") return undefined;
   return typeof value.mimeType === "string" ? value.mimeType : undefined;
+}
+
+export function attachmentReference(value: AnswerValue | undefined): AttachmentReference | undefined {
+  if (value == null || Array.isArray(value) || typeof value !== "object") return undefined;
+  return typeof value.uri === "string" && value.uri ? (value as AttachmentReference) : undefined;
 }
 
 export function attachmentErrorMessage(error: unknown, messages: WhoVaUiMessages): string {

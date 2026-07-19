@@ -34,7 +34,7 @@ export default tseslint.config(
     languageOptions: { globals: { ...globals.browser, ...globals.node } }
   },
   {
-    files: ["src/compiler/xlsform.ts", "src/engine/expression.ts"],
+    files: ["src/engine/expression.ts"],
     rules: { complexity: ["error", 45] }
   },
   {

@@ -8,6 +8,8 @@ export {
   validateSubmission
 } from "./engine/validation.js";
 export { createWhoVaSession } from "./engine/session.js";
+export { compileInstrumentDefinition } from "./engine/instrument-model.js";
+export type { CompiledInstrumentDefinition, InstrumentRuntimeIndex } from "./engine/instrument-model.js";
 export {
   ENGLISH_UI_MESSAGES,
   ENGLISH_UI_MESSAGE_TEMPLATES,
@@ -32,7 +34,13 @@ export type {
   WhoVaUiMessageTemplates,
   WhoVaUiTranslations
 } from "./i18n.js";
-export { createDraftId, createLocalStorageDraftStore, WHO_VA_DRAFT_KEY_PREFIX } from "./draft.js";
+export {
+  WHO_VA_DRAFT_KEY_PREFIX,
+  WHO_VA_DRAFT_SCHEMA_VERSION,
+  createDraftId,
+  createLocalStorageDraftStore,
+  decodeWhoVaDraft
+} from "./draft.js";
 export { createWhoVaInitialDataFromPrefill } from "./prefill.js";
 export type {
   WhoVaDeceasedPrefill,

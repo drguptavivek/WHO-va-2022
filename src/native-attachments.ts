@@ -13,6 +13,7 @@ import {
   type InspectedRasterImage,
   type ProcessImageAttachmentOptions
 } from "./attachments.js";
+import type { ProcessedImageAttachmentReference } from "./types.js";
 
 export interface NativeAttachmentSelection {
   uri: string;
@@ -29,18 +30,7 @@ export interface NativeAttachmentFileAdapter {
   remove(uri: string): Promise<void>;
 }
 
-export interface NativeProcessedImageReference {
-  [key: string]: unknown;
-  id: string;
-  uri: string;
-  name: string;
-  originalName: string;
-  mimeType: "image/jpeg";
-  size: number;
-  width: number;
-  height: number;
-  processed: true;
-}
+export type NativeProcessedImageReference = ProcessedImageAttachmentReference;
 
 export interface ProcessNativeImageAttachmentOptions {
   policy?: ImageAttachmentPolicy;

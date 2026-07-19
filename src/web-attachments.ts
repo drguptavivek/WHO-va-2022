@@ -15,6 +15,7 @@ import {
   type RetainedPdfAttachment
 } from "./attachments.js";
 import { createDraftId } from "./draft.js";
+import type { ProcessedImageAttachmentReference } from "./types.js";
 
 const WEB_ATTACHMENT_DATABASE = "who-va-2022-attachments";
 const WEB_ATTACHMENT_OBJECT_STORE = "binary";
@@ -33,18 +34,7 @@ export interface WebAttachmentBinaryStore {
   listIds?(): Promise<string[]>;
 }
 
-export interface WebStoredAttachmentReference {
-  [key: string]: unknown;
-  id: string;
-  uri: string;
-  name: string;
-  originalName: string;
-  mimeType: "image/jpeg";
-  size: number;
-  width: number;
-  height: number;
-  processed: true;
-}
+export type WebStoredAttachmentReference = ProcessedImageAttachmentReference;
 
 export interface ProcessWebImageAttachmentOptions {
   store: WebAttachmentBinaryStore;

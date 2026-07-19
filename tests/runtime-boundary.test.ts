@@ -36,7 +36,7 @@ describe("runtime artifact boundary", () => {
     });
   });
 
-  it("builds from checked-in JSON while workbook tooling remains development-only", async () => {
+  it("builds from checked-in JSON without workbook tooling", async () => {
     const [source, nativeSource, webSource, packageSource] = await Promise.all([
       readFile("src/index.ts", "utf8"),
       readFile("src/native.tsx", "utf8"),
@@ -58,6 +58,6 @@ describe("runtime artifact boundary", () => {
     expect(packageJson.scripts?.build).not.toContain("generate");
     expect(packageJson.scripts?.check).not.toContain("generate");
     expect(packageJson.dependencies ?? {}).not.toHaveProperty("exceljs");
-    expect(packageJson.devDependencies).toHaveProperty("exceljs");
+    expect(packageJson.devDependencies ?? {}).not.toHaveProperty("exceljs");
   });
 });

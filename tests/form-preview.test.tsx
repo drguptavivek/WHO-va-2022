@@ -73,6 +73,7 @@ describe("answer preview", () => {
     document.body.append(container);
     const root = createRoot(container);
     const foreignDraft: WhoVaDraft = {
+      schemaVersion: 1,
       id: "draft-a",
       instrumentId: previewInstrument.id,
       instrumentVersion: previewInstrument.version,

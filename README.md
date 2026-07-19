@@ -4,7 +4,7 @@ An independent, React Native-first implementation of the **2022 WHO Verbal Autop
 
 This project is not affiliated with, sponsored by, or endorsed by the World Health Organization (WHO). “WHO” identifies the source instrument only. See [Licensing and attribution](#licensing-and-attribution).
 
-The runtime and package build do **not** use SurveyJS, Excel, or XLSForm generation. The WHO workbook and its `exceljs` compiler are retained only as development fixtures for source-conformance tests; they never write the canonical JSON contract.
+The runtime, package build, and test suite do **not** parse Excel or generate from XLSForm. The WHO workbook is retained only as a human-readable provenance/reference document; the checked-in JSON is the sole executable contract.
 
 ## Documentation
 
@@ -48,9 +48,9 @@ The canonical JSON remains one offline artifact, but the `/native` and `/web` fo
 
 Opening the first default form still parses the complete instrument once. The runtime does not fetch a section at a time: relevance, calculations, navigation, and final validation can refer to questions in other sections, and the instrument must continue working completely offline. This trades a single predictable parse for simpler, reliable interviews; only the current section's controls are rendered. Further section chunking should be considered only if profiling the target low-spec devices shows this deferred parse is still material.
 
-Once an instrument is used, the runtime builds shared indexes for questions by name, questions by section, sections by name, and calculated questions.
+Once an instrument is used, the runtime validates and freezes it, verifies any supplied expression AST against its source, and builds shared indexes for questions by name, questions by section, sections by name, and calculated questions. Invalid custom instruments fail at this boundary rather than producing partial runtime behavior.
 
-Indexes are cached by instrument identity in a `WeakMap`. Sessions and translated instruments can be released normally, while repeated lookups avoid scanning all 450 questions.
+Indexes and source-derived expression ASTs are cached by object identity in `WeakMap`s. Sessions and translated instruments can be released normally, while repeated lookups avoid scanning all 450 questions or reparsing expressions.
 
 Calculations run once after an answer changes and once for full submission validation. Relevance checks reuse that calculated state instead of recalculating the 38 derived fields for every question.
 
@@ -131,6 +131,8 @@ export default function App() {
 ```
 
 `initialData` accepts canonical WHO question IDs directly, and `createWhoVaInitialDataFromPrefill()` maps common host context such as a death-list record, citizenship/nationality, logged-in interviewer profile, HIV/malaria mortality presets, and state/district location. Prefilled answers remain normal editable form answers unless the WHO instrument marks that question read-only. Keep host-only identifiers, such as a local death-list UUID or RBAC assignment ID, outside the WHO answer payload; pass them as `draftId` or attach them in your server submission envelope.
+
+Prefill evidence is mutually exclusive: choose date of birth or reported age, and choose date of death or reported year. Caller-owned form sessions must be paired with their instrument and cannot also receive `initialData`; managed forms accept `initialData` and create their own session.
 
 | Prefill data                              | WHO code                   | Label                                        | Expected shape                                                                       |
 | ----------------------------------------- | -------------------------- | -------------------------------------------- | ------------------------------------------------------------------------------------ |

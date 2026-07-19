@@ -2,7 +2,8 @@
  * Canonical answer and submission validation, relevance evaluation, and
  * calculated-field normalization for the canonical instrument contract.
  */
-import { evaluateExpression, parseExpression } from "./expression.js";
+import { evaluateExpression } from "./expression.js";
+import { getCompiledExpressionAst } from "./instrument-model.js";
 import { getInstrumentRuntimeIndex } from "./instrument-index.js";
 import type {
   AnswerValue,
@@ -16,9 +17,7 @@ import type {
 import { ENGLISH_UI_MESSAGES, localizeText, type WhoVaUiMessages } from "../i18n.js";
 import { isValidIsoDate } from "../date.js";
 
-function expressionAst(expression: { source: string; ast?: ReturnType<typeof parseExpression> }) {
-  return expression.ast ?? parseExpression(expression.source);
-}
+const expressionAst = getCompiledExpressionAst;
 
 function isEmpty(value: unknown): boolean {
   return value == null || value === "" || (Array.isArray(value) && value.length === 0);
@@ -220,5 +219,7 @@ export function validateSubmission(
       )
     );
   }
-  return { valid: issues.length === 0, data: normalized, issues };
+  return issues.length
+    ? { valid: false, data: normalized, issues: [issues[0]!, ...issues.slice(1)] }
+    : { valid: true, data: normalized, issues: [] };
 }

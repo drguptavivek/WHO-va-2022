@@ -91,8 +91,9 @@ export function previewAnswer(
   if (typeof value === "boolean") return value ? messages.yes : messages.no;
   if (typeof value === "number") return String(value);
   if (value == null) return messages.recorded;
+  const attachment = value as Record<string, unknown>;
   for (const property of ["name", "originalName", "fileName", "uri"] as const) {
-    const candidate = value[property];
+    const candidate = attachment[property];
     if (typeof candidate === "string" && candidate) return candidate;
   }
   return messages.recorded;

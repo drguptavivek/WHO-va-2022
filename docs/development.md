@@ -29,7 +29,7 @@ Useful commands:
 | Command                | Purpose                                                            |
 | ---------------------- | ------------------------------------------------------------------ |
 | `pnpm typecheck`       | Check TypeScript without emitting files                            |
-| `pnpm test`            | Run Vitest unit, integration, tracer, and source-conformance tests |
+| `pnpm test`            | Run Vitest unit, integration, tracer, and canonical-contract tests |
 | `pnpm test:watch`      | Run Vitest in watch mode                                           |
 | `pnpm test:e2e`        | Run Playwright against the Vite demo                               |
 | `pnpm test:e2e:headed` | Run the browser suite visibly and sequentially                     |
@@ -61,20 +61,20 @@ Useful commands:
 | `e2e/`                            | Playwright form automation                                                          |
 | `examples/`                       | Minimal React web, Expo, and plain-web integrations                                 |
 | `demo/`                           | Local Vite preview used by developers and Playwright                                |
-| `whova2022_xls_form_for_odk.xlsx` | WHO source workbook retained as provenance and a test fixture                       |
+| `whova2022_xls_form_for_odk.xlsx` | WHO source workbook retained only as provenance/reference documentation             |
 
 ## Source-of-truth rules
 
 `src/generated/who-va-2022.instrument.json` is the authoritative executable instrument. It is checked in so builds are deterministic and offline. The runtime and package build must not read the workbook or import `exceljs`.
 
-The workbook is a provenance artifact. `src/compiler/xlsform.ts` may read it only in tests to compare the source with the canonical JSON. The compiler must not regenerate or overwrite the checked-in contract.
+The workbook is a provenance artifact for human review only. Production code, builds, and automated tests must not parse it, import an Excel library, or regenerate the checked-in contract from it.
 
 When changing the instrument:
 
 1. Edit the canonical JSON deliberately and review the diff as data.
 2. Keep stable question names and coded choice values unless the external data contract is intentionally changing.
 3. Update `who-va-2022.question-audit.json` when the human-review matrix must change with the contract.
-4. Run source-conformance tests and the question-by-question test suite.
+4. Run canonical-contract and question-by-question runtime tests.
 5. Document any intentional divergence from the retained workbook.
 
 Known deviations and gotchas are tracked in `docs/xlsform-app-audit.md`. Current intentional differences are the `nmh` runtime section path, the omitted `Id10365` constraint, the adapted `Id10382` constraint and messages, and clearer app messages for `Id10023_a`, `Id10023_b`, and `Id10382`. The current source-form constraint gotchas are `Id10260`, `Id10414`, `Id10414_a`, and `Id10414_b`: those constraints are preserved and evaluable, but their formulas refer to values outside the compiled app choice lists, so they cannot fire as constraint validation errors for valid app inputs.

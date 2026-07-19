@@ -16,7 +16,7 @@ import type {
   WhoVaDraftStore,
   WhoVaSession
 } from "../types.js";
-import { createDraftId } from "../draft.js";
+import { WHO_VA_DRAFT_SCHEMA_VERSION, createDraftId, decodeWhoVaDraft } from "../draft.js";
 import { createWhoVaSession } from "../engine/session.js";
 import { applyCalculations, isQuestionRelevantWithCalculatedData } from "../engine/validation.js";
 import { localeFromLanguageName, resolveUiMessages, type WhoVaUiTranslations } from "../i18n.js";
@@ -37,10 +37,7 @@ import {
 
 export type { WhoVaPlatformServices } from "./question-controls.js";
 
-export interface WhoVaFormProps {
-  instrument?: InstrumentDefinition;
-  session?: WhoVaSession;
-  initialData?: SubmissionData;
+interface WhoVaFormCommonProps {
   locale?: string;
   uiTranslations?: WhoVaUiTranslations;
   showSourceGuidance?: boolean;
@@ -58,6 +55,12 @@ export interface WhoVaFormProps {
   onInstrumentError?: (error: Error) => void;
   onComplete?: (result: SubmissionValidationResult) => void;
 }
+
+export type WhoVaFormProps = WhoVaFormCommonProps &
+  (
+    | { session: WhoVaSession; instrument: InstrumentDefinition; initialData?: never }
+    | { session?: never; instrument?: InstrumentDefinition; initialData?: SubmissionData }
+  );
 
 export interface WhoVaDraftController {
   draftId: string;
@@ -119,6 +122,9 @@ export function createWhoVaForm(
   });
 
   function ReadyForm(props: WhoVaFormProps & { resolvedInstrument: InstrumentDefinition }) {
+    if (props.session && props.initialData !== undefined) {
+      throw new Error("WhoVaForm cannot combine a caller-owned session with initialData");
+    }
     const { draftStore, onChange, onDraftController, onDraftError, onDraftSaved, onReady } = props;
     const instrument = props.resolvedInstrument;
     const locale = props.locale ?? localeFromLanguageName(instrument.defaultLanguage) ?? "en";
@@ -197,7 +203,8 @@ export function createWhoVaForm(
       const store = draftStore ?? primitives.draftStore;
       let active = true;
       const restore = async () => {
-        const draft = await store?.load?.(restoredNavigation.draftId);
+        const loadedDraft = await store?.load?.(restoredNavigation.draftId);
+        const draft = loadedDraft ? decodeWhoVaDraft(loadedDraft) : undefined;
         if (!active) return;
         if (draft && draft.instrumentId === instrument.id && draft.instrumentVersion === instrument.version) {
           session.replaceData(draft.data);
@@ -237,7 +244,8 @@ export function createWhoVaForm(
           }
           const store = draftStore ?? primitives.draftStore;
           void Promise.resolve(store?.load?.(state.draftId))
-            .then((draft) => {
+            .then((loadedDraft) => {
+              const draft = loadedDraft ? decodeWhoVaDraft(loadedDraft) : undefined;
               if (draft?.instrumentId === instrument.id && draft.instrumentVersion === instrument.version) {
                 session.replaceData(draft.data);
               }
@@ -272,6 +280,7 @@ export function createWhoVaForm(
       const now = new Date().toISOString();
       const current = session.getSnapshot();
       const draft: WhoVaDraft = {
+        schemaVersion: WHO_VA_DRAFT_SCHEMA_VERSION,
         id: draftId,
         instrumentId: instrument.id,
         instrumentVersion: instrument.version,
@@ -423,7 +432,7 @@ export function createWhoVaForm(
         props.onValidation?.(result.issues);
         scrollToIssue(result.issues[0]);
       }
-      if (result.completed) props.onComplete?.(session.validate());
+      if (result.status === "completed") props.onComplete?.(result.result);
     };
 
     const answeredQuestions = useMemo(() => {

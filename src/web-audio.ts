@@ -3,23 +3,13 @@
  * same binary store used by other web attachments.
  */
 import { createDraftId } from "./draft.js";
-import type { AnswerValue } from "./types.js";
+import type { AudioAttachmentReference } from "./types.js";
 import type { WebAttachmentBinaryStore } from "./web-attachments.js";
 
-export interface WebStoredAudioReference {
-  [key: string]: unknown;
-  id: string;
-  uri: string;
-  name: string;
-  originalName: string;
-  mimeType: string;
-  size: number;
-  durationMs: number;
-  processed: true;
-}
+export type WebStoredAudioReference = AudioAttachmentReference;
 
 export interface WebAudioRecordingSession {
-  stop(): Promise<AnswerValue>;
+  stop(): Promise<WebStoredAudioReference>;
   cancel(): void;
 }
 
@@ -84,9 +74,9 @@ export async function startWebAudioRecording(
   const startedAt = (options.now ?? Date.now)();
   let cancelled = false;
   let sizeError: Error | undefined;
-  let resolveCompletion!: (value: AnswerValue) => void;
+  let resolveCompletion!: (value: WebStoredAudioReference) => void;
   let rejectCompletion!: (reason: Error) => void;
-  const completion = new Promise<AnswerValue>((resolve, reject) => {
+  const completion = new Promise<WebStoredAudioReference>((resolve, reject) => {
     resolveCompletion = resolve;
     rejectCompletion = reject;
   });

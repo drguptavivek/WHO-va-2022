@@ -18,16 +18,24 @@ export interface WhoVaPresetPrefill {
   malariaMortality?: WhoVaMortalityLevel;
 }
 
-export interface WhoVaDeceasedPrefill {
+interface WhoVaDeceasedPrefillCommon {
   givenNames?: string;
   surname?: string;
   sex?: WhoVaKnownSex;
   citizenship?: WhoVaCitizenship;
-  dateOfBirth?: string;
-  ageInYears?: number;
-  dateOfDeath?: string;
-  yearOfDeath?: string;
 }
+
+type WhoVaBirthEvidence =
+  | { dateOfBirth: string; ageInYears?: never }
+  | { dateOfBirth?: never; ageInYears: number }
+  | { dateOfBirth?: undefined; ageInYears?: undefined };
+
+type WhoVaDeathEvidence =
+  | { dateOfDeath: string; yearOfDeath?: never }
+  | { dateOfDeath?: never; yearOfDeath: string }
+  | { dateOfDeath?: undefined; yearOfDeath?: undefined };
+
+export type WhoVaDeceasedPrefill = WhoVaDeceasedPrefillCommon & WhoVaBirthEvidence & WhoVaDeathEvidence;
 
 export interface WhoVaInterviewerPrefill {
   name?: string;
@@ -77,6 +85,12 @@ function addInterviewer(data: SubmissionData, interviewer: WhoVaInterviewerPrefi
 }
 
 function addDeceased(data: SubmissionData, deceased: WhoVaDeceasedPrefill | undefined): void {
+  if (deceased?.dateOfBirth && deceased.ageInYears != null) {
+    throw new Error("Provide either deceased.dateOfBirth or deceased.ageInYears, not both");
+  }
+  if (deceased?.dateOfDeath && deceased.yearOfDeath) {
+    throw new Error("Provide either deceased.dateOfDeath or deceased.yearOfDeath, not both");
+  }
   addString(data, "Id10017", deceased?.givenNames);
   addString(data, "Id10018", deceased?.surname);
   if (deceased?.sex) data.Id10019 = deceased.sex;

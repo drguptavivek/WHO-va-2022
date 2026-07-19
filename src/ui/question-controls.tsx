@@ -11,13 +11,22 @@ import {
   isRetainedPdfAttachment,
   type ImageAttachmentPolicy
 } from "../attachments.js";
-import type { AnswerValue, InstrumentQuestion, SubmissionData, ValidationIssue } from "../types.js";
+import type {
+  AnswerValue,
+  AttachmentCandidate,
+  AttachmentReference,
+  InstrumentQuestion,
+  ProcessedImageAttachmentReference,
+  SubmissionData,
+  ValidationIssue
+} from "../types.js";
 import { dateFormatPlaceholder, formatDisplayDate, parseDisplayDate } from "./date-value.js";
 import { ENGLISH_UI_MESSAGES, type WhoVaUiMessages } from "../i18n.js";
 import {
   attachmentDetails,
   attachmentErrorMessage,
   attachmentMimeType,
+  attachmentReference,
   languageChoiceLabel,
   localized,
   questionControlStyles,
@@ -27,7 +36,7 @@ import {
 export { questionControlStyles } from "./question-control-support.js";
 
 export interface WhoVaPlatformServices {
-  captureAudio?: (question: InstrumentQuestion, data: SubmissionData) => Promise<AnswerValue>;
+  captureAudio?: (question: InstrumentQuestion, data: SubmissionData) => Promise<AttachmentReference>;
   startAudioRecording?: (
     question: InstrumentQuestion,
     data: SubmissionData
@@ -37,26 +46,32 @@ export interface WhoVaPlatformServices {
     data: SubmissionData,
     currentValue?: string
   ) => Promise<string | undefined>;
-  captureImage?: (question: InstrumentQuestion, data: SubmissionData) => Promise<AnswerValue | undefined>;
-  selectImage?: (question: InstrumentQuestion, data: SubmissionData) => Promise<AnswerValue | undefined>;
+  captureImage?: (
+    question: InstrumentQuestion,
+    data: SubmissionData
+  ) => Promise<AttachmentCandidate | undefined>;
+  selectImage?: (
+    question: InstrumentQuestion,
+    data: SubmissionData
+  ) => Promise<AttachmentCandidate | undefined>;
   processImage?: (
-    selection: AnswerValue,
+    selection: AttachmentCandidate,
     policy: ImageAttachmentPolicy,
     question: InstrumentQuestion,
     data: SubmissionData
-  ) => Promise<AnswerValue>;
+  ) => Promise<ProcessedImageAttachmentReference>;
   selectFile?: (
     question: InstrumentQuestion,
     data: SubmissionData,
     acceptedMimeTypes: string[]
-  ) => Promise<AnswerValue | undefined>;
-  resolveAttachmentUri?: (attachment: AnswerValue) => Promise<string | undefined>;
+  ) => Promise<AttachmentCandidate | undefined>;
+  resolveAttachmentUri?: (attachment: AttachmentReference) => Promise<string | undefined>;
   releaseAttachmentUri?: (uri: string) => void;
-  removeAttachment?: (attachment: AnswerValue) => Promise<void>;
+  removeAttachment?: (attachment: AttachmentReference) => Promise<void>;
 }
 
 export interface WhoVaAudioRecordingSession {
-  stop(): Promise<AnswerValue>;
+  stop(): Promise<AttachmentReference>;
   cancel(): void | Promise<void>;
 }
 
@@ -400,6 +415,7 @@ export function createWhoVaQuestionControls(primitives: WhoVaQuestionControlPrim
     const [recordingError, setRecordingError] = useState<string>();
     const session = useRef<WhoVaAudioRecordingSession | undefined>(undefined);
     const services = { ...primitives.platform, ...platform };
+    const currentAttachment = attachmentReference(value);
     const disabled =
       phase === "starting" ||
       phase === "stopping" ||
@@ -438,7 +454,7 @@ export function createWhoVaQuestionControls(primitives: WhoVaQuestionControlPrim
                 setPhase("stopping");
                 const recorded = await session.current.stop();
                 session.current = undefined;
-                if (value !== undefined) await services.removeAttachment?.(value);
+                if (currentAttachment) await services.removeAttachment?.(currentAttachment);
                 onAnswer(recorded);
                 setPhase("idle");
                 return;
@@ -452,7 +468,7 @@ export function createWhoVaQuestionControls(primitives: WhoVaQuestionControlPrim
               if (!services.captureAudio) return;
               setPhase("starting");
               const recorded = await services.captureAudio(question, data);
-              if (value !== undefined) await services.removeAttachment?.(value);
+              if (currentAttachment) await services.removeAttachment?.(currentAttachment);
               onAnswer(recorded);
               setPhase("idle");
             } catch (error) {
@@ -495,13 +511,14 @@ export function createWhoVaQuestionControls(primitives: WhoVaQuestionControlPrim
     const [previewUri, setPreviewUri] = useState<string | undefined>(() => attachment.uri);
     const [processingError, setProcessingError] = useState<string>();
     const services = { ...primitives.platform, ...platform };
+    const currentAttachment = attachmentReference(value);
     const resolveAttachmentUri = services.resolveAttachmentUri;
     const releaseAttachmentUri = services.releaseAttachmentUri;
 
     useEffect(() => {
       let active = true;
       let resolvedUri: string | undefined;
-      const attachmentValue = value;
+      const attachmentValue = attachmentReference(value);
       if (!attachment.uri) {
         setPreviewUri(undefined);
         return () => {
@@ -511,7 +528,6 @@ export function createWhoVaQuestionControls(primitives: WhoVaQuestionControlPrim
       if (
         !resolveAttachmentUri ||
         attachmentValue === undefined ||
-        typeof attachmentValue === "string" ||
         !attachment.uri.startsWith("who-va-attachment:")
       ) {
         setPreviewUri(attachment.uri);
@@ -549,7 +565,7 @@ export function createWhoVaQuestionControls(primitives: WhoVaQuestionControlPrim
         if (selected !== undefined) {
           if (!isProcessedImageAttachment(selected))
             throw new AttachmentProcessingError("image-output-invalid");
-          if (value !== undefined) await services.removeAttachment?.(value);
+          if (currentAttachment) await services.removeAttachment?.(currentAttachment);
           onAnswer(selected);
           setRotation(0);
           setZoom(1);
@@ -659,7 +675,7 @@ export function createWhoVaQuestionControls(primitives: WhoVaQuestionControlPrim
                 accessibilityRole="button"
                 style={[questionControlStyles.button, questionControlStyles.buttonDanger]}
                 onPress={() => {
-                  if (value !== undefined) void services.removeAttachment?.(value);
+                  if (currentAttachment) void services.removeAttachment?.(currentAttachment);
                   onAnswer(undefined);
                 }}
               >
@@ -686,6 +702,7 @@ export function createWhoVaQuestionControls(primitives: WhoVaQuestionControlPrim
     const [processingError, setProcessingError] = useState<string>();
     const attachment = attachmentDetails(value);
     const services = { ...primitives.platform, ...platform };
+    const currentAttachment = attachmentReference(value);
     const acceptsImages = question.appearance === "image-or-pdf";
     const acceptedMimeTypes = acceptsImages
       ? [
@@ -747,7 +764,7 @@ export function createWhoVaQuestionControls(primitives: WhoVaQuestionControlPrim
                       acceptsImages ? "image-output-invalid" : "pdf-render-failed"
                     );
                   }
-                  if (value !== undefined) await services.removeAttachment?.(value);
+                  if (currentAttachment) await services.removeAttachment?.(currentAttachment);
                   onAnswer(selected);
                 }
               } catch (error) {
@@ -775,7 +792,7 @@ export function createWhoVaQuestionControls(primitives: WhoVaQuestionControlPrim
               accessibilityRole="button"
               style={[questionControlStyles.button, questionControlStyles.buttonDanger]}
               onPress={() => {
-                if (value !== undefined) void services.removeAttachment?.(value);
+                if (currentAttachment) void services.removeAttachment?.(currentAttachment);
                 onAnswer(undefined);
               }}
             >

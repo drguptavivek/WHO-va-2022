@@ -3,6 +3,7 @@
  * Browser and native adapters supply the codecs and persistence used here.
  */
 import { createDraftId } from "./draft.js";
+import type { ProcessedImageAttachmentReference, RetainedPdfAttachmentReference } from "./types.js";
 
 export interface ImageAttachmentPolicy {
   acceptedMimeTypes: readonly ["image/jpeg", "image/png"];
@@ -133,24 +134,25 @@ export interface ProcessedImageAttachment {
 export function isProcessedImageAttachment(
   value: unknown,
   policy: ImageAttachmentPolicy = WHO_VA_ATTACHMENT_POLICY.image
-): value is Record<string, unknown> & {
-  uri: string;
-  name: string;
-  mimeType: "image/jpeg";
-  size: number;
-  processed: true;
-} {
+): value is ProcessedImageAttachmentReference {
   if (value == null || Array.isArray(value) || typeof value !== "object") return false;
   const candidate = value as Record<string, unknown>;
   return (
     candidate.processed === true &&
     candidate.mimeType === "image/jpeg" &&
+    typeof candidate.id === "string" &&
+    candidate.id.length > 0 &&
     typeof candidate.uri === "string" &&
     typeof candidate.name === "string" &&
     candidate.name.toLowerCase().endsWith(".jpg") &&
+    typeof candidate.originalName === "string" &&
     typeof candidate.size === "number" &&
     candidate.size > 0 &&
-    candidate.size <= policy.maxOutputBytes
+    candidate.size <= policy.maxOutputBytes &&
+    typeof candidate.width === "number" &&
+    candidate.width > 0 &&
+    typeof candidate.height === "number" &&
+    candidate.height > 0
   );
 }
 
@@ -218,18 +220,7 @@ export function processInspectedImageAttachment(
   return encodeInspectedImage(name, inspected, transcoder, new Uint8Array(), options);
 }
 
-export interface RetainedPdfAttachment {
-  [key: string]: unknown;
-  id: string;
-  uri: string;
-  name: string;
-  originalName: string;
-  mimeType: "application/pdf";
-  size: number;
-  originalRetained: true;
-  processed: false;
-  serverSideValidationRequired: true;
-}
+export type RetainedPdfAttachment = RetainedPdfAttachmentReference;
 
 export function isRetainedPdfAttachment(
   value: unknown,
