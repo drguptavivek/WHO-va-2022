@@ -49,8 +49,16 @@ export interface WhoVaFormProps {
   onValidation?: (issues: ValidationIssue[]) => void;
   onDraftSaved?: (draft: WhoVaDraft) => void;
   onDraftError?: (error: Error) => void;
+  onDraftController?: (controller: WhoVaDraftController | undefined) => void;
+  autoSaveDraftOnChange?: boolean;
+  autoSaveDraftIntervalMs?: number | false;
   onInstrumentError?: (error: Error) => void;
   onComplete?: (result: SubmissionValidationResult) => void;
+}
+
+export interface WhoVaDraftController {
+  draftId: string;
+  saveDraft(): Promise<void>;
 }
 
 export interface WhoVaPrimitiveSet {
@@ -272,7 +280,7 @@ export function createWhoVaForm(
   });
 
   function ReadyForm(props: WhoVaFormProps & { resolvedInstrument: InstrumentDefinition }) {
-    const { draftStore, onChange, onDraftError, onReady } = props;
+    const { draftStore, onChange, onDraftController, onDraftError, onDraftSaved, onReady } = props;
     const instrument = props.resolvedInstrument;
     const locale = props.locale ?? localeFromLanguageName(instrument.defaultLanguage) ?? "en";
     const messages = resolveUiMessages(locale, props.uiTranslations);
@@ -311,9 +319,12 @@ export function createWhoVaForm(
     const [draftIssues, setDraftIssues] = useState<Record<string, ValidationIssue>>({});
     const [draftId] = useState(() => props.draftId ?? restoredNavigation?.draftId ?? createDraftId());
     const [draftStatus, setDraftStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
+    const autoSaveDraftIntervalMs = props.autoSaveDraftIntervalMs ?? 20_000;
     const draftCreatedAt = useRef(new Date().toISOString());
     const draftSaveQueue = useRef<Promise<void>>(Promise.resolve());
     const latestDraftSaveRequest = useRef(0);
+    const onDraftErrorRef = useRef(onDraftError);
+    const onDraftSavedRef = useRef(onDraftSaved);
     const scrollViewRef = useRef<unknown>(null);
     const questionRefs = useRef<Record<string, unknown>>({});
     const questionPositions = useRef<Record<string, number>>({});
@@ -326,6 +337,11 @@ export function createWhoVaForm(
         onChange?.(next.data, next);
       });
     }, [onChange, onReady, session]);
+
+    useEffect(() => {
+      onDraftErrorRef.current = onDraftError;
+      onDraftSavedRef.current = onDraftSaved;
+    }, [onDraftError, onDraftSaved]);
 
     useEffect(() => {
       session.setLocale(locale, props.uiTranslations);
@@ -407,8 +423,8 @@ export function createWhoVaForm(
       });
     }, []);
 
-    const saveDraft = async () => {
-      const store = props.draftStore ?? primitives.draftStore;
+    const saveDraft = useCallback(async () => {
+      const store = draftStore ?? primitives.draftStore;
       if (!store) return;
       const requestId = ++latestDraftSaveRequest.current;
       const now = new Date().toISOString();
@@ -427,16 +443,38 @@ export function createWhoVaForm(
         try {
           await store.save(draft);
           if (requestId === latestDraftSaveRequest.current) setDraftStatus("saved");
-          props.onDraftSaved?.(draft);
+          onDraftSavedRef.current?.(draft);
         } catch (error) {
           const resolved = error instanceof Error ? error : new Error(String(error));
           if (requestId === latestDraftSaveRequest.current) setDraftStatus("error");
-          props.onDraftError?.(resolved);
+          onDraftErrorRef.current?.(resolved);
         }
       });
       draftSaveQueue.current = save;
       await save;
-    };
+    }, [draftId, instrument.id, instrument.version, draftStore, session]);
+
+    useEffect(() => {
+      onDraftController?.({ draftId, saveDraft });
+      return () => onDraftController?.(undefined);
+    }, [draftId, onDraftController, saveDraft]);
+
+    useEffect(() => {
+      if (!props.autoSaveDraftOnChange) return;
+      if (Object.keys(snapshot.data).length === 0) return;
+      queueMicrotask(() => void saveDraft());
+    }, [props.autoSaveDraftOnChange, saveDraft, snapshot.data]);
+
+    useEffect(() => {
+      if (autoSaveDraftIntervalMs === false) return;
+      if (autoSaveDraftIntervalMs <= 0) return;
+      const timer = setInterval(() => {
+        if (Object.keys(session.getSnapshot().data).length === 0) return;
+        void saveDraft();
+      }, autoSaveDraftIntervalMs);
+
+      return () => clearInterval(timer);
+    }, [autoSaveDraftIntervalMs, saveDraft, session]);
 
     const scrollToIssue = (issue: ValidationIssue | undefined) => {
       if (!issue) return;
@@ -701,8 +739,11 @@ export function createWhoVaForm(
       let active = true;
       if (!loadDefaultInstrument) {
         const error = new Error("No instrument or default instrument loader was provided");
-        setLoadError(error);
-        onInstrumentError?.(error);
+        queueMicrotask(() => {
+          if (!active) return;
+          setLoadError(error);
+          onInstrumentError?.(error);
+        });
         return () => {
           active = false;
         };

@@ -51,6 +51,7 @@ Useful commands:
 | `src/engine/`                     | Expression parsing/evaluation, calculations, validation, indexes, and session state |
 | `src/ui/`                         | Shared form and reusable question-control factories                                 |
 | `src/generated/`                  | Checked-in canonical instrument and question audit                                  |
+| `docs/xlsform-app-audit.md`       | Group-by-group and question-by-question audit of XLSForm against app JSON           |
 | `src/languages/`                  | Lazily imported built-in language files                                             |
 | `src/attachments.ts`              | Platform-neutral attachment policy and processing contracts                         |
 | `src/web-attachments.ts`          | IndexedDB, browser image processing, and PDF.js adapters                            |
@@ -74,6 +75,8 @@ When changing the instrument:
 3. Update `who-va-2022.question-audit.json` when the human-review matrix must change with the contract.
 4. Run source-conformance tests and the question-by-question test suite.
 5. Document any intentional divergence from the retained workbook.
+
+Known deviations and gotchas are tracked in `docs/xlsform-app-audit.md`. Current intentional differences are the `nmh` runtime section path, the omitted `Id10365` constraint, the adapted `Id10382` constraint and messages, and clearer app messages for `Id10023_a`, `Id10023_b`, and `Id10382`. The current source-form constraint gotchas are `Id10260`, `Id10414`, `Id10414_a`, and `Id10414_b`: those constraints are preserved and evaluable, but their formulas refer to values outside the compiled app choice lists, so they cannot fire as constraint validation errors for valid app inputs.
 
 ## Runtime flow
 
@@ -117,6 +120,7 @@ The suites are intentionally layered:
 - Unit tests cover dates, expressions, localization, attachments, and isolated controls.
 - Tracer and integration tests cover calculations, constraints, sessions, web-component events, and runtime boundaries.
 - Parameterized tests exercise every named WHO question through field and submission validation.
+- `tests/exhaustive-runtime-expressions.test.ts` evaluates all 38 calculations and all 87 configured constraints, including explicit coverage for inert source-form constraints.
 - Source-conformance tests compare the canonical JSON with the workbook without mutating either artifact.
 - Playwright drives the rendered form, including error correction, age calculations, and navigation.
 

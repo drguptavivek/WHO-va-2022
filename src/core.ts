@@ -33,6 +33,7 @@ export type {
   WhoVaUiTranslations
 } from "./i18n.js";
 export { createDraftId, createLocalStorageDraftStore, WHO_VA_DRAFT_KEY_PREFIX } from "./draft.js";
+export type { WhoVaDraftController, WhoVaFormProps, WhoVaPlatformServices } from "./ui/create-who-va-form.js";
 export {
   AttachmentProcessingError,
   WHO_VA_ATTACHMENT_POLICY,

@@ -17,7 +17,7 @@ export {
 } from "./instrument-loader.js";
 export { processNativeImageAttachment } from "./native-attachments.js";
 export type * from "./native-attachments.js";
-export type { WhoVaFormProps, WhoVaPlatformServices } from "./ui/create-who-va-form.js";
+export type { WhoVaDraftController, WhoVaFormProps, WhoVaPlatformServices } from "./ui/create-who-va-form.js";
 
 export const WhoVaForm = createWhoVaForm(
   { View, Text, TextInput, Pressable, ScrollView, Image, Svg, SvgCircle, SvgPath },

@@ -13,6 +13,7 @@ The runtime and package build do **not** use SurveyJS, Excel, or XLSForm generat
 - [Architecture](https://github.com/drguptavivek/WHO-va-2022/blob/main/docs/architecture.md) — executable contract, runtime boundaries, shared behavior, and platform services
 - [Attachment processing](https://github.com/drguptavivek/WHO-va-2022/blob/main/docs/attachments.md) — validation policy, browser/native lifecycles, and the server boundary
 - [Examples and host app integration](https://github.com/drguptavivek/WHO-va-2022/blob/main/docs/examples.md) — React web, web component, Expo/React Native, draft storage, and demo build notes
+- [XLSForm to app audit](https://github.com/drguptavivek/WHO-va-2022/blob/main/docs/xlsform-app-audit.md) — group-by-group and question-by-question source audit, including known gotchas
 
 ## Installation
 
@@ -334,6 +335,18 @@ Canonical artifacts:
 - `src/generated/who-va-2022.question-audit.json` — human-reviewable question matrix retained alongside the contract
 
 The package build reads only the checked-in JSON. Tests may compile the retained XLSForm in memory to detect source drift and verify type, coded values, requiredness, relevance AST, constraints, calculations, field validation, and isolated submission validation. The test compiler never regenerates or modifies the JSON.
+
+### Deviations from WHO form / gotchas
+
+The canonical JSON intentionally keeps a few runtime adaptations separate from the retained XLSForm:
+
+- `nmh` is shown under `consented > injuries_accidents` so the mid-form guidance appears with the injury section instead of as a detached completion-screen item.
+- `Id10365` omits the source constraint because the upstream rule rejects a valid normal-birth-weight combination.
+- `Id10382` uses `(.>=0 and .<=98) or .=99` instead of `.>=0 and .<=99`, matching the interviewer guidance that `99` means do not know and actual `88` hours should be entered as `87`.
+- `Id10023_a`, `Id10023_b`, and `Id10382` use clearer app-supplied English constraint messages.
+- Four source constraints are retained and evaluable but inert for valid app inputs: `Id10260`, `Id10414`, `Id10414_a`, and `Id10414_b`. Their constraint formulas mention values that are not in the compiled app choice lists for those questions, so normal runtime validation cannot raise a constraint error from them.
+
+See the [XLSForm to app audit](https://github.com/drguptavivek/WHO-va-2022/blob/main/docs/xlsform-app-audit.md) and `tests/exhaustive-runtime-expressions.test.ts` for the exhaustive constraint/calculation coverage.
 
 See the [developer guide](https://github.com/drguptavivek/WHO-va-2022/blob/main/docs/development.md) for the full contributor workflow and [Architecture](https://github.com/drguptavivek/WHO-va-2022/blob/main/docs/architecture.md) for the trust boundaries and extension points.
 
