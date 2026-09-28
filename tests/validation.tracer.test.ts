@@ -1,15 +1,39 @@
 import { describe, expect, it } from "vitest";
 
+import generatedInstrument from "../src/generated/who-va-2022.instrument.json";
+
 import {
   getQuestion,
   isQuestionRelevant,
   validateAnswer,
   validateSubmission,
   whoVa2022Instrument,
-  type AnswerValue
+  type AnswerValue,
+  type InstrumentQuestion
 } from "../src/index.js";
 
+function unconstrainedInterviewerQuestion(): InstrumentQuestion {
+  const question = { ...getQuestion(whoVa2022Instrument, "Id10010"), constraintMessage: {} };
+  delete question.constraint;
+  return question;
+}
+
 describe("shared field and submission validation", () => {
+  it("exposes validation metadata on every generated WHO question", () => {
+    for (const question of generatedInstrument.questions) {
+      expect(question.validation).toBeDefined();
+      expect(question.validation).toMatchObject({
+        required: question.required,
+        dataType: question.dataType,
+        constraintMessage: question.constraintMessage
+      });
+      expect(question.validation.choiceValues ?? []).toEqual(
+        question.choices?.map((choice) => choice.value) ?? []
+      );
+      expect(question.validation.constraint?.source).toBe(question.constraint?.source);
+    }
+  });
+
   it("rejects an unlisted coded value at the field boundary", () => {
     const question = getQuestion(whoVa2022Instrument, "Id10010b");
     expect(validateAnswer(question, "unknown", {})).toEqual([
@@ -34,6 +58,36 @@ describe("shared field and submission validation", () => {
     ]);
     expect(validateAnswer(question, 18, {})).toEqual([]);
     expect(validateAnswer(question, 99, {})).toEqual([]);
+  });
+
+  it("rejects alphanumeric and special characters in the interviewer name", () => {
+    const question = getQuestion(whoVa2022Instrument, "Id10010");
+    expect(validateAnswer(question, "Anita Rao", {})).toEqual([]);
+    expect(validateAnswer(question, "Anita2", {})).toEqual([
+      expect.objectContaining({
+        question: "Id10010",
+        code: "constraint",
+        message: "Interviewer name can contain letters and spaces only"
+      })
+    ]);
+    expect(validateAnswer(question, "Anita-Rao", {})).toEqual([
+      expect.objectContaining({ question: "Id10010", code: "constraint" })
+    ]);
+  });
+
+  it("rejects alphanumeric and special characters in the respondent name", () => {
+    const question = getQuestion(whoVa2022Instrument, "Id10007");
+    expect(validateAnswer(question, "Ravi Kumar", {})).toEqual([]);
+    expect(validateAnswer(question, "Ravi2", {})).toEqual([
+      expect.objectContaining({
+        question: "Id10007",
+        code: "constraint",
+        message: "Respondent name can contain letters and spaces only"
+      })
+    ]);
+    expect(validateAnswer(question, "Ravi-Kumar", {})).toEqual([
+      expect.objectContaining({ question: "Id10007", code: "constraint" })
+    ]);
   });
 
   it("enforces the complete labour-duration coding rule for Id10382", () => {
@@ -85,10 +139,11 @@ describe("shared field and submission validation", () => {
     "rejects the malformed attachment answer %j",
     (value) => {
       const question = {
-        ...getQuestion(whoVa2022Instrument, "Id10010"),
+        ...unconstrainedInterviewerQuestion(),
         name: "attachment",
         control: "file" as const,
-        dataType: "attachment" as const
+        dataType: "attachment" as const,
+        constraintMessage: {}
       };
 
       expect(validateAnswer(question, value as AnswerValue, {})).toEqual([
@@ -99,10 +154,11 @@ describe("shared field and submission validation", () => {
 
   it("accepts an attachment object with a non-empty locator", () => {
     const question = {
-      ...getQuestion(whoVa2022Instrument, "Id10010"),
+      ...unconstrainedInterviewerQuestion(),
       name: "attachment",
       control: "file" as const,
-      dataType: "attachment" as const
+      dataType: "attachment" as const,
+      constraintMessage: {}
     };
 
     expect(validateAnswer(question, { uri: "who-va-attachment:stored-id" }, {})).toEqual([]);
@@ -112,11 +168,12 @@ describe("shared field and submission validation", () => {
     "rejects the malformed audit answer %j",
     (value) => {
       const question = {
-        ...getQuestion(whoVa2022Instrument, "Id10010"),
+        ...unconstrainedInterviewerQuestion(),
         name: "audit",
         sourceType: "audit",
         control: "system" as const,
-        dataType: "audit" as const
+        dataType: "audit" as const,
+        constraintMessage: {}
       };
 
       expect(validateAnswer(question, value as AnswerValue, {})).toEqual([
@@ -127,11 +184,12 @@ describe("shared field and submission validation", () => {
 
   it("accepts a timestamped audit record through the system-control boundary", () => {
     const question = {
-      ...getQuestion(whoVa2022Instrument, "Id10010"),
+      ...unconstrainedInterviewerQuestion(),
       name: "audit",
       sourceType: "audit",
       control: "system" as const,
-      dataType: "audit" as const
+      dataType: "audit" as const,
+      constraintMessage: {}
     };
 
     expect(validateAnswer(question, { startedAt: "2026-07-18T12:00:00.000Z" }, {})).toEqual([]);

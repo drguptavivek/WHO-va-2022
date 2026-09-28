@@ -7,9 +7,15 @@ import type { WhoVaUiTranslations } from "./i18n.js";
 export type AnswerDataType =
   | "string"
   | "number"
+  // XLSForm's `decimal`: a finite number that may have a fractional part.
+  // Kept separate from `number` so an integer question still rejects 1.5.
+  | "decimal"
   | "boolean"
   | "date"
+  | "time"
   | "dateTime"
+  // ODK geopoint: "latitude longitude altitude accuracy", space separated.
+  | "geopoint"
   | "string[]"
   | "attachment"
   | "audit"
@@ -19,9 +25,15 @@ export type AnswerDataType =
 export type QuestionControl =
   | "text"
   | "integer"
+  | "decimal"
   | "singleChoice"
   | "multipleChoice"
   | "date"
+  | "time"
+  | "datetime"
+  | "barcode"
+  | "range"
+  | "geopoint"
   | "audio"
   | "image"
   | "file"
@@ -49,6 +61,7 @@ export interface SourceExpression {
 
 export type ExpressionCallNode =
   | { type: "call"; name: "selected"; arguments: [ExpressionNode, ExpressionNode] }
+  | { type: "call"; name: "regex"; arguments: [ExpressionNode, ExpressionNode] }
   | { type: "call"; name: "count-selected" | "string-length" | "int" | "date"; arguments: [ExpressionNode] }
   | { type: "call"; name: "if"; arguments: [ExpressionNode, ExpressionNode, ExpressionNode] }
   | { type: "call"; name: "today"; arguments: [] };
@@ -65,6 +78,14 @@ export type ExpressionNode =
       right: ExpressionNode;
     }
   | ExpressionCallNode;
+
+export interface InstrumentQuestionValidation {
+  required: boolean;
+  dataType: AnswerDataType;
+  choiceValues?: string[];
+  constraint?: SourceExpression;
+  constraintMessage: LocalizedText;
+}
 
 export interface InstrumentQuestion {
   name: string;
@@ -87,6 +108,7 @@ export interface InstrumentQuestion {
   relevant?: SourceExpression;
   constraint?: SourceExpression;
   constraintMessage: LocalizedText;
+  validation?: InstrumentQuestionValidation;
   calculation?: SourceExpression;
   sectionPath: string[];
 }
@@ -101,12 +123,32 @@ export interface InstrumentSection {
   relevant?: SourceExpression;
 }
 
+/**
+ * Where an instrument came from. Recorded for audit only: `formId` and
+ * `formVersion` are whoever authored the XLSForm's to change, and they do
+ * change between revisions, so nothing may key off them.
+ */
+export interface InstrumentSource {
+  formId?: string;
+  formTitle?: string;
+  formVersion?: string;
+  file?: string;
+}
+
 export interface InstrumentDefinition {
   id: string;
   title: string;
   version: string;
+  /**
+   * The host's stable identifier for this questionnaire, independent of the
+   * authoring tool. DigitVA sets it to `mas_form_types.form_type_code` and
+   * binds field and choice mappings to it, so it must survive a form
+   * republish that changes `version`.
+   */
+  formTypeCode?: string;
   defaultLanguage: string;
   sourceFile: string;
+  source?: InstrumentSource;
   sections: InstrumentSection[];
   questions: InstrumentQuestion[];
 }
@@ -237,7 +279,9 @@ export interface SessionSnapshot {
   currentSection: InstrumentSection;
   currentSectionIndex: number;
   visibleSectionCount: number;
+  visibleSections: InstrumentSection[];
   questions: InstrumentQuestion[];
+  lockedQuestionNames: string[];
   issues: ValidationIssue[];
   canGoBack: boolean;
   canGoForward: boolean;
@@ -261,6 +305,7 @@ export type SessionNavigationResult =
 
 export interface WhoVaSessionOptions {
   initialData?: SubmissionData;
+  lockedQuestionNames?: Iterable<string>;
   initialSection?: string;
   locale?: string;
   uiTranslations?: WhoVaUiTranslations;
@@ -271,6 +316,7 @@ export interface WhoVaSessionOptions {
 export interface WhoVaSession {
   getSnapshot(): SessionSnapshot;
   setInstrument(instrument: InstrumentDefinition): void;
+  setLockedQuestionNames(names: Iterable<string>): void;
   setAnswer(name: string, value: AnswerValue | undefined): void;
   replaceData(data: SubmissionData): void;
   goToSection(name: string): boolean;
