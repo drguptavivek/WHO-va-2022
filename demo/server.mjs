@@ -1340,6 +1340,7 @@ const server = createHttpServer(async (request, response) => {
     }
 
     if (url.pathname.startsWith("/api/attachments/") && request.method === "GET") {
+      await requireAuthenticatedUser(request, url);
       const id = decodeURIComponent(url.pathname.slice("/api/attachments/".length));
       const attachment = await loadAttachment(id);
       const bytes = await readFile(attachment.storagePath);
