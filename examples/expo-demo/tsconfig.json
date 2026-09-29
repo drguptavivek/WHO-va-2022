@@ -3,5 +3,5 @@
   "compilerOptions": {
     "strict": true
   },
-  "include": ["app", "components", "expo-env.d.ts"]
+  "include": ["app", "components"]
 }

@@ -22,6 +22,31 @@ export type InstrumentTranslations = Record<string, InstrumentTranslation>;
 /** JSON-serializable UI strings. Braced names such as {label} are replaced at runtime. */
 export interface WhoVaUiMessageTemplates {
   sectionProgress: string;
+  sections: string;
+  sectionsDone: string;
+  sectionsRemaining: string;
+  decrease: string;
+  increase: string;
+  unitDays: string;
+  unitMonths: string;
+  unitYears: string;
+  unitHours: string;
+  unitMinutes: string;
+  unitWeeks: string;
+  unitGrams: string;
+  interviewer: string;
+  interviewerInstruction: string;
+  dateFormatHint: string;
+  requiredShort: string;
+  day: string;
+  month: string;
+  year: string;
+  openCalendar: string;
+  audioUnavailable: string;
+  imageUnavailable: string;
+  fileUnavailable: string;
+  moreSectionsNote: string;
+  close: string;
   back: string;
   saveDraft: string;
   saving: string;
@@ -58,6 +83,13 @@ export interface WhoVaUiMessageTemplates {
   audioRecordingFailed: string;
   selectedImage: string;
   savedImageLoadFailed: string;
+  scanBarcode: string;
+  getLocation: string;
+  updateLocation: string;
+  sign: string;
+  reSign: string;
+  draw: string;
+  redraw: string;
   openingCamera: string;
   camera: string;
   openingImages: string;
@@ -116,6 +148,31 @@ export interface WhoVaLanguageLoaderOptions {
 
 export interface WhoVaUiMessages {
   sectionProgress: (current: number, total: number) => string;
+  sections: string;
+  sectionsDone: (count: number) => string;
+  sectionsRemaining: (count: number) => string;
+  decrease: string;
+  increase: string;
+  unitDays: string;
+  unitMonths: string;
+  unitYears: string;
+  unitHours: string;
+  unitMinutes: string;
+  unitWeeks: string;
+  unitGrams: string;
+  interviewer: string;
+  interviewerInstruction: string;
+  dateFormatHint: string;
+  requiredShort: string;
+  day: string;
+  month: string;
+  year: string;
+  openCalendar: string;
+  audioUnavailable: string;
+  imageUnavailable: string;
+  fileUnavailable: string;
+  moreSectionsNote: string;
+  close: string;
   back: string;
   saveDraft: string;
   saving: string;
@@ -152,6 +209,13 @@ export interface WhoVaUiMessages {
   audioRecordingFailed: string;
   selectedImage: string;
   savedImageLoadFailed: string;
+  scanBarcode: string;
+  getLocation: string;
+  updateLocation: string;
+  sign: string;
+  reSign: string;
+  draw: string;
+  redraw: string;
   openingCamera: string;
   camera: string;
   openingImages: string;
@@ -191,14 +255,44 @@ export type WhoVaUiTranslations = Record<string, Partial<WhoVaUiMessageTemplates
 
 export const ENGLISH_UI_MESSAGE_TEMPLATES: WhoVaUiMessageTemplates = {
   sectionProgress: "Section {current} of {total}",
+  sections: "Sections",
+  sectionsDone: "{count} done",
+  sectionsRemaining: "{count} left",
+  decrease: "Decrease",
+  increase: "Increase",
+  unitDays: "days",
+  unitMonths: "months",
+  unitYears: "years",
+  unitHours: "hours",
+  unitMinutes: "minutes",
+  unitWeeks: "weeks",
+  unitGrams: "grammes",
+  interviewer: "Interviewer",
+  interviewerInstruction: "Interviewer instruction",
+  dateFormatHint: "DD-MMM-YYYY, for example 16-Jul-1986",
+  requiredShort: "This question is required.",
+  day: "Day",
+  month: "Month",
+  year: "Year",
+  openCalendar: "Open calendar",
+  audioUnavailable:
+    "Recording isn't available here yet — capture it in the ODK app or note it in the narrative.",
+  imageUnavailable:
+    "Photos can't be attached here yet — capture them in the ODK app or note them in the narrative.",
+  fileUnavailable:
+    "Files can't be attached here yet — attach them in the ODK app or note them in the narrative.",
+  moreSectionsNote: "More sections appear as you answer",
+  close: "Close",
   back: "Back",
   saveDraft: "Save draft",
   saving: "Saving…",
   next: "Next",
   complete: "Complete",
-  draftSaved: "Draft saved · {id}",
+  // The draft id is still passed in (`{id}` works in a host template) but the
+  // defaults leave it out: an interviewer has no use for an internal UUID.
+  draftSaved: "Draft saved",
   draftSaveFailed: "Draft could not be saved",
-  draftId: "Draft ID · {id}",
+  draftId: "Draft not saved yet",
   required: "{label} is required",
   invalidType: "{name} must be a valid {dataType} value",
   invalidChoice: "{name} contains a value outside its WHO choice list",
@@ -228,6 +322,13 @@ export const ENGLISH_UI_MESSAGE_TEMPLATES: WhoVaUiMessageTemplates = {
   audioRecordingFailed: "Audio recording failed. Please try again.",
   selectedImage: "Selected image",
   savedImageLoadFailed: "The saved image could not be loaded from this device.",
+  scanBarcode: "Scan",
+  getLocation: "Get location",
+  updateLocation: "Update location",
+  sign: "Sign",
+  reSign: "Re-sign",
+  draw: "Draw",
+  redraw: "Redraw",
   openingCamera: "Opening camera…",
   camera: "Camera",
   openingImages: "Opening images…",
@@ -273,6 +374,8 @@ function messagesFromTemplates(templates: WhoVaUiMessageTemplates): WhoVaUiMessa
   return {
     ...templates,
     sectionProgress: (current, total) => format(templates.sectionProgress, { current, total }),
+    sectionsDone: (count) => format(templates.sectionsDone, { count }),
+    sectionsRemaining: (count) => format(templates.sectionsRemaining, { count }),
     draftSaved: (id) => format(templates.draftSaved, { id }),
     draftId: (id) => format(templates.draftId, { id }),
     required: (label) => format(templates.required, { label }),

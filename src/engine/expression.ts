@@ -60,11 +60,16 @@ function tokenize(source: string): Token[] {
           index += 1;
           break;
         }
-        if (next === "\\" && source[index + 1]) {
-          value += source[index + 1];
-          index += 2;
-          continue;
-        }
+        // XPath 1.0 string literals have no backslash escape mechanism at
+        // all -- a backslash is an ordinary literal character. The only
+        // quote-escaping convention is the doubled-quote handling above
+        // (`''`/`""`). This matters for `regex()` patterns, which are the
+        // main source of backslashes in XLSForm expressions: ND01's
+        // social-autopsy duration constraint uses `\d`, and it must survive
+        // as `\d`, not collapse to `d`. Do not special-case `\'`/`\"` here:
+        // that reading of the backslash consumes the closing quote of a
+        // literal that ends in a backslash (e.g. `'a\' = 'x'`), running the
+        // literal into the rest of the expression.
         value += next;
         index += 1;
       }
@@ -215,6 +220,7 @@ class Parser {
       }
       const supported = [
         "selected",
+        "regex",
         "count-selected",
         "string-length",
         "int",
@@ -231,12 +237,14 @@ class Parser {
 }
 
 function callNode(name: ExpressionCallNode["name"], arguments_: ExpressionNode[]): ExpressionCallNode {
-  const expectedArguments = name === "selected" ? 2 : name === "if" ? 3 : name === "today" ? 0 : 1;
+  const expectedArguments =
+    name === "selected" || name === "regex" ? 2 : name === "if" ? 3 : name === "today" ? 0 : 1;
   if (arguments_.length !== expectedArguments) {
     throw new Error(`${name}() requires ${expectedArguments} arguments`);
   }
   switch (name) {
     case "selected":
+    case "regex":
       return { type: "call", name, arguments: [arguments_[0]!, arguments_[1]!] };
     case "if":
       return { type: "call", name, arguments: [arguments_[0]!, arguments_[1]!, arguments_[2]!] };
@@ -365,6 +373,11 @@ export function evaluateExpression(
           const [value, wanted] = arguments_;
           if (Array.isArray(value)) return value.some((item) => equal(item, wanted));
           return equal(value, wanted);
+        }
+        case "regex": {
+          const [value, pattern] = arguments_;
+          if (isEmpty(value)) return false;
+          return new RegExp(String(pattern)).test(String(value));
         }
         case "count-selected": {
           const value = arguments_[0];

@@ -8,11 +8,20 @@ import {
   type WhoVaFormElement
 } from "../src/web-component.js";
 import type { WhoVaPlatformServices } from "../src/web.js";
+import { whoVa2022Instrument } from "../src/instrument.js";
 
 afterEach(() => {
   document.body.replaceChildren();
   localStorage.clear();
 });
+
+// The element only knows it is safe to overwrite a draft once its mount-time
+// restore has settled (digitva-ybz); tests that save or autosave wait for
+// who-va-ready rather than a fixed tick, or a click against the still-loading
+// Save-draft button (disabled until then) would silently do nothing.
+function waitForReady(element: WhoVaFormElement): Promise<void> {
+  return new Promise((resolve) => element.addEventListener("who-va-ready", () => resolve(), { once: true }));
+}
 
 describe("framework-independent web embedding", () => {
   it("does not enable plaintext browser persistence by default", async () => {
@@ -36,8 +45,15 @@ describe("framework-independent web embedding", () => {
 
     expect(element.getData().Id10011).toEqual(expect.any(String));
     expect(element.textContent).not.toContain("Once filled in ODK Collect");
-    expect(element.textContent).toContain("(Id10010) Name of VA interviewer");
-    expect(element.textContent).not.toContain("(Id10010) [Name of VA interviewer]");
+    // The WHO code is a chip beside the label, not the label's first word.
+    expect(element.querySelector('[data-testid="question-code-Id10010"]')?.textContent).toBe("Id10010");
+    expect(element.textContent).toContain("Name of VA interviewer");
+    expect(element.textContent).not.toContain("(Id10010)");
+    element.setAttribute("hide-question-codes", "");
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(element.querySelector('[data-testid="question-code-Id10010"]')).toBeNull();
+    element.removeAttribute("hide-question-codes");
+    await new Promise((resolve) => setTimeout(resolve, 0));
     element.setData({ Id10010b: "female" });
     expect(element.getData().Id10010b).toBe("female");
     expect(element.validate().valid).toBe(false);
@@ -75,8 +91,9 @@ describe("framework-independent web embedding", () => {
     element.addEventListener("who-va-draft-saved", (event) => {
       savedDraft = (event as CustomEvent<{ id: string }>).detail;
     });
+    const ready = waitForReady(element);
     document.body.append(element);
-    await new Promise((resolve) => setTimeout(resolve, 0));
+    await ready;
 
     const saveDraft = [...element.querySelectorAll('[role="button"]')].find(
       (button) => button.getAttribute("aria-label") === "Save draft"
@@ -96,8 +113,9 @@ describe("framework-independent web embedding", () => {
     const element = document.createElement("who-va-secure-draft-test") as WhoVaFormElement;
     const save = vi.fn();
     element.draftStore = { save };
+    const ready = waitForReady(element);
     document.body.append(element);
-    await new Promise((resolve) => setTimeout(resolve, 0));
+    await ready;
 
     const saveDraft = [...element.querySelectorAll('[role="button"]')].find(
       (button) => button.getAttribute("aria-label") === "Save draft"
@@ -130,8 +148,9 @@ describe("framework-independent web embedding", () => {
     element.addEventListener("who-va-draft-saved", (event) => {
       savedDraft = (event as CustomEvent<{ data: Record<string, unknown> }>).detail;
     });
+    const ready = waitForReady(element);
     document.body.append(element);
-    await new Promise((resolve) => setTimeout(resolve, 0));
+    await ready;
     element.setData({ Id10010: "Autosaved interviewer" });
 
     const next = [...element.querySelectorAll('[role="button"]')].find(
@@ -140,5 +159,57 @@ describe("framework-independent web embedding", () => {
     next?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
 
     await vi.waitFor(() => expect(savedDraft?.data.Id10010).toBe("Autosaved interviewer"));
+  });
+});
+
+describe("section stepper", () => {
+  it("lists every visible section, notes that more will appear, and opens no drawer when wide", async () => {
+    defineWhoVaElement("who-va-stepper-test");
+    const element = document.createElement("who-va-stepper-test") as WhoVaFormElement;
+    document.body.append(element);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    // jsdom reports no layout, so the form takes its wide layout: a rail, no drawer toggle.
+    expect(element.querySelector('[data-testid="section-rail"]')).not.toBeNull();
+    expect(element.querySelector('[data-testid="section-drawer-toggle"]')).toBeNull();
+    const items = element.querySelectorAll('[data-testid="section-slider-item"]');
+    expect(items).toHaveLength(3);
+    expect(items[0]?.getAttribute("aria-label")).toBe("1. VA interviewer");
+    expect(element.textContent).toContain("More sections appear as you answer");
+    element.setData({
+      Id10013: "yes",
+      Id10019: "male",
+      Id10020: "yes",
+      Id10021: "1980-01-01",
+      Id10022: "yes",
+      Id10023_a: "2026-07-17"
+    });
+    await vi.waitFor(() =>
+      expect(element.querySelectorAll('[data-testid="section-slider-item"]').length).toBeGreaterThan(10)
+    );
+    expect(element.textContent).not.toContain("More sections appear as you answer");
+    element.remove();
+  });
+});
+
+describe("host-supplied instrument after connect", () => {
+  it("binds the form to the new session so setData reaches what is shown", async () => {
+    defineWhoVaElement("who-va-swap-test");
+    const element = document.createElement("who-va-swap-test") as WhoVaFormElement;
+    document.body.append(element);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    element.instrument = { ...whoVa2022Instrument };
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    element.setData({
+      Id10013: "yes",
+      Id10019: "male",
+      Id10020: "yes",
+      Id10021: "1980-01-01",
+      Id10022: "yes",
+      Id10023_a: "2026-07-17"
+    });
+    await vi.waitFor(() =>
+      expect(element.querySelectorAll('[data-testid="section-slider-item"]').length).toBeGreaterThan(10)
+    );
+    element.remove();
   });
 });
